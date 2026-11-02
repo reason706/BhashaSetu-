@@ -178,12 +178,39 @@ class SpeechService {
     return !!this.synth;
   }
 
+  public playCelebrationChime(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.09);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime + idx * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.09 + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.09);
+        osc.stop(ctx.currentTime + idx * 0.09 + 0.3);
+      });
+    } catch {
+      // Ignore if AudioContext is blocked
+    }
+  }
+
   public speak(
     text: string,
     options?: {
       rate?: number;
       pitch?: number;
       speakerIndex?: 0 | 1;
+      useDialogueCalibrationRate?: boolean;
       onStart?: () => void;
       onEnd?: () => void;
     }
@@ -203,7 +230,10 @@ class SpeechService {
     }
     utterance.lang = voice?.lang || 'en-US';
 
-    const baseRate = options?.rate ?? 0.95;
+    const baseRate = options?.useDialogueCalibrationRate
+      ? calibration.dialogueRate
+      : options?.rate ?? calibration.dialogueRate ?? 0.95;
+
     if (options?.speakerIndex === 0) {
       utterance.rate = Math.max(0.45, Math.min(1.3, baseRate));
       utterance.pitch = options?.pitch ?? calibration.speakerAPitch;
@@ -212,7 +242,7 @@ class SpeechService {
       utterance.pitch = options?.pitch ?? calibration.speakerBPitch;
     } else {
       utterance.rate = Math.max(0.45, Math.min(1.3, baseRate));
-      utterance.pitch = options?.pitch ?? 1.0;
+      utterance.pitch = options?.pitch ?? calibration.speakerAPitch ?? 1.0;
     }
 
     utterance.onstart = () => {

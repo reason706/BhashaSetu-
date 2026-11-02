@@ -56,6 +56,8 @@ interface LecturePlayerProps {
   lecture: LectureUnit;
   allLectures?: LectureUnit[];
   savedWordIds: string[];
+  masteredWordIds?: string[];
+  lectureNote?: string;
   completedUnitIds?: string[];
   completedSteps?: number[];
   mistakeNotebook?: MistakeItem[];
@@ -64,6 +66,8 @@ interface LecturePlayerProps {
   isCompleted: boolean;
   initialStep?: ModuleStep;
   onToggleSaveWord: (wordId: string) => void;
+  onToggleMasteredWord?: (wordId: string) => void;
+  onUpdateLectureNote?: (lectureId: string, note: string) => void;
   onCompleteLecture: (scoreRecord: ModuleScoreRecord) => void;
   onCompleteStep?: (lectureId: string, stepIndex: number) => void;
   onSelectLecture?: (lectureId: string, step?: ModuleStep) => void;
@@ -136,6 +140,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   lecture,
   allLectures = CORE_SYLLABUS,
   savedWordIds,
+  masteredWordIds = [],
+  lectureNote = '',
   completedUnitIds = [],
   completedSteps = [],
   mistakeNotebook = [],
@@ -144,6 +150,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   isCompleted,
   initialStep = 0,
   onToggleSaveWord,
+  onToggleMasteredWord,
+  onUpdateLectureNote,
   onCompleteLecture,
   onCompleteStep,
   onSelectLecture,
@@ -169,8 +177,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   const [selfTestMaskWords, setSelfTestMaskWords] = useState(false);
   const [unmaskedWordIds, setUnmaskedWordIds] = useState<Record<string, boolean>>({});
 
-  // Responsive Top Bar 3-Dot Menu, Mistake Notes Drawer & Printable Cheat Sheet state
+  // Responsive Top Bar 3-Dot Menu, Personal Scratchpad Drawer, Mistake Notes Drawer & Printable Cheat Sheet state
   const [showMobileOverflowMenu, setShowMobileOverflowMenu] = useState(false);
+  const [showScratchpadDrawer, setShowScratchpadDrawer] = useState(false);
+  const [scratchpadDraft, setScratchpadDraft] = useState(lectureNote);
+  const [scratchpadSavedAt, setScratchpadSavedAt] = useState<string | null>(null);
   const [showMistakeNotesDrawer, setShowMistakeNotesDrawer] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
 
@@ -247,7 +258,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     setSelfTestMaskWords(false);
     setUnmaskedWordIds({});
     setShowMobileOverflowMenu(false);
-  }, [lecture.id, initialStep]);
+    setScratchpadDraft(lectureNote || '');
+  }, [lecture.id, initialStep, lectureNote]);
 
   const lectureMistakes = useMemo(
     () => mistakeNotebook.filter((m) => m.lectureId === lecture.id),
@@ -473,16 +485,36 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       const speakerIdx = (idx % 2) as 0 | 1;
       setActiveDialogueLineIdx(idx);
 
-      // In Role-Play mode, pause briefly on the learner's own character turn so they can read it aloud
+      // In Role-Play Shadowing mode (Listen -> Record -> Compare), automatically trigger microphone recording on the learner's own character turn!
       const isUserRoleTurn =
         (rolePlaySpeaker === 'A' && speakerIdx === 0) ||
         (rolePlaySpeaker === 'B' && speakerIdx === 1);
 
       if (isUserRoleTurn) {
-        window.setTimeout(() => {
-          idx += 1;
-          playNext();
-        }, 2800);
+        if (speechService.isRecognitionSupported()) {
+          const lineIndexForTurn = idx;
+          speechService
+            .evaluatePronunciation(line.english, (listening) => {
+              setListeningDialogueLineIdx(listening ? lineIndexForTurn : null);
+            })
+            .then((result) => {
+              setDialogueMicResults((prev) => ({ ...prev, [lineIndexForTurn]: result }));
+            })
+            .catch(() => {
+              setListeningDialogueLineIdx(null);
+            })
+            .finally(() => {
+              window.setTimeout(() => {
+                idx += 1;
+                playNext();
+              }, 600);
+            });
+        } else {
+          window.setTimeout(() => {
+            idx += 1;
+            playNext();
+          }, 2800);
+        }
         return;
       }
 
@@ -1068,6 +1100,18 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               )}
             </div>
           </div>
+
+          {/* Section 4: Personal Lecture Notes Scratchpad (Printed on Study Sheet) */}
+          {scratchpadDraft.trim() && (
+            <div className="p-5 rounded-xl bg-[#FAF7F2] border border-[#E7E0D6] space-y-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C]">
+                4. My Personal Nepali-English Lecture Notes
+              </div>
+              <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-nepali text-[#1C1917]">
+                {scratchpadDraft}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1200,8 +1244,21 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   </span>
                 </div>
 
-                {/* Desktop (>= lg): Direct Mistake Notes & Study Cheat Sheet Buttons */}
+                {/* Desktop (>= lg): Direct My Notes, Mistake Notes & Study Cheat Sheet Buttons */}
                 <div className="hidden lg:flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowScratchpadDrawer((prev) => !prev)}
+                    className={`min-h-[40px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                      showScratchpadDrawer || scratchpadDraft.trim()
+                        ? 'border-[#15803D] bg-[#15803D]/10 text-[#15803D] dark:text-emerald-400'
+                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB]'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5 text-[#15803D]" />
+                    <span>My Notes {scratchpadDraft.trim() ? '✓' : ''}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setShowMistakeNotesDrawer((prev) => !prev)}
@@ -1241,6 +1298,23 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          setShowScratchpadDrawer((prev) => !prev);
+                          setShowMobileOverflowMenu(false);
+                        }}
+                        className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center justify-between"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-[#15803D]" />
+                          <span>My Personal Notes</span>
+                        </span>
+                        {scratchpadDraft.trim() && (
+                          <span className="text-[#15803D] font-ipa">Saved</span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
                           setShowMistakeNotesDrawer((prev) => !prev);
                           setShowMobileOverflowMenu(false);
                         }}
@@ -1273,6 +1347,52 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             );
           })()}
         </div>
+
+        {/* Persistent Personal Lecture Notes Scratchpad Drawer */}
+        {showScratchpadDrawer && (
+          <div className="mb-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                  <FileText className="w-4 h-4" />
+                  <span>Personal Lecture Notes Scratchpad (Auto-Saved & Included on Printable Study Sheet)</span>
+                </div>
+                <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                  Jot down your own Nepali-English grammar reminders, silent-letter memory tricks, or pronunciation cues for Lecture {String(lecture.lectureNumber).padStart(2, '0')}.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {scratchpadSavedAt && (
+                  <span className="font-ipa text-[11px] text-[#15803D] dark:text-emerald-400 font-semibold">
+                    ✓ Auto-saved ({scratchpadSavedAt})
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowScratchpadDrawer(false)}
+                  className="p-1.5 rounded-lg text-[#57534E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              rows={3}
+              value={scratchpadDraft}
+              onChange={(e) => {
+                const val = e.target.value;
+                setScratchpadDraft(val);
+                if (onUpdateLectureNote) {
+                  onUpdateLectureNote(lecture.id, val);
+                  setScratchpadSavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                }
+              }}
+              placeholder="Write your personal notes for this lecture here (e.g., Remember: in 'knight', K and GH are silent; Nepali SOV -> English SVO)..."
+              className="w-full p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#15803D]"
+            />
+          </div>
+        )}
 
         {/* Collapsible Mistake Notes Drawer */}
         {showMistakeNotesDrawer && (
@@ -1383,6 +1503,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {visibleStepOneWords.map((item: VocabularyItem, index: number) => {
               const isSaved = savedWordIds.includes(item.id);
+              const isWordMastered = masteredWordIds.includes(item.id);
               const isNormalSpeaking = speakingId === `${item.id}-normal`;
               const isSlowSpeaking = speakingId === `${item.id}-slow`;
               const isSentenceSpeaking = speakingId === `${item.id}-sentence`;
@@ -1397,7 +1518,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-2.5"
                 >
                   <div className="space-y-2.5">
-                    {/* Compact Header Row: Word Number · POS · Silent Rule + Icon-Only Bookmark */}
+                    {/* Compact Header Row: Word Number · POS · Silent Rule + Mastered Checkmark & Icon-Only Bookmark */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs text-[#57534E] dark:text-[#A8A29E] truncate">
                         <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -1411,23 +1532,47 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onToggleSaveWord(item.id)}
-                        aria-label={isSaved ? 'Remove bookmark' : 'Bookmark word'}
-                        title={isSaved ? 'Bookmarked' : 'Bookmark word'}
-                        className={`min-h-[36px] min-w-[36px] rounded-xl border flex items-center justify-center transition-colors shrink-0 ${
-                          isSaved
-                            ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]'
-                            : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B91C1C]'
-                        }`}
-                      >
-                        {isSaved ? (
-                          <BookmarkCheck className="w-4 h-4" />
-                        ) : (
-                          <Bookmark className="w-4 h-4" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {onToggleMasteredWord && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleMasteredWord(item.id)}
+                            aria-label={isWordMastered ? 'Unmark mastered word' : 'Mark word as mastered'}
+                            title={
+                              isWordMastered
+                                ? 'Mastered! Counts toward 50 Words Mastered badge'
+                                : 'Mark word as Mastered'
+                            }
+                            className={`min-h-[36px] px-2.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
+                              isWordMastered
+                                ? 'border-[#15803D] bg-[#15803D] text-white'
+                                : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:border-[#15803D]'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">
+                              {isWordMastered ? 'Mastered' : 'Master'}
+                            </span>
+                          </button>
                         )}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => onToggleSaveWord(item.id)}
+                          aria-label={isSaved ? 'Remove bookmark' : 'Bookmark word'}
+                          title={isSaved ? 'Bookmarked' : 'Bookmark word'}
+                          className={`min-h-[36px] min-w-[36px] rounded-xl border flex items-center justify-center transition-colors shrink-0 ${
+                            isSaved
+                              ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]'
+                              : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B91C1C]'
+                          }`}
+                        >
+                          {isSaved ? (
+                            <BookmarkCheck className="w-4 h-4" />
+                          ) : (
+                            <Bookmark className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Headword + IPA on Left | Compact 1.0x & 0.65x Audio Controls on Right */}
@@ -3071,25 +3216,27 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               </div>
             </div>
 
-            {/* Interactive Two-Person Role-Play Selector */}
+            {/* Interactive Two-Person Role-Play & Shadowing Selector (Listen -> Record -> Compare) */}
             {lecture.moduleE_dialogue && lecture.moduleE_dialogue.lines.length >= 2 && (
               <div className="mt-4 pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-[#57534E] dark:text-[#A8A29E]">
-                  <strong className="text-[#1C1917] dark:text-[#F5F2EB]">Two-Voice Mode:</strong>{' '}
-                  Speaker A ({lecture.moduleE_dialogue.lines[0]?.speaker}) and Speaker B (
-                  {lecture.moduleE_dialogue.lines[1]?.speaker}) use distinct conversational voices.
+                  <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                    Dialogue Shadowing Mode (Listen → Record → Compare):
+                  </strong>{' '}
+                  Pick Speaker A ({lecture.moduleE_dialogue.lines[0]?.speaker}) or Speaker B (
+                  {lecture.moduleE_dialogue.lines[1]?.speaker}) and click Play — the app speaks your partner&apos;s line and records your voice on your turn!
                 </span>
-                <div className="flex items-center gap-1 p-1 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+                <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
                   {(
                     [
                       { id: 'off', label: 'Listen Both Voices' },
                       {
                         id: 'A',
-                        label: `Role-Play as ${lecture.moduleE_dialogue.lines[0]?.speaker || 'A'}`,
+                        label: `Shadow as ${lecture.moduleE_dialogue.lines[0]?.speaker || 'Speaker A'}`,
                       },
                       {
                         id: 'B',
-                        label: `Role-Play as ${lecture.moduleE_dialogue.lines[1]?.speaker || 'B'}`,
+                        label: `Shadow as ${lecture.moduleE_dialogue.lines[1]?.speaker || 'Speaker B'}`,
                       },
                     ] as const
                   ).map((rp) => (
@@ -3097,7 +3244,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       key={rp.id}
                       type="button"
                       onClick={() => setRolePlaySpeaker(rp.id)}
-                      className={`min-h-[30px] px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                      className={`min-h-[32px] px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                         rolePlaySpeaker === rp.id
                           ? 'bg-white dark:bg-[#1F1C18] text-[#B91C1C] dark:text-[#F87171] shadow-xs'
                           : 'text-[#57534E] dark:text-[#A8A29E]'

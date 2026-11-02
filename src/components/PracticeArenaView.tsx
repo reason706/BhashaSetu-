@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   Volume2,
@@ -12,24 +12,26 @@ import {
   RotateCcw,
   GitBranch,
   MessageSquare,
-  Layers,
   Plus,
   Trash2,
   Printer,
   Headphones,
-  AlertTriangle,
   Award,
   ArrowRight,
   Clock,
-  BookOpen,
+  Mic,
+  Radio,
+  SkipForward,
+  Check,
 } from 'lucide-react';
 import {
   LectureUnit,
   LanguageMode,
   CustomVocabItem,
   MistakeItem,
+  ExamSimulationRecord,
 } from '../types/curriculum';
-import { speechService } from '../services/speech';
+import { speechService, PronunciationResult } from '../services/speech';
 import { getMassiveLexicon } from '../data/massiveLexicon';
 
 export type ArenaToolTab =
@@ -42,10 +44,13 @@ export type ArenaToolTab =
   | 'roleplay'
   | 'shadowing'
   | 'custom-deck'
-  | 'cheatsheets';
+  | 'cheatsheets'
+  | 'exam-simulator'
+  | 'commuter-audio';
 
 interface PracticeArenaViewProps {
   lectures: LectureUnit[];
+  savedWordIds?: string[];
   customWords: CustomVocabItem[];
   mistakeNotebook: MistakeItem[];
   sprintHighScore: number;
@@ -60,6 +65,8 @@ interface PracticeArenaViewProps {
   onRecordDetectiveSolved: (passageId: string) => void;
   onRecordRolePlayCompleted: (scenarioId: string) => void;
   onRecordMistake: (mistake: Omit<MistakeItem, 'id' | 'consecutiveCorrect' | 'createdAt'>) => void;
+  onRecordExamResult?: (result: Omit<ExamSimulationRecord, 'id' | 'completedAt'>) => void;
+  onOpenLecture?: (lectureId: string) => void;
   onOpenDailyChallenge: () => void;
 }
 
@@ -582,6 +589,7 @@ const CONNECTED_SPEECH_ITEMS: ConnectedSpeechItem[] = [
 // ============================================================================
 interface SprintItem {
   word: string;
+  level: 'B1' | 'B2' | 'C1';
   maskedDisplay: string;
   correctCluster: string;
   options: string[];
@@ -593,6 +601,7 @@ interface SprintItem {
 const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   {
     word: 'Receipt',
+    level: 'B1',
     maskedDisplay: 'R E C _ _ _ T',
     correctCluster: 'EIP',
     options: ['EIP', 'IEP', 'EEP', 'IAP'],
@@ -602,6 +611,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Subtle',
+    level: 'B2',
     maskedDisplay: 'S U _ _ L E',
     correctCluster: 'BT',
     options: ['BT', 'TT', 'PT', 'TL'],
@@ -611,6 +621,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Wednesday',
+    level: 'B1',
     maskedDisplay: 'W E _ _ E S D A Y',
     correctCluster: 'DN',
     options: ['DN', 'ND', 'NN', 'NS'],
@@ -620,6 +631,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Plumber',
+    level: 'B1',
     maskedDisplay: 'P L U _ _ E R',
     correctCluster: 'MB',
     options: ['MB', 'MM', 'MP', 'NB'],
@@ -629,6 +641,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Castle',
+    level: 'B1',
     maskedDisplay: 'C A _ _ L E',
     correctCluster: 'ST',
     options: ['ST', 'SS', 'SC', 'SL'],
@@ -638,6 +651,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Mortgage',
+    level: 'C1',
     maskedDisplay: 'M O R _ _ A G E',
     correctCluster: 'TG',
     options: ['TG', 'G', 'DG', 'CG'],
@@ -647,6 +661,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Discipline',
+    level: 'B2',
     maskedDisplay: 'D I _ _ I P L I N E',
     correctCluster: 'SC',
     options: ['SC', 'SS', 'CC', 'CS'],
@@ -656,6 +671,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Autumn',
+    level: 'B2',
     maskedDisplay: 'A U T U _ _',
     correctCluster: 'MN',
     options: ['MN', 'MM', 'NM', 'M'],
@@ -665,6 +681,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Knight',
+    level: 'B1',
     maskedDisplay: '_ _ I G H T',
     correctCluster: 'KN',
     options: ['KN', 'N', 'GN', 'WR'],
@@ -674,6 +691,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Psychology',
+    level: 'C1',
     maskedDisplay: '_ _ Y C H O L O G Y',
     correctCluster: 'PS',
     options: ['PS', 'S', 'PH', 'SC'],
@@ -683,6 +701,7 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Queue',
+    level: 'C1',
     maskedDisplay: 'Q _ _ _ _',
     correctCluster: 'UEUE',
     options: ['UEUE', 'EUEU', 'UUEE', 'UEU'],
@@ -692,12 +711,333 @@ const SPRINT_CHALLENGE_POOL: SprintItem[] = [
   },
   {
     word: 'Handkerchief',
+    level: 'B2',
     maskedDisplay: 'H A N _ _ E R C H I E F',
     correctCluster: 'DK',
     options: ['DK', 'K', 'NK', 'CK'],
     ipa: '/ˈhæŋ.kə.tʃɪf/',
     nepali: 'रुमाल',
     rule: 'Silent D before K',
+  },
+];
+
+// ============================================================================
+// DATA FOR NEPALI-TO-ENGLISH TRANSLATION & L1 INTERFERENCE LAB
+// ============================================================================
+const SOV_SVO_REORDER_DRILLS = [
+  {
+    id: 'sov-1',
+    nepaliSentence: 'इमानदार प्लम्बरले बुधबार बिहान भान्साको पाइप मर्मत गर्यो।',
+    nepaliSOVBreakdown: '[इमानदार प्लम्बरले (S)] + [बुधबार बिहान (Time)] + [भान्साको पाइप (O)] + [मर्मत गर्यो (V)]',
+    scrambledChunks: ['the kitchen pipe', 'The honest plumber', 'on Wednesday morning', 'repaired'],
+    correctOrder: ['The honest plumber', 'repaired', 'the kitchen pipe', 'on Wednesday morning'],
+    explanation:
+      'In Nepali (SOV), the verb "मर्मत गर्यो" comes at the very end. In English (SVO), the Verb ("repaired") must follow immediately after the Subject ("The honest plumber").',
+  },
+  {
+    id: 'sov-2',
+    nepaliSentence: 'हामीले बैंकका प्रबन्धकलाई हस्ताक्षर गरिएको रसिद बुझायौँ।',
+    nepaliSOVBreakdown: '[हामीले (S)] + [बैंकका प्रबन्धकलाई (Indirect O)] + [हस्ताक्षर गरिएको रसिद (Direct O)] + [बुझायौँ (V)]',
+    scrambledChunks: ['the signed receipt', 'to the bank manager', 'submitted', 'We'],
+    correctOrder: ['We', 'submitted', 'the signed receipt', 'to the bank manager'],
+    explanation:
+      'Place the action verb ("submitted") right after the subject ("We"), followed by the direct object ("the signed receipt") and recipient ("to the bank manager").',
+  },
+  {
+    id: 'sov-3',
+    nepaliSentence: 'मनोविज्ञानका प्राध्यापकले विद्यार्थीहरूलाई मौन अक्षरका नियमहरू बुझाउनुभयो।',
+    nepaliSOVBreakdown: '[प्राध्यापकले (S)] + [विद्यार्थीहरूलाई (O)] + [नियमहरू (O)] + [बुझाउनुभयो (V)]',
+    scrambledChunks: [
+      'explained',
+      'to the students',
+      'The psychology professor',
+      'the silent-letter rules',
+    ],
+    correctOrder: [
+      'The psychology professor',
+      'explained',
+      'the silent-letter rules',
+      'to the students',
+    ],
+    explanation:
+      'English uses "explained [something] to [someone]" in strict Subject + Verb + Object + Prepositional Phrase order.',
+  },
+  {
+    id: 'sov-4',
+    nepaliSentence: 'के तपाईं मलाई रेलवे स्टेशन कहाँ छ भन्न सक्नुहुन्छ?',
+    nepaliSOVBreakdown: 'Embedded Indirect Question SVO Order',
+    scrambledChunks: ['is?', 'where', 'Could you tell me', 'the railway station'],
+    correctOrder: ['Could you tell me', 'where', 'the railway station', 'is?'],
+    explanation:
+      'In polite indirect questions ("Could you tell me..."), keep the embedded clause in SVO order ("where the railway station is"), NOT "where is the railway station".',
+  },
+];
+
+const ARTICLE_MASTERY_DRILLS = [
+  {
+    id: 'art-1',
+    sentenceWithBlank: 'Mr. Adhikari is ___ honest accountant who never hides a debt.',
+    nepaliContext: 'अधिकारीजी एक इमानदार लेखापाल हुनुहुन्छ।',
+    options: ['a', 'an', 'the', 'Ø (No article)'],
+    correctAnswer: 'an',
+    rule: 'Use "an" before "honest" (/ˈɒn.ɪst/) because the initial "h" is SILENT, so the word begins with a vowel sound (/ɒ/).',
+  },
+  {
+    id: 'art-2',
+    sentenceWithBlank: 'It takes about ___ hour to reach the castle from the valley.',
+    nepaliContext: 'उपत्यकाबाट किल्ला पुग्न करिब एक घण्टा लाग्छ।',
+    options: ['a', 'an', 'the', 'Ø (No article)'],
+    correctAnswer: 'an',
+    rule: 'Use "an" before "hour" (/aʊər/) because "h" is silent and the word starts with a vowel diphthong.',
+  },
+  {
+    id: 'art-3',
+    sentenceWithBlank: 'My sister studies psychology at ___ European university.',
+    nepaliContext: 'मेरी बहिनी युरोपेली विश्वविद्यालयमा मनोविज्ञान पढ्छिन्।',
+    options: ['a', 'an', 'the', 'Ø (No article)'],
+    correctAnswer: 'a',
+    rule: 'Even though "European" starts with the letter E, it is pronounced with a consonant /j/ ("Yoo-ro-pean") sound, so it takes "a", not "an"!',
+  },
+  {
+    id: 'art-4',
+    sentenceWithBlank: '___ knowledge of silent letters improves your English spelling rapidly.',
+    nepaliContext: 'मौन अक्षरको ज्ञानले अंग्रेजी हिज्जे छिटो सुधार्छ। (General uncountable noun)',
+    options: ['A', 'An', 'The', 'Ø (No article)'],
+    correctAnswer: 'Ø (No article)',
+    rule: 'Uncountable abstract nouns like "knowledge", "information", and "advice" do NOT take "a/an", and when used in a general sense or with "of", either zero article or specific "The" applies—never "a knowledge".',
+  },
+];
+
+const PREPOSITION_TRAP_DRILLS = [
+  {
+    id: 'prep-1',
+    nepaliPostposition: 'बुधबारमा (Day of the week · -मा)',
+    sentenceWithBlank: 'The plumber promised to inspect the pipeline ___ Wednesday.',
+    options: ['in', 'on', 'at', 'by'],
+    correctAnswer: 'on',
+    explanation:
+      'Nepali uses "-मा" for months, days, and times. In English: use "ON" for specific days/dates (on Wednesday), "IN" for months/years (in October), and "AT" for clock times (at 9:00 AM).',
+  },
+  {
+    id: 'prep-2',
+    nepaliPostposition: 'आमासँग अनुहार मिल्छ (Resemble · -सँग)',
+    sentenceWithBlank: 'The young heir closely resembles ___ his grandfather.',
+    options: ['with', 'to', 'by', 'Ø (No preposition)'],
+    correctAnswer: 'Ø (No preposition)',
+    explanation:
+      'In Nepali we say "हजुरबुवासँग मिल्छ", tempting learners to say "resembles with". In English, "resemble" is a transitive verb—no preposition is used!',
+  },
+  {
+    id: 'prep-3',
+    nepaliPostposition: 'बसद्वारा / बसमा यात्रा गर्नु (Mode of transport · -ले / -मा)',
+    sentenceWithBlank: 'We travelled to Pokhara ___ tourist bus last autumn.',
+    options: ['in', 'on', 'by', 'with'],
+    correctAnswer: 'by',
+    explanation:
+      'Use "by + transport noun" without an article (by bus, by train, by plane) when describing how you travelled.',
+  },
+  {
+    id: 'prep-4',
+    nepaliPostposition: 'कुनै विषयको बारेमा छलफल गर्नु (Discuss · बारेमा)',
+    sentenceWithBlank: 'The committee discussed ___ the new budget for two hours.',
+    options: ['about', 'on', 'over', 'Ø (No preposition)'],
+    correctAnswer: 'Ø (No preposition)',
+    explanation:
+      '"Discuss" already means "talk about". Never say "discussed about the budget"—say "discussed the budget".',
+  },
+];
+
+const CONTINUOUS_OVERUSE_DRILLS = [
+  {
+    id: 'cont-1',
+    nepaliThought: 'मसँग यो बिलको रसिद छ। (Possession state)',
+    wrongHabit: '✗ “I am having the receipt for this bill.”',
+    options: [
+      'I have the receipt for this bill.',
+      'I am having the receipt for this bill.',
+      'I having the receipt for this bill.',
+    ],
+    correctAnswer: 'I have the receipt for this bill.',
+    explanation:
+      'Stative verbs of possession ("have", "own", "belong") use Simple Present ("I have"), not Present Continuous ("I am having"), when describing ownership.',
+  },
+  {
+    id: 'cont-2',
+    nepaliThought: 'मलाई यो शब्दको अर्थ थाहा छ। (Mental state)',
+    wrongHabit: '✗ “I am knowing the meaning of this word.”',
+    options: [
+      'I know the meaning of this word.',
+      'I am knowing the meaning of this word.',
+      'I am know the meaning of this word.',
+    ],
+    correctAnswer: 'I know the meaning of this word.',
+    explanation:
+      '"Know", "understand", "believe", and "remember" are mental stative verbs—never use -ing with them in standard English.',
+  },
+  {
+    id: 'cont-3',
+    nepaliThought: 'म ५ वर्षदेखि काठमाडौँमा बस्दै छु। (Duration from past to now)',
+    wrongHabit: '✗ “I am living in Kathmandu since five years.”',
+    options: [
+      'I have been living in Kathmandu for five years.',
+      'I am living in Kathmandu since five years.',
+      'I live in Kathmandu from five years.',
+    ],
+    correctAnswer: 'I have been living in Kathmandu for five years.',
+    explanation:
+      'When an action started in the past and continues now, use Present Perfect Continuous ("have been living") + "for" (duration of 5 years) or "since" (starting point like 2020).',
+  },
+];
+
+// ============================================================================
+// DATA FOR 10-MINUTE EXAM & CAREER READINESS SIMULATOR (IELTS / PTE / INTERVIEW)
+// ============================================================================
+interface ExamDiagnosticQuestion {
+  id: string;
+  section: 'listening' | 'proofreading' | 'grammar' | 'speaking';
+  sectionLabel: string;
+  prompt: string;
+  nepaliHint: string;
+  audioText?: string;
+  options: string[];
+  correctAnswer: string;
+  recommendedLectureId: string;
+  recommendedLectureTitle: string;
+  explanation: string;
+}
+
+const EXAM_DIAGNOSTIC_QUESTIONS: ExamDiagnosticQuestion[] = [
+  {
+    id: 'ex-1',
+    section: 'listening',
+    sectionLabel: 'Section A · Listening & Orthography Dictation',
+    prompt: 'Listen to the audio prompt and choose the exact spelling of the missing word: "Please keep your stamped ___ for tax records."',
+    nepaliHint: 'कृपया कर रेकर्डको लागि छाप लगाइएको रसिद राख्नुहोस्।',
+    audioText: 'Please keep your stamped receipt for tax records.',
+    options: ['receipt', 'reciept', 'reseipt', 'recipt'],
+    correctAnswer: 'receipt',
+    recommendedLectureId: 'lecture-1-silent-consonants',
+    recommendedLectureTitle: 'Lecture 01: Everyday Silent Consonants',
+    explanation: 'Remember the "C + EI" rule (receive, ceiling, receipt) plus silent "p" before "t".',
+  },
+  {
+    id: 'ex-2',
+    section: 'listening',
+    sectionLabel: 'Section A · Listening & Orthography Dictation',
+    prompt: 'Listen and select the exact word spoken: "The bank approved our home ___ on Wednesday."',
+    nepaliHint: 'बैंकले बुधबार हाम्रो घर धितो कर्जा स्वीकृत गर्यो।',
+    audioText: 'The bank approved our home mortgage on Wednesday.',
+    options: ['mortgage', 'morgage', 'mortgaje', 'morggage'],
+    correctAnswer: 'mortgage',
+    recommendedLectureId: 'lecture-5-vowel-clusters',
+    recommendedLectureTitle: 'Lecture 05: Tricky Vowel Clusters & Finance',
+    explanation: '"Mortgage" (/ˈmɔː.ɡɪdʒ/) has a silent "t" before "g".',
+  },
+  {
+    id: 'ex-3',
+    section: 'proofreading',
+    sectionLabel: 'Section B · Silent-Letter Proofreading',
+    prompt: 'Which sentence has 100% accurate English spelling for an official workplace email?',
+    nepaliHint: 'कार्यालयको इमेलको लागि कुन वाक्यको हिज्जे पूर्ण रूपमा सही छ?',
+    options: [
+      'Our colleague scheduled the Wednesday meeting with the psychology department.',
+      'Our collegue sceduled the Wensday meeting with the sychology department.',
+      'Our colleague scheduled the Wednesdey meeting with the psycology department.',
+      'Our coleague scheduled the Wednesday meeting with the psychology department.',
+    ],
+    correctAnswer: 'Our colleague scheduled the Wednesday meeting with the psychology department.',
+    recommendedLectureId: 'lecture-9-academic-stems',
+    recommendedLectureTitle: 'Lecture 09: Academic & Workplace Orthography',
+    explanation: 'Watch out for silent "-ue" in colleague, "dn" in Wednesday, and "ps-" in psychology.',
+  },
+  {
+    id: 'ex-4',
+    section: 'proofreading',
+    sectionLabel: 'Section B · Silent-Letter Proofreading',
+    prompt: 'Spot the accurately spelled sentence describing an autumn travel itinerary:',
+    nepaliHint: 'शरद ऋतुको यात्रा तालिका वर्णन गर्ने सही हिज्जे भएको वाक्य छान्नुहोस्:',
+    options: [
+      'In autumn, foreign tourists climb the ancient castle aisle.',
+      'In autum, foriegn tourists clime the ancient casle aisle.',
+      'In autumn, foreign tourists climb the ancient castle ile.',
+      'In autunm, foreign tourists climb the ancient castel aisle.',
+    ],
+    correctAnswer: 'In autumn, foreign tourists climb the ancient castle aisle.',
+    recommendedLectureId: 'lecture-2-nature-landmarks',
+    recommendedLectureTitle: 'Lecture 02: Nature, Landmarks & Silent Consonants',
+    explanation: 'Autumn (silent n), foreign (silent g), climb (silent b), castle (silent t), aisle (silent s).',
+  },
+  {
+    id: 'ex-5',
+    section: 'grammar',
+    sectionLabel: 'Section C · L1 Grammar & SVO Syntax Check',
+    prompt: 'Choose the grammatically natural sentence for an IELTS / Job Interview:',
+    nepaliHint: 'अन्तर्वार्ताको लागि व्याकरणिक रूपमा प्राकृतिक वाक्य छान्नुहोस्:',
+    options: [
+      'I have been working in financial accounting for four years.',
+      'I am working in financial accounting since four years.',
+      'I am having four years experience in financial accounting.',
+      'Since four years I work in financial accounting.',
+    ],
+    correctAnswer: 'I have been working in financial accounting for four years.',
+    recommendedLectureId: 'lecture-4-time-tenses',
+    recommendedLectureTitle: 'Lecture 04: Time Expressions & Perfect Tenses',
+    explanation: 'Use Present Perfect Continuous ("have been working") + "for" with a duration of time.',
+  },
+  {
+    id: 'ex-6',
+    section: 'grammar',
+    sectionLabel: 'Section C · L1 Grammar & SVO Syntax Check',
+    prompt: 'Select the polite, grammatically accurate indirect question:',
+    nepaliHint: 'शिष्ट र व्याकरणिक रूपमा सही अप्रत्यक्ष प्रश्न छान्नुहोस्:',
+    options: [
+      'Could you tell me when the interview panel will announce the results?',
+      'Could you tell me when will the interview panel announce the results?',
+      'Please tell me that when the interview panel announce result?',
+      'Could you tell me about when is the result?',
+    ],
+    correctAnswer: 'Could you tell me when the interview panel will announce the results?',
+    recommendedLectureId: 'lecture-7-polite-modals',
+    recommendedLectureTitle: 'Lecture 07: Polite Modals & Indirect Questions',
+    explanation: 'After "Could you tell me...", keep the embedded clause in statement SVO order ("when the panel will announce"), without inverting "will".',
+  },
+  {
+    id: 'ex-7',
+    section: 'speaking',
+    sectionLabel: 'Section D · Career & Exam Spoken Response',
+    prompt: 'Job Interview Prompt: "Tell me about a time you solved a difficult problem at work or school." Speak your answer with the mic or select the strongest C1 response:',
+    nepaliHint: 'काम वा कलेजमा कुनै कठिन समस्या समाधान गरेको अनुभव बताउनुहोस्:',
+    audioText: 'Last autumn, I noticed a subtle discrepancy in our project budget and calmly coordinated with my colleagues to resolve the debt ahead of schedule.',
+    options: [
+      'Last autumn, I noticed a subtle discrepancy in our project budget and calmly coordinated with my colleagues to resolve the debt ahead of schedule.',
+      'According to me, last year problem came in budget and I discussed about it with friends.',
+      'I am having good problem solving skill because I gave many exams in college.',
+      'Yesterday I project budget checked and mistake fixed.',
+    ],
+    correctAnswer:
+      'Last autumn, I noticed a subtle discrepancy in our project budget and calmly coordinated with my colleagues to resolve the debt ahead of schedule.',
+    recommendedLectureId: 'lecture-10-executive-fluency',
+    recommendedLectureTitle: 'Lecture 10: Professional & Executive Fluency',
+    explanation: 'Uses clear past-tense SVO structure and high-value C1 vocabulary (subtle, discrepancy, budget, colleagues, debt, schedule).',
+  },
+  {
+    id: 'ex-8',
+    section: 'speaking',
+    sectionLabel: 'Section D · Career & Exam Spoken Response',
+    prompt: 'IELTS Speaking Part 3 Prompt: "Why is clear pronunciation important in international communication?" Speak the model response or choose the best structured answer:',
+    nepaliHint: 'अन्तर्राष्ट्रिय सञ्चारमा स्पष्ट उच्चारण किन महत्त्वपूर्ण छ?',
+    audioText: 'Clear pronunciation bridges the gap between written orthography and spoken fluency, ensuring that silent letters and connected speech never cause misunderstanding.',
+    options: [
+      'Clear pronunciation bridges the gap between written orthography and spoken fluency, ensuring that silent letters and connected speech never cause misunderstanding.',
+      'Pronunciation is very good for talking with foreign peoples in abroad.',
+      'If we are knowing silent letter, we are speaking very fastly.',
+      'In my point of view, English spelling and sound is having big difference.',
+    ],
+    correctAnswer:
+      'Clear pronunciation bridges the gap between written orthography and spoken fluency, ensuring that silent letters and connected speech never cause misunderstanding.',
+    recommendedLectureId: 'lecture-12-rhetoric-mastery',
+    recommendedLectureTitle: 'Lecture 12: C1 Rhetoric & Public Speaking Mastery',
+    explanation: 'Uses strong academic collocations ("bridges the gap", "written orthography", "spoken fluency") free of L1 translation traps.',
   },
 ];
 
@@ -1018,6 +1358,7 @@ const ROLEPLAY_SCENARIOS: RolePlayScenario[] = [
 
 export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   lectures,
+  savedWordIds = [],
   customWords,
   mistakeNotebook,
   sprintHighScore,
@@ -1032,6 +1373,8 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   onRecordDetectiveSolved,
   onRecordRolePlayCompleted,
   onRecordMistake,
+  onRecordExamResult,
+  onOpenLecture,
   onOpenDailyChallenge,
 }) => {
   const [activeTool, setActiveTool] = useState<ArenaToolTab>(initialToolTab);
@@ -1057,13 +1400,21 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   // --- Feature #3 State: Confusables Arena ---
   const [confusableAnswers, setConfusableAnswers] = useState<Record<string, string>>({});
 
-  // --- Feature #4 State: Nepali Interference Fixer ---
+  // --- Feature #4 State: Nepali-to-English Translation & L1 Interference Lab ---
+  const [interferenceSubTab, setInterferenceSubTab] = useState<
+    'sov-svo' | 'articles' | 'prepositions' | 'continuous-traps'
+  >('sov-svo');
+  const [sovPlacedChunks, setSovPlacedChunks] = useState<Record<string, string[]>>({});
+  const [articleAnswers, setArticleAnswers] = useState<Record<string, string>>({});
+  const [prepositionAnswers, setPrepositionAnswers] = useState<Record<string, string>>({});
+  const [continuousAnswers, setContinuousAnswers] = useState<Record<string, string>>({});
   const [interferenceAnswers, setInterferenceAnswers] = useState<Record<string, string>>({});
 
   // --- Feature #5 State: Connected Speech Decoder ---
   const [connectedAnswers, setConnectedAnswers] = useState<Record<string, string>>({});
 
-  // --- Feature #6 State: 60-Second Spelling Sprint ---
+  // --- Feature #6 State: 60-Second Spelling Sprint + Difficulty Tiers ---
+  const [sprintTier, setSprintTier] = useState<'ALL' | 'B1' | 'B2' | 'C1' | 'MISTAKES'>('ALL');
   const [sprintRunning, setSprintRunning] = useState(false);
   const [sprintSecondsLeft, setSprintSecondsLeft] = useState(60);
   const [sprintScore, setSprintScore] = useState(0);
@@ -1075,10 +1426,13 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   // --- Feature #7 State: Word Family Tree Explorer ---
   const [selectedTreeId, setSelectedTreeId] = useState(WORD_FAMILY_TREES[0].id);
 
-  // --- Feature #8 State: Role-Play Simulator ---
+  // --- Feature #8 State: Role-Play Simulator + Voice Input Mic ---
   const [activeScenarioIdx, setActiveScenarioIdx] = useState(0);
   const [rolePlayTurnIdx, setRolePlayTurnIdx] = useState(0);
   const [selectedRolePlayChoice, setSelectedRolePlayChoice] = useState<number | null>(null);
+  const [rolePlayListening, setRolePlayListening] = useState(false);
+  const [rolePlayVoiceResult, setRolePlayVoiceResult] = useState<PronunciationResult | null>(null);
+  const [rolePlayMicError, setRolePlayMicError] = useState<string | null>(null);
 
   // --- Feature #9 State: Custom Study Deck Builder ---
   const [newWordInput, setNewWordInput] = useState('');
@@ -1105,6 +1459,25 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   >('vocab-table');
   const [vocabTableSearch, setVocabTableSearch] = useState('');
   const [vocabTableLectureFilter, setVocabTableLectureFilter] = useState<number | 'ALL'>('ALL');
+
+  // --- Tool 11 State: Timed 10-Min IELTS / PTE / Job Interview Exam Simulator ---
+  const [examStarted, setExamStarted] = useState(false);
+  const [examFinished, setExamFinished] = useState(false);
+  const [examSecondsLeft, setExamSecondsLeft] = useState(600); // 10 minutes
+  const [examQuestionIdx, setExamQuestionIdx] = useState(0);
+  const [examAnswers, setExamAnswers] = useState<Record<string, string>>({});
+  const [examMicListening, setExamMicListening] = useState(false);
+  const [examMicResult, setExamMicResult] = useState<PronunciationResult | null>(null);
+
+  // --- Tool 12 State: Hands-Free Commuter Audio Mode (Podcast Player) ---
+  const [commuterPlaying, setCommuterPlaying] = useState(false);
+  const [commuterSource, setCommuterSource] = useState<'lecture' | 'saved' | 'mistakes'>('lecture');
+  const [commuterLectureNum, setCommuterLectureNum] = useState<number>(1);
+  const [commuterTrackIdx, setCommuterTrackIdx] = useState(0);
+  const [commuterPhase, setCommuterPhase] = useState<
+    'idle' | 'word-1x' | 'pause-2s' | 'word-075x' | 'sentence'
+  >('idle');
+  const commuterCancelRef = useRef(false);
 
   const isFullNepali = languageMode === 'full-nepali';
 
@@ -1227,6 +1600,22 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     }
   };
 
+  // Active Sprint Pool filtered by CEFR Tier or Mistake Notebook
+  const activeSprintPool = useMemo(() => {
+    if (sprintTier === 'MISTAKES' && mistakeNotebook.length > 0) {
+      const mistakeSet = new Set(mistakeNotebook.map((m) => m.correctAnswer.trim().toLowerCase()));
+      const matched = SPRINT_CHALLENGE_POOL.filter((item) =>
+        mistakeSet.has(item.word.toLowerCase())
+      );
+      if (matched.length > 0) return matched;
+    }
+    if (sprintTier === 'B1' || sprintTier === 'B2' || sprintTier === 'C1') {
+      const filtered = SPRINT_CHALLENGE_POOL.filter((item) => item.level === sprintTier);
+      return filtered.length > 0 ? filtered : SPRINT_CHALLENGE_POOL;
+    }
+    return SPRINT_CHALLENGE_POOL;
+  }, [sprintTier, mistakeNotebook]);
+
   const handleStartSprint = () => {
     setSprintScore(0);
     setSprintCombo(0);
@@ -1235,7 +1624,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     setSprintFeedback(null);
     setSprintFinished(false);
     setSprintRunning(true);
-    const firstWord = SPRINT_CHALLENGE_POOL[0];
+    const firstWord = activeSprintPool[0];
     if (firstWord) {
       speechService.speak(firstWord.word, { rate: preferredSpeechRate });
     }
@@ -1243,7 +1632,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
   const handleAnswerSprint = (choice: string) => {
     if (!sprintRunning || sprintFeedback) return;
-    const item = SPRINT_CHALLENGE_POOL[sprintIdx % SPRINT_CHALLENGE_POOL.length];
+    const item = activeSprintPool[sprintIdx % activeSprintPool.length];
     const isCorrect = choice === item.correctCluster;
 
     if (isCorrect) {
@@ -1272,12 +1661,127 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       const nextIndex = sprintIdx + 1;
       setSprintIdx(nextIndex);
       setSprintFeedback(null);
-      const nextItem = SPRINT_CHALLENGE_POOL[nextIndex % SPRINT_CHALLENGE_POOL.length];
+      const nextItem = activeSprintPool[nextIndex % activeSprintPool.length];
       if (nextItem) {
         speechService.speak(nextItem.word, { rate: preferredSpeechRate });
       }
     }, 380);
   };
+
+  // 10-Minute Exam Simulator Timer Effect
+  useEffect(() => {
+    if (!examStarted || examFinished) return;
+    if (examSecondsLeft <= 0) {
+      handleFinishExam();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setExamSecondsLeft((s) => s - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [examStarted, examFinished, examSecondsLeft]);
+
+  const handleFinishExam = () => {
+    setExamStarted(false);
+    setExamFinished(true);
+    const listeningScore = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+      (q) => q.section === 'listening' && examAnswers[q.id] === q.correctAnswer
+    ).length;
+    const proofreadingScore = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+      (q) => q.section === 'proofreading' && examAnswers[q.id] === q.correctAnswer
+    ).length;
+    const grammarScore = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+      (q) => q.section === 'grammar' && examAnswers[q.id] === q.correctAnswer
+    ).length;
+    const speakingScore = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+      (q) => q.section === 'speaking' && examAnswers[q.id] === q.correctAnswer
+    ).length;
+    const totalCorrect = listeningScore + proofreadingScore + grammarScore + speakingScore;
+    const overallScore = Math.round((totalCorrect / EXAM_DIAGNOSTIC_QUESTIONS.length) * 100);
+    const estimatedBand =
+      overallScore >= 85
+        ? 'C1 · IELTS Band 7.5–8.0'
+        : overallScore >= 65
+        ? 'B2 · IELTS Band 6.5–7.0'
+        : 'B1 · IELTS Band 5.5–6.0';
+
+    if (onRecordExamResult) {
+      onRecordExamResult({
+        overallScore,
+        estimatedBand,
+        listeningScore: Math.round((listeningScore / 2) * 100),
+        proofreadingScore: Math.round((proofreadingScore / 2) * 100),
+        grammarScore: Math.round((grammarScore / 2) * 100),
+        speakingScore: Math.round((speakingScore / 2) * 100),
+      });
+    }
+  };
+
+  // Commuter Audio Mode Playlist & Loop Effect
+  const commuterTracks = useMemo(() => {
+    const all = getMassiveLexicon(lectures);
+    if (commuterSource === 'saved') {
+      const saved = all.filter((w) => savedWordIds.includes(w.id));
+      return saved.length > 0 ? saved : all.filter((w) => w.isCoreLessonWord);
+    }
+    if (commuterSource === 'mistakes') {
+      const targets = new Set(mistakeNotebook.map((m) => m.correctAnswer.trim().toLowerCase()));
+      const matched = all.filter((w) => targets.has(w.word.toLowerCase()));
+      return matched.length > 0 ? matched : all.filter((w) => w.isCoreLessonWord);
+    }
+    return all.filter((w) => w.lectureNumber === commuterLectureNum && w.isCoreLessonWord);
+  }, [commuterSource, commuterLectureNum, lectures, savedWordIds, mistakeNotebook]);
+
+  const currentCommuterTrack =
+    commuterTracks[commuterTrackIdx % Math.max(1, commuterTracks.length)] || null;
+
+  useEffect(() => {
+    if (!commuterPlaying || !currentCommuterTrack) {
+      setCommuterPhase('idle');
+      return;
+    }
+    commuterCancelRef.current = false;
+    let pauseTimer: number | null = null;
+    let nextTimer: number | null = null;
+
+    setCommuterPhase('word-1x');
+    speechService.speak(currentCommuterTrack.word, {
+      rate: 1.0,
+      onEnd: () => {
+        if (commuterCancelRef.current) return;
+        setCommuterPhase('pause-2s');
+        pauseTimer = window.setTimeout(() => {
+          if (commuterCancelRef.current) return;
+          setCommuterPhase('word-075x');
+          speechService.speak(currentCommuterTrack.word, {
+            rate: 0.75,
+            onEnd: () => {
+              if (commuterCancelRef.current) return;
+              setCommuterPhase('sentence');
+              speechService.speak(currentCommuterTrack.englishExample, {
+                rate: preferredSpeechRate,
+                onEnd: () => {
+                  if (commuterCancelRef.current) return;
+                  nextTimer = window.setTimeout(() => {
+                    if (!commuterCancelRef.current) {
+                      setCommuterTrackIdx((prev) => (prev + 1) % Math.max(1, commuterTracks.length));
+                    }
+                  }, 900);
+                },
+              });
+            },
+          });
+        }, 2000);
+      },
+    });
+
+    return () => {
+      commuterCancelRef.current = true;
+      if (pauseTimer) window.clearTimeout(pauseTimer);
+      if (nextTimer) window.clearTimeout(nextTimer);
+      speechService.stop();
+    };
+  }, [commuterPlaying, commuterTrackIdx, currentCommuterTrack, commuterTracks.length, preferredSpeechRate]);
 
   const handleCreateCustomCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1300,12 +1804,39 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     setNewExampleInput('');
   };
 
-  const currentSprintItem = SPRINT_CHALLENGE_POOL[sprintIdx % SPRINT_CHALLENGE_POOL.length];
+  const currentSprintItem = activeSprintPool[sprintIdx % activeSprintPool.length];
   const currentWordTree =
     WORD_FAMILY_TREES.find((t) => t.id === selectedTreeId) || WORD_FAMILY_TREES[0];
   const currentScenario = ROLEPLAY_SCENARIOS[activeScenarioIdx] || ROLEPLAY_SCENARIOS[0];
   const currentRolePlayTurn =
     currentScenario.turns[rolePlayTurnIdx] || currentScenario.turns[0];
+
+  const handleSpeakRolePlayResponse = async () => {
+    setRolePlayMicError(null);
+    if (!speechService.isRecognitionSupported()) {
+      setRolePlayMicError(
+        'Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.'
+      );
+      return;
+    }
+    const bestIdx = currentRolePlayTurn.choices.findIndex((c) => c.quality === 'best');
+    const bestOption = currentRolePlayTurn.choices[bestIdx] || currentRolePlayTurn.choices[0];
+    try {
+      const res = await speechService.evaluatePronunciation(bestOption.text, (listening) => {
+        setRolePlayListening(listening);
+      });
+      setRolePlayVoiceResult(res);
+      if (res.score >= 50 && bestIdx !== -1) {
+        setSelectedRolePlayChoice(bestIdx);
+        if (rolePlayTurnIdx + 1 === currentScenario.turns.length) {
+          onRecordRolePlayCompleted(currentScenario.id);
+        }
+      }
+    } catch (err: unknown) {
+      setRolePlayListening(false);
+      setRolePlayMicError(err instanceof Error ? err.message : 'Microphone error.');
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-6">
@@ -1313,13 +1844,13 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
         <div>
           <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
-            Interactive Fluency & Phonics Practice Hub · 10 Specialized Studios
+            Interactive Fluency, Translation & Exam Readiness Hub · 12 Specialized Studios
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            Practice Arena, Word Trees, Role-Play & Master Vocabulary List
+            Practice Arena, L1 Translation Lab, 10-Min Exam Simulator & Commuter Audio
           </h1>
           <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-            Train with the Silent-Letter Detective, Confusables Arena, Nepali Interference Fixer, Connected Speech Decoder, 60s Sprint, Word Family Trees, Role-Play Simulator, Shadowing Loop, Custom Decks, and Printable Cheat-Sheets.
+            Train with the Nepali-to-English Translation Lab, Timed 10-Min IELTS/PTE/Interview Simulator, Hands-Free Commuter Audio Podcast Player, Role-Play Voice Simulator, and 60s Phonics Sprint.
           </p>
         </div>
 
@@ -1333,20 +1864,22 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         </button>
       </div>
 
-      {/* 10-Tool Navigation Bar */}
+      {/* 12-Tool Navigation Bar */}
       <div className="p-2 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center gap-1.5 print:hidden">
         {(
           [
             { id: 'detective', label: '1. Silent-Letter Detective' },
             { id: 'confusables', label: '2. Confusables & Homophones' },
-            { id: 'interference', label: '3. Nepali Interference Fixer' },
+            { id: 'interference', label: '3. Nepali-to-English Translation Lab' },
             { id: 'connected-speech', label: '4. Connected Speech Decoder' },
             { id: 'sprint', label: '5. 60s Phonics Sprint' },
             { id: 'word-trees', label: '6. Word Family Root Trees' },
-            { id: 'roleplay', label: '7. Role-Play Simulator' },
+            { id: 'roleplay', label: '7. Role-Play Simulator (Voice)' },
             { id: 'shadowing', label: '8. Shadowing Rhythm Studio' },
             { id: 'custom-deck', label: `9. Custom Deck (${customWords.length})` },
             { id: 'cheatsheets', label: '10. Master Vocab List & PDF Sheets' },
+            { id: 'exam-simulator', label: '11. 10-Min Exam Simulator (IELTS/PTE)' },
+            { id: 'commuter-audio', label: '12. Hands-Free Commuter Audio' },
           ] as { id: ArenaToolTab; label: string }[]
         ).map((tab) => (
           <button
@@ -1355,6 +1888,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             onClick={() => {
               speechService.stop();
               setShadowPhase('idle');
+              setCommuterPlaying(false);
               setActiveTool(tab.id);
             }}
             className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
@@ -1637,88 +2171,409 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       )}
 
       {/* =================================================================== */}
-      {/* TOOL 3 (FEATURE #4): NEPALI-TO-ENGLISH INTERFERENCE FIXER           */}
+      {/* TOOL 3 (FEATURE #4): NEPALI-TO-ENGLISH TRANSLATION & L1 LAB         */}
       {/* =================================================================== */}
       {activeTool === 'interference' && (
-        <section className="space-y-4">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-              Feature #4 · Direct Translation Trap Eliminator
+        <section className="space-y-5">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
+            <div>
+              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                Nepali-to-English Translation & L1 Interference Lab
+              </div>
+              <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                Master SOV → SVO Word Order, Articles, Prepositions & Stative Verbs
+              </h2>
+              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
+                Practice the 4 biggest Nepali-to-English structural shifts: reordering Subject-Object-Verb into Subject-Verb-Object, mastering silent-letter articles (a/an/the/Ø), mapping Nepali postpositions (मा, ले, सँग) to English prepositions, and fixing Present Continuous overuse.
+              </p>
             </div>
-            <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-              Nepali-to-English Direct Translation & Interference Fixer
-            </h2>
-            <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
-              Translating word-for-word from Nepali often creates subtle grammar mistakes in English (like <em>“discussed about”</em> or <em>“gave an exam”</em>). Select the natural English sentence for each thought below:
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {INTERFERENCE_DRILLS.map((drill) => {
-              const selected = interferenceAnswers[drill.id];
-              return (
-                <div
-                  key={drill.id}
-                  className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+            {/* 4 Sub-Module Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {(
+                [
+                  { id: 'sov-svo', label: '1. SOV → SVO Word Order Reordering' },
+                  { id: 'articles', label: '2. Article Mastery (a / an / the / Ø)' },
+                  { id: 'prepositions', label: '3. Preposition Traps (in / on / at / by / with)' },
+                  { id: 'continuous-traps', label: '4. Continuous Overuse & Direct Translation Traps' },
+                ] as const
+              ).map((sub) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setInterferenceSubTab(sub.id)}
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    interferenceSubTab === sub.id
+                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                  }`}
                 >
-                  <div className="space-y-2.5">
-                    <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
-                      नेपाली भाव: “{drill.nepaliThought}”
-                    </div>
-                    <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#B91C1C] dark:text-[#F87171]">
-                      <strong>Common Direct-Translation Trap:</strong> {drill.commonNepaliTrap}
-                    </div>
-
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] pt-1">
-                      Select the Natural Standard English Sentence:
-                    </div>
-                    <div className="space-y-2">
-                      {drill.options.map((opt) => {
-                        const isPicked = selected === opt;
-                        const isCorrect = opt === drill.naturalEnglishFix;
-                        let btnStyle =
-                          'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
-                        if (selected) {
-                          if (isCorrect) {
-                            btnStyle =
-                              'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
-                          } else if (isPicked) {
-                            btnStyle =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through';
-                          }
-                        }
-                        return (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => {
-                              setInterferenceAnswers((prev) => ({ ...prev, [drill.id]: opt }));
-                              if (opt === drill.naturalEnglishFix) {
-                                speechService.speak(opt, { rate: preferredSpeechRate });
-                              }
-                            }}
-                            className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
-                          >
-                            <span>{opt}</span>
-                            {selected && isCorrect && (
-                              <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {selected && (
-                    <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      <strong className="text-[#1C1917] dark:text-[#F5F2EB]">Why? </strong>
-                      {drill.grammarRule}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  {sub.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* SUB-TAB 1: SOV -> SVO WORD ORDER REORDERING */}
+          {interferenceSubTab === 'sov-svo' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {SOV_SVO_REORDER_DRILLS.map((drill) => {
+                const placed = sovPlacedChunks[drill.id] || [];
+                const isComplete = placed.length === drill.correctOrder.length;
+                const isExactMatch =
+                  isComplete &&
+                  placed.every((chunk, idx) => chunk === drill.correctOrder[idx]);
+
+                return (
+                  <div
+                    key={drill.id}
+                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                        नेपाली वाक्य (SOV): “{drill.nepaliSentence}”
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[11px] font-nepali text-[#57534E] dark:text-[#A8A29E]">
+                        {drill.nepaliSOVBreakdown}
+                      </div>
+
+                      <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        Tap chunks in English SVO order (Subject → Verb → Object):
+                      </div>
+
+                      {/* Available Chunk Pool */}
+                      <div className="flex flex-wrap gap-2">
+                        {drill.scrambledChunks.map((chunk) => {
+                          const isUsed = placed.includes(chunk);
+                          return (
+                            <button
+                              key={chunk}
+                              type="button"
+                              onClick={() => {
+                                if (isUsed) {
+                                  setSovPlacedChunks((prev) => ({
+                                    ...prev,
+                                    [drill.id]: (prev[drill.id] || []).filter((c) => c !== chunk),
+                                  }));
+                                } else {
+                                  const next = [...placed, chunk];
+                                  setSovPlacedChunks((prev) => ({ ...prev, [drill.id]: next }));
+                                  if (
+                                    next.length === drill.correctOrder.length &&
+                                    next.every((c, i) => c === drill.correctOrder[i])
+                                  ) {
+                                    speechService.speak(next.join(' '), {
+                                      rate: preferredSpeechRate,
+                                    });
+                                  }
+                                }
+                              }}
+                              className={`min-h-[36px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                                isUsed
+                                  ? 'bg-[#B91C1C]/10 border-[#B91C1C] text-[#B91C1C] line-through opacity-60'
+                                  : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                              }`}
+                            >
+                              {chunk}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Assembled English SVO Sentence Box */}
+                      <div className="min-h-[48px] p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-dashed border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                          {placed.length > 0
+                            ? placed.join(' ')
+                            : 'Tap the chunks above to build the SVO sentence...'}
+                        </span>
+                        {placed.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSovPlacedChunks((prev) => ({ ...prev, [drill.id]: [] }))
+                            }
+                            className="text-xs font-semibold text-[#B91C1C] hover:underline"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isComplete && (
+                      <div
+                        className={`p-3.5 rounded-xl border text-xs ${
+                          isExactMatch
+                            ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300'
+                            : 'bg-amber-50/80 dark:bg-amber-950/40 border-[#D97706] text-amber-900 dark:text-amber-200'
+                        }`}
+                      >
+                        <div className="font-bold mb-1">
+                          {isExactMatch
+                            ? '✓ Accurate English SVO Order!'
+                            : `✗ Target SVO Order: "${drill.correctOrder.join(' ')}"`}
+                        </div>
+                        <p>{drill.explanation}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* SUB-TAB 2: ARTICLE MASTERY (A / AN / THE / ZERO ARTICLE) */}
+          {interferenceSubTab === 'articles' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {ARTICLE_MASTERY_DRILLS.map((drill) => {
+                const picked = articleAnswers[drill.id];
+                return (
+                  <div
+                    key={drill.id}
+                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="font-nepali text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                        {drill.nepaliContext}
+                      </div>
+                      <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        “{drill.sentenceWithBlank}”
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        {drill.options.map((opt) => {
+                          const isSelected = picked === opt;
+                          const isRight = opt === drill.correctAnswer;
+                          let btnClass =
+                            'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
+                          if (picked) {
+                            if (isRight) {
+                              btnClass =
+                                'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-bold';
+                            } else if (isSelected) {
+                              btnClass =
+                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through';
+                            }
+                          }
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() =>
+                                setArticleAnswers((prev) => ({ ...prev, [drill.id]: opt }))
+                              }
+                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${btnClass}`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {picked && (
+                      <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                          Article Rule:{' '}
+                        </strong>
+                        {drill.rule}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* SUB-TAB 3: PREPOSITION TRAPS MAPPED TO NEPALI POSTPOSITIONS */}
+          {interferenceSubTab === 'prepositions' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {PREPOSITION_TRAP_DRILLS.map((drill) => {
+                const picked = prepositionAnswers[drill.id];
+                return (
+                  <div
+                    key={drill.id}
+                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="font-nepali text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                        Nepali Postposition Cue: {drill.nepaliPostposition}
+                      </div>
+                      <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        “{drill.sentenceWithBlank}”
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        {drill.options.map((opt) => {
+                          const isSelected = picked === opt;
+                          const isRight = opt === drill.correctAnswer;
+                          let btnClass =
+                            'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
+                          if (picked) {
+                            if (isRight) {
+                              btnClass =
+                                'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-bold';
+                            } else if (isSelected) {
+                              btnClass =
+                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through';
+                            }
+                          }
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() =>
+                                setPrepositionAnswers((prev) => ({ ...prev, [drill.id]: opt }))
+                              }
+                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${btnClass}`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {picked && (
+                      <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                          Preposition Rule:{' '}
+                        </strong>
+                        {drill.explanation}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* SUB-TAB 4: PRESENT CONTINUOUS OVERUSE & DIRECT TRANSLATION TRAPS */}
+          {interferenceSubTab === 'continuous-traps' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {CONTINUOUS_OVERUSE_DRILLS.map((drill) => {
+                const picked = continuousAnswers[drill.id];
+                return (
+                  <div
+                    key={drill.id}
+                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                        {drill.nepaliThought}
+                      </div>
+                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#B91C1C] dark:text-[#F87171]">
+                        <strong>Present Continuous Overuse Trap:</strong> {drill.wrongHabit}
+                      </div>
+                      <div className="space-y-2 pt-1">
+                        {drill.options.map((opt) => {
+                          const isPicked = picked === opt;
+                          const isRight = opt === drill.correctAnswer;
+                          let style =
+                            'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
+                          if (picked) {
+                            if (isRight) {
+                              style =
+                                'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-semibold';
+                            } else if (isPicked) {
+                              style =
+                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through';
+                            }
+                          }
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setContinuousAnswers((prev) => ({ ...prev, [drill.id]: opt }));
+                                if (opt === drill.correctAnswer) {
+                                  speechService.speak(opt, { rate: preferredSpeechRate });
+                                }
+                              }}
+                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${style}`}
+                            >
+                              <span>{opt}</span>
+                              {picked && isRight && (
+                                <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {picked && (
+                      <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">Why? </strong>
+                        {drill.explanation}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {INTERFERENCE_DRILLS.map((drill) => {
+                const selected = interferenceAnswers[drill.id];
+                return (
+                  <div
+                    key={drill.id}
+                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                        नेपाली भाव: “{drill.nepaliThought}”
+                      </div>
+                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#B91C1C] dark:text-[#F87171]">
+                        <strong>Common Direct-Translation Trap:</strong> {drill.commonNepaliTrap}
+                      </div>
+
+                      <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] pt-1">
+                        Select the Natural Standard English Sentence:
+                      </div>
+                      <div className="space-y-2">
+                        {drill.options.map((opt) => {
+                          const isPicked = selected === opt;
+                          const isCorrect = opt === drill.naturalEnglishFix;
+                          let btnStyle =
+                            'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
+                          if (selected) {
+                            if (isCorrect) {
+                              btnStyle =
+                                'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                            } else if (isPicked) {
+                              btnStyle =
+                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through';
+                            }
+                          }
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setInterferenceAnswers((prev) => ({ ...prev, [drill.id]: opt }));
+                                if (opt === drill.naturalEnglishFix) {
+                                  speechService.speak(opt, { rate: preferredSpeechRate });
+                                }
+                              }}
+                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                            >
+                              <span>{opt}</span>
+                              {selected && isCorrect && (
+                                <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {selected && (
+                      <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">Why? </strong>
+                        {drill.grammarRule}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
@@ -1861,13 +2716,48 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
           </div>
 
+          {/* Sprint Difficulty Tier Selector (All / B1 / B2 / C1 / Mistake Notebook) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <span className="text-xs font-semibold text-[#57534E] dark:text-[#A8A29E]">
+              Select Sprint Difficulty Tier:
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { id: 'ALL', label: 'All Levels' },
+                  { id: 'B1', label: 'B1 Foundation' },
+                  { id: 'B2', label: 'B2 Fluency' },
+                  { id: 'C1', label: 'C1 Mastery' },
+                  { id: 'MISTAKES', label: `Mistake Notebook (${mistakeNotebook.length})` },
+                ] as const
+              ).map((tier) => (
+                <button
+                  key={tier.id}
+                  type="button"
+                  disabled={sprintRunning}
+                  onClick={() => {
+                    setSprintTier(tier.id);
+                    setSprintIdx(0);
+                  }}
+                  className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                    sprintTier === tier.id
+                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                  }`}
+                >
+                  {tier.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!sprintRunning && !sprintFinished ? (
             <div className="text-center py-8 space-y-4">
               <div className="w-14 h-14 rounded-2xl bg-[#D97706]/15 text-[#D97706] flex items-center justify-center mx-auto">
                 <Zap className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                How Many Silent-Letter Words Can You Complete in 60 Seconds?
+                How Many Silent-Letter Words Can You Complete in 60 Seconds? ({sprintTier} Tier)
               </h3>
               <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
                 You will hear each word and see its Nepali meaning + masked letters. Tap the accurate missing letter cluster to build your combo multiplier!
@@ -2191,9 +3081,50 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
 
             <div className="space-y-2.5">
-              <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Choose Your Response:
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Choose Your Response (or Speak with Your Microphone!):
+                </div>
+                <button
+                  type="button"
+                  disabled={rolePlayListening}
+                  onClick={handleSpeakRolePlayResponse}
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
+                    rolePlayListening
+                      ? 'bg-[#B91C1C] text-white border-[#B91C1C] animate-pulse'
+                      : 'bg-white dark:bg-[#1F1C18] border-[#B91C1C] text-[#B91C1C] dark:text-[#F87171] hover:bg-[#B91C1C] hover:text-white'
+                  }`}
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>
+                    {rolePlayListening
+                      ? 'Listening to Your Spoken Response...'
+                      : 'Speak Response with Mic'}
+                  </span>
+                </button>
               </div>
+
+              {rolePlayMicError && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 text-xs text-amber-900 dark:text-amber-200">
+                  {rolePlayMicError}
+                </div>
+              )}
+
+              {rolePlayVoiceResult && (
+                <div
+                  className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                    rolePlayVoiceResult.passed
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300'
+                      : 'bg-amber-50 dark:bg-amber-950/40 border-[#D97706] text-amber-900 dark:text-amber-200'
+                  }`}
+                >
+                  <span>
+                    🎙️ You spoke: “{rolePlayVoiceResult.transcript}”
+                  </span>
+                  <span className="font-ipa font-bold">{rolePlayVoiceResult.score}% Match</span>
+                </div>
+              )}
+
               {currentRolePlayTurn.choices.map((ch, idx) => {
                 const isSelected = selectedRolePlayChoice === idx;
                 let style =
@@ -2214,7 +3145,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     onClick={() => {
                       setSelectedRolePlayChoice(idx);
                       if (ch.quality === 'best') {
-                        speechService.speak(ch.text, { rate: preferredSpeechRate });
+                        speechService.speak(ch.text, {
+                          rate: preferredSpeechRate,
+                          speakerIndex: 1,
+                        });
                         if (rolePlayTurnIdx + 1 === currentScenario.turns.length) {
                           onRecordRolePlayCompleted(currentScenario.id);
                         }
@@ -2917,6 +3851,477 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     <div className="text-[#57534E]">“{cw.englishExample}”</div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 11: TIMED 10-MINUTE EXAM & CAREER READINESS SIMULATOR          */}
+      {/* =================================================================== */}
+      {activeTool === 'exam-simulator' && (
+        <section className="max-w-4xl mx-auto bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
+            <div>
+              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                Timed Diagnostic Mock Test · IELTS / PTE / Job Interview Readiness
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                10-Minute Comprehensive Fluency & Orthography Simulator
+              </h2>
+              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
+                Combines Listening Dictation, Silent-Letter Proofreading, L1 Grammar Error Spotting, and Spoken Response prompts—generating an instant Band/CEFR Score Breakdown with direct links to fix weak areas.
+              </p>
+            </div>
+
+            {examStarted && !examFinished && (
+              <div className="px-4 py-2 rounded-xl bg-[#B91C1C] text-white font-ipa text-sm font-bold inline-flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                <span>
+                  {Math.floor(examSecondsLeft / 60)}:
+                  {String(examSecondsLeft % 60).padStart(2, '0')}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {!examStarted && !examFinished ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#B91C1C]/12 text-[#B91C1C] flex items-center justify-center mx-auto">
+                <Award className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Ready for Your 10-Minute IELTS / PTE / Interview Diagnostic?
+              </h3>
+              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] max-w-lg mx-auto">
+                You will complete 8 targeted tasks across 4 sections: Listening Dictation, Silent-Letter Proofreading, SVO & Tense Grammar, and Spoken Interview Responses.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setExamAnswers({});
+                  setExamQuestionIdx(0);
+                  setExamSecondsLeft(600);
+                  setExamFinished(false);
+                  setExamStarted(true);
+                }}
+                className="min-h-[48px] px-7 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Start 10-Minute Diagnostic Exam</span>
+              </button>
+            </div>
+          ) : examFinished ? (
+            (() => {
+              const listeningCorrect = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+                (q) => q.section === 'listening' && examAnswers[q.id] === q.correctAnswer
+              ).length;
+              const proofreadingCorrect = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+                (q) => q.section === 'proofreading' && examAnswers[q.id] === q.correctAnswer
+              ).length;
+              const grammarCorrect = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+                (q) => q.section === 'grammar' && examAnswers[q.id] === q.correctAnswer
+              ).length;
+              const speakingCorrect = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+                (q) => q.section === 'speaking' && examAnswers[q.id] === q.correctAnswer
+              ).length;
+              const totalCorrect =
+                listeningCorrect + proofreadingCorrect + grammarCorrect + speakingCorrect;
+              const overallPct = Math.round(
+                (totalCorrect / EXAM_DIAGNOSTIC_QUESTIONS.length) * 100
+              );
+              const bandLabel =
+                overallPct >= 85
+                  ? 'C1 Advanced · IELTS Band 7.5–8.0'
+                  : overallPct >= 65
+                  ? 'B2 Upper-Intermediate · IELTS Band 6.5–7.0'
+                  : 'B1 Intermediate · IELTS Band 5.5–6.0';
+
+              const missedItems = EXAM_DIAGNOSTIC_QUESTIONS.filter(
+                (q) => examAnswers[q.id] !== q.correctAnswer
+              );
+
+              return (
+                <div className="space-y-6">
+                  <div className="p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-center space-y-2">
+                    <div className="text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                      Diagnostic Assessment Complete
+                    </div>
+                    <div className="text-3xl font-bold font-ipa text-[#1C1917] dark:text-[#F5F2EB]">
+                      {overallPct}% Overall · {bandLabel}
+                    </div>
+                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                      You answered {totalCorrect} of {EXAM_DIAGNOSTIC_QUESTIONS.length} diagnostic tasks accurately.
+                    </p>
+                  </div>
+
+                  {/* 4-Pillar Score Breakdown */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Listening Dictation', score: `${listeningCorrect}/2` },
+                      { label: 'Silent Proofreading', score: `${proofreadingCorrect}/2` },
+                      { label: 'L1 Grammar & SVO', score: `${grammarCorrect}/2` },
+                      { label: 'Spoken Response', score: `${speakingCorrect}/2` },
+                    ].map((s) => (
+                      <div
+                        key={s.label}
+                        className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-center"
+                      >
+                        <div className="font-ipa text-xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                          {s.score}
+                        </div>
+                        <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                          {s.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Targeted Remediation Links */}
+                  {missedItems.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        Targeted Remediation Plan (Click to Fix Weak Areas):
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {missedItems.map((q) => (
+                          <div
+                            key={q.id}
+                            className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2 text-xs"
+                          >
+                            <div className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                              {q.sectionLabel}
+                            </div>
+                            <div className="text-[#1C1917] dark:text-[#F5F2EB] font-medium">
+                              Target: “{q.correctAnswer}”
+                            </div>
+                            <p className="text-[#57534E] dark:text-[#A8A29E]">{q.explanation}</p>
+                            {onOpenLecture && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenLecture(q.recommendedLectureId)}
+                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] font-semibold inline-flex items-center gap-1.5"
+                              >
+                                <span>Open {q.recommendedLectureTitle}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExamAnswers({});
+                        setExamQuestionIdx(0);
+                        setExamSecondsLeft(600);
+                        setExamFinished(false);
+                        setExamStarted(true);
+                      }}
+                      className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Retake 10-Minute Simulator</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            (() => {
+              const q = EXAM_DIAGNOSTIC_QUESTIONS[examQuestionIdx];
+              const picked = examAnswers[q.id];
+              return (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      {q.sectionLabel}
+                    </span>
+                    <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
+                      Task {examQuestionIdx + 1} of {EXAM_DIAGNOSTIC_QUESTIONS.length}
+                    </span>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
+                    <div className="text-base sm:text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      {q.prompt}
+                    </div>
+                    {languageMode !== 'english-only' && (
+                      <div className="font-nepali text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
+                        {q.nepaliHint}
+                      </div>
+                    )}
+
+                    {q.audioText && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            speechService.speak(q.audioText!, { rate: preferredSpeechRate })
+                          }
+                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                          <span>Play Exam Audio Prompt (1.0x)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => speechService.speak(q.audioText!, { rate: 0.75 })}
+                          className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
+                        >
+                          <Turtle className="w-4 h-4 text-[#D97706]" />
+                          <span>Play Careful (0.75x)</span>
+                        </button>
+
+                        {q.section === 'speaking' && (
+                          <button
+                            type="button"
+                            disabled={examMicListening}
+                            onClick={async () => {
+                              if (!speechService.isRecognitionSupported()) return;
+                              try {
+                                const res = await speechService.evaluatePronunciation(
+                                  q.correctAnswer,
+                                  (l) => setExamMicListening(l)
+                                );
+                                setExamMicResult(res);
+                                if (res.score >= 45) {
+                                  setExamAnswers((prev) => ({ ...prev, [q.id]: q.correctAnswer }));
+                                }
+                              } catch {
+                                setExamMicListening(false);
+                              }
+                            }}
+                            className={`min-h-[40px] px-4 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 ${
+                              examMicListening
+                                ? 'bg-[#15803D] text-white border-[#15803D] animate-pulse'
+                                : 'bg-white dark:bg-[#1F1C18] border-[#15803D] text-[#15803D]'
+                            }`}
+                          >
+                            <Mic className="w-4 h-4" />
+                            <span>
+                              {examMicListening ? 'Listening...' : 'Speak Response with Mic'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {examMicResult && q.section === 'speaking' && (
+                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-[#15803D] text-xs text-[#15803D] dark:text-emerald-300 flex items-center justify-between">
+                        <span>You spoke: “{examMicResult.transcript}”</span>
+                        <span className="font-ipa font-bold">{examMicResult.score}% Match</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {q.options.map((opt) => {
+                      const isSelected = picked === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => {
+                            setExamAnswers((prev) => ({ ...prev, [q.id]: opt }));
+                            setExamMicResult(null);
+                          }}
+                          className={`w-full p-4 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-[#B91C1C] bg-[#B91C1C]/10 text-[#1C1917] dark:text-[#F5F2EB] font-semibold ring-1 ring-[#B91C1C]'
+                              : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
+                          }`}
+                        >
+                          <span>{opt}</span>
+                          {isSelected && <Check className="w-4 h-4 text-[#B91C1C] shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924]">
+                    <button
+                      type="button"
+                      disabled={examQuestionIdx === 0}
+                      onClick={() => {
+                        setExamMicResult(null);
+                        setExamQuestionIdx((i) => Math.max(0, i - 1));
+                      }}
+                      className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold disabled:opacity-40"
+                    >
+                      ← Previous Task
+                    </button>
+
+                    {examQuestionIdx + 1 < EXAM_DIAGNOSTIC_QUESTIONS.length ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExamMicResult(null);
+                          setExamQuestionIdx((i) => i + 1);
+                        }}
+                        className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      >
+                        <span>Next Task</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleFinishExam}
+                        className="min-h-[42px] px-6 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Submit Diagnostic Exam & View Band Report</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </section>
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 12: HANDS-FREE "COMMUTER AUDIO MODE" (PODCAST PLAYER)          */}
+      {/* =================================================================== */}
+      {activeTool === 'commuter-audio' && (
+        <section className="max-w-3xl mx-auto bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                <Radio className={`w-4 h-4 ${commuterPlaying ? 'animate-pulse' : ''}`} />
+                <span>Hands-Free "Commuter Audio Mode" (Podcast Loop)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                Background-Friendly Vocabulary & Sentence Audio Loop
+              </h2>
+              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
+                Speaks each English word at <strong>1.0x</strong>, pauses <strong>2 seconds</strong> for mental recall, speaks it at <strong>0.75x slow phoneme speed</strong>, and reads the example sentence automatically.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {(
+                [
+                  { id: 'lecture', label: 'Selected Lecture Vocab' },
+                  { id: 'saved', label: `Saved Words (${savedWordIds.length})` },
+                  { id: 'mistakes', label: `Mistake Notebook (${mistakeNotebook.length})` },
+                ] as const
+              ).map((src) => (
+                <button
+                  key={src.id}
+                  type="button"
+                  onClick={() => {
+                    setCommuterSource(src.id);
+                    setCommuterTrackIdx(0);
+                  }}
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold ${
+                    commuterSource === src.id
+                      ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] border-transparent'
+                      : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
+                  }`}
+                >
+                  {src.label}
+                </button>
+              ))}
+            </div>
+
+            {commuterSource === 'lecture' && (
+              <select
+                value={commuterLectureNum}
+                onChange={(e) => {
+                  setCommuterLectureNum(Number(e.target.value));
+                  setCommuterTrackIdx(0);
+                }}
+                className="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold"
+              >
+                {lectures.slice(0, 12).map((l) => (
+                  <option key={l.id} value={l.lectureNumber}>
+                    Lecture {String(l.lectureNumber).padStart(2, '0')}: {l.title}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {currentCommuterTrack && (
+            <div className="p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-center space-y-4">
+              <div className="flex items-center justify-center gap-2 text-xs font-ipa">
+                <span className="text-[#57534E] dark:text-[#A8A29E]">
+                  Track {(commuterTrackIdx % Math.max(1, commuterTracks.length)) + 1} of{' '}
+                  {commuterTracks.length}
+                </span>
+                <span>·</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171] font-semibold">
+                  {commuterPhase === 'word-1x' && '🔊 1/4 · Word at 1.0x'}
+                  {commuterPhase === 'pause-2s' && '⏳ 2/4 · 2s Mental Recall Pause'}
+                  {commuterPhase === 'word-075x' && '🐢 3/4 · Word at 0.75x'}
+                  {commuterPhase === 'sentence' && '📖 4/4 · Example Sentence'}
+                  {commuterPhase === 'idle' && 'Paused / Ready'}
+                </span>
+              </div>
+
+              <div className="text-3xl sm:text-4xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                {currentCommuterTrack.word}
+              </div>
+              <div className="font-ipa text-sm text-[#57534E] dark:text-[#A8A29E]">
+                {currentCommuterTrack.ipa} · {currentCommuterTrack.silentLettersSummary}
+              </div>
+              <div className="font-nepali text-lg font-semibold text-[#15803D] dark:text-emerald-400">
+                {currentCommuterTrack.nepaliMeaning}
+              </div>
+              <p className="text-sm text-[#1C1917] dark:text-[#F5F2EB] max-w-lg mx-auto">
+                “{currentCommuterTrack.englishExample}”
+              </p>
+
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (commuterPlaying) {
+                      setCommuterPlaying(false);
+                      speechService.stop();
+                    } else {
+                      setCommuterPlaying(true);
+                    }
+                  }}
+                  className={`min-h-[46px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 ${
+                    commuterPlaying
+                      ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917]'
+                      : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
+                  }`}
+                >
+                  {commuterPlaying ? (
+                    <>
+                      <Square className="w-4 h-4" />
+                      <span>Stop Hands-Free Loop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Start Hands-Free Loop</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCommuterTrackIdx((prev) => (prev + 1) % Math.max(1, commuterTracks.length))
+                  }
+                  className="min-h-[46px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold inline-flex items-center gap-1.5"
+                >
+                  <SkipForward className="w-4 h-4" />
+                  <span>Skip Track</span>
+                </button>
               </div>
             </div>
           )}

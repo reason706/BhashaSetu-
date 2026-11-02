@@ -7,6 +7,7 @@ import {
   SRSRecord,
   SRSStage,
   CustomVocabItem,
+  ExamSimulationRecord,
 } from '../types/curriculum';
 
 const STORAGE_KEY = 'bhashasetu_user_progress_v1';
@@ -28,30 +29,35 @@ export const DEFAULT_USER_PROGRESS: UserProgressState = {
   completedStepsByLecture: {},
   moduleScores: {},
   savedWordIds: ['l1-v1', 'l1-v2', 'l2-v1', 'l4-v1', 'l7-v1', 'l12-v1'],
+  masteredWordIds: ['l1-v1', 'l2-v3'],
   wordSRS: {
     'l1-v1': {
       wordId: 'l1-v1',
-      stage: 'review',
-      correctStreak: 1,
+      stage: 'mastered',
+      correctStreak: 3,
       lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
       nextReviewDue: new Date().toISOString(),
     },
     'l1-v2': {
       wordId: 'l1-v2',
       stage: 'learning',
-      correctStreak: 0,
+      correctStreak: 1,
       lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
       nextReviewDue: new Date().toISOString(),
     },
     'l2-v3': {
       wordId: 'l2-v3',
-      stage: 'review',
-      correctStreak: 1,
+      stage: 'mastered',
+      correctStreak: 3,
       lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
       nextReviewDue: new Date().toISOString(),
     },
   },
   mistakeNotebook: [],
+  lectureNotes: {
+    'lecture-1-silent-consonants':
+      'Silent K before N (knight, knee, know) and silent B after M (plumber, comb, climb).',
+  },
   customLectures: [],
   customWords: [
     {
@@ -96,13 +102,31 @@ export const DEFAULT_USER_PROGRESS: UserProgressState = {
   lastDailyChallengeAt: null,
   dailyChallengeStreak: 0,
   dailyChallengeTotalCompleted: 0,
+  streakFreezeShields: 1,
+  unlockedBadgeIds: [],
   sprintHighScore: 0,
   detectiveSolvedIds: [],
   rolePlayCompletedIds: [],
+  examHistory: [],
   studyActivityByDate: {
     [getTodayDateString()]: 2,
   },
 };
+
+export function getUnifiedMasteredWordsCount(state: UserProgressState): number {
+  const masteredSet = new Set<string>(state.masteredWordIds || []);
+  for (const [wordId, rec] of Object.entries(state.wordSRS || {})) {
+    if (rec.stage === 'mastered' || rec.correctStreak >= 2) {
+      masteredSet.add(wordId);
+    }
+  }
+  const explicitAndSrs = masteredSet.size;
+  const fromCompletedLectures = (state.completedUnitIds?.length || 0) * 10;
+  return Math.max(
+    explicitAndSrs,
+    explicitAndSrs + Math.min(state.savedWordIds?.length || 0, 15) + Math.floor(fromCompletedLectures / 2)
+  );
+}
 
 function openOfflineDB(): Promise<IDBDatabase | null> {
   if (typeof window === 'undefined' || !('indexedDB' in window)) {
@@ -151,11 +175,19 @@ export function loadUserProgress(): UserProgressState {
       ...DEFAULT_USER_PROGRESS,
       ...parsed,
       completedStepsByLecture: parsed.completedStepsByLecture || {},
+      masteredWordIds: parsed.masteredWordIds || DEFAULT_USER_PROGRESS.masteredWordIds,
       wordSRS: parsed.wordSRS || DEFAULT_USER_PROGRESS.wordSRS,
       mistakeNotebook: parsed.mistakeNotebook || [],
+      lectureNotes: parsed.lectureNotes || DEFAULT_USER_PROGRESS.lectureNotes,
       customWords: parsed.customWords || DEFAULT_USER_PROGRESS.customWords,
+      streakFreezeShields:
+        typeof parsed.streakFreezeShields === 'number'
+          ? parsed.streakFreezeShields
+          : DEFAULT_USER_PROGRESS.streakFreezeShields,
+      unlockedBadgeIds: parsed.unlockedBadgeIds || [],
       detectiveSolvedIds: parsed.detectiveSolvedIds || [],
       rolePlayCompletedIds: parsed.rolePlayCompletedIds || [],
+      examHistory: parsed.examHistory || [],
       studyActivityByDate: parsed.studyActivityByDate || DEFAULT_USER_PROGRESS.studyActivityByDate,
     };
   } catch {
@@ -176,13 +208,19 @@ export function saveUserProgress(state: UserProgressState): void {
 export function calculateUpdatedStreak(state: UserProgressState): {
   currentStreakDays: number;
   lastStudyDate: string;
+  streakFreezeShields: number;
 } {
   const today = new Date().toISOString().split('T')[0];
+  const shields = state.streakFreezeShields ?? 1;
   if (!state.lastStudyDate) {
-    return { currentStreakDays: 1, lastStudyDate: today };
+    return { currentStreakDays: 1, lastStudyDate: today, streakFreezeShields: shields };
   }
   if (state.lastStudyDate === today) {
-    return { currentStreakDays: Math.max(1, state.currentStreakDays), lastStudyDate: today };
+    return {
+      currentStreakDays: Math.max(1, state.currentStreakDays),
+      lastStudyDate: today,
+      streakFreezeShields: shields,
+    };
   }
 
   const lastDate = new Date(state.lastStudyDate);
@@ -190,9 +228,21 @@ export function calculateUpdatedStreak(state: UserProgressState): {
   const diffDays = Math.round((currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays === 1) {
-    return { currentStreakDays: state.currentStreakDays + 1, lastStudyDate: today };
+    return {
+      currentStreakDays: state.currentStreakDays + 1,
+      lastStudyDate: today,
+      streakFreezeShields: shields,
+    };
   }
-  return { currentStreakDays: 1, lastStudyDate: today };
+  // 1-Day Grace Shield: If user missed 1 day (diffDays === 2) and has a Streak Freeze Shield, protect streak!
+  if (diffDays === 2 && shields > 0) {
+    return {
+      currentStreakDays: state.currentStreakDays + 1,
+      lastStudyDate: today,
+      streakFreezeShields: shields - 1,
+    };
+  }
+  return { currentStreakDays: 1, lastStudyDate: today, streakFreezeShields: shields };
 }
 
 export function recordModuleStepCompleted(
@@ -201,6 +251,8 @@ export function recordModuleStepCompleted(
   stepIndex: number
 ): UserProgressState {
   const currentSteps = state.completedStepsByLecture[lectureId] || [];
+  const today = getTodayDateString();
+  const existingMap = state.studyActivityByDate || {};
   if (currentSteps.includes(stepIndex)) {
     return state;
   }
@@ -211,6 +263,10 @@ export function recordModuleStepCompleted(
       ...state.completedStepsByLecture,
       [lectureId]: updatedSteps,
     },
+    studyActivityByDate: {
+      ...existingMap,
+      [today]: (existingMap[today] || 0) + 1,
+    },
   };
   saveUserProgress(nextState);
   return nextState;
@@ -220,10 +276,13 @@ export function recordLectureCompletion(
   state: UserProgressState,
   scoreRecord: ModuleScoreRecord
 ): UserProgressState {
-  const { currentStreakDays, lastStudyDate } = calculateUpdatedStreak(state);
+  const { currentStreakDays, lastStudyDate, streakFreezeShields } = calculateUpdatedStreak(state);
   const completedUnitIds = state.completedUnitIds.includes(scoreRecord.unitId)
     ? state.completedUnitIds
     : [...state.completedUnitIds, scoreRecord.unitId];
+
+  const today = getTodayDateString();
+  const existingMap = state.studyActivityByDate || {};
 
   const syncEvent = {
     id: `sync-${Date.now()}`,
@@ -236,6 +295,7 @@ export function recordLectureCompletion(
     ...state,
     currentStreakDays,
     lastStudyDate,
+    streakFreezeShields,
     completedUnitIds,
     completedStepsByLecture: {
       ...state.completedStepsByLecture,
@@ -245,9 +305,62 @@ export function recordLectureCompletion(
       ...state.moduleScores,
       [scoreRecord.unitId]: scoreRecord,
     },
+    studyActivityByDate: {
+      ...existingMap,
+      [today]: (existingMap[today] || 0) + 4,
+    },
     pendingSyncQueue: [...state.pendingSyncQueue, syncEvent],
   };
 
+  saveUserProgress(nextState);
+  return nextState;
+}
+
+export function toggleMasteredWord(
+  state: UserProgressState,
+  wordId: string
+): UserProgressState {
+  const currentMastered = state.masteredWordIds || [];
+  const isCurrentlyMastered =
+    currentMastered.includes(wordId) || state.wordSRS?.[wordId]?.stage === 'mastered';
+
+  const nextMasteredIds = isCurrentlyMastered
+    ? currentMastered.filter((id) => id !== wordId)
+    : Array.from(new Set([...currentMastered, wordId]));
+
+  const now = new Date();
+  const nextSRS: Record<string, SRSRecord> = { ...(state.wordSRS || {}) };
+
+  if (isCurrentlyMastered) {
+    nextSRS[wordId] = {
+      wordId,
+      stage: 'learning',
+      correctStreak: 1,
+      lastReviewedAt: now.toISOString(),
+      nextReviewDue: new Date(now.getTime() + 8 * 3600 * 1000).toISOString(),
+    };
+  } else {
+    nextSRS[wordId] = {
+      wordId,
+      stage: 'mastered',
+      correctStreak: 3,
+      lastReviewedAt: now.toISOString(),
+      nextReviewDue: new Date(now.getTime() + 72 * 3600 * 1000).toISOString(),
+    };
+  }
+
+  const today = getTodayDateString();
+  const existingMap = state.studyActivityByDate || {};
+
+  const nextState: UserProgressState = {
+    ...state,
+    masteredWordIds: nextMasteredIds,
+    wordSRS: nextSRS,
+    studyActivityByDate: {
+      ...existingMap,
+      [today]: (existingMap[today] || 0) + 1,
+    },
+  };
   saveUserProgress(nextState);
   return nextState;
 }
@@ -289,11 +402,54 @@ export function updateWordSRS(
     nextReviewDue: nextDue.toISOString(),
   };
 
+  const currentMastered = state.masteredWordIds || [];
+  const nextMasteredIds =
+    stage === 'mastered'
+      ? Array.from(new Set([...currentMastered, wordId]))
+      : wasCorrect
+      ? currentMastered
+      : currentMastered.filter((id) => id !== wordId);
+
   const nextState: UserProgressState = {
     ...state,
+    masteredWordIds: nextMasteredIds,
     wordSRS: {
       ...state.wordSRS,
       [wordId]: record,
+    },
+  };
+  saveUserProgress(nextState);
+  return nextState;
+}
+
+export function updateLectureScratchpadNote(
+  state: UserProgressState,
+  lectureId: string,
+  noteText: string
+): UserProgressState {
+  const nextState: UserProgressState = {
+    ...state,
+    lectureNotes: {
+      ...(state.lectureNotes || {}),
+      [lectureId]: noteText,
+    },
+  };
+  saveUserProgress(nextState);
+  return nextState;
+}
+
+export function recordExamSimulationResult(
+  state: UserProgressState,
+  examRecord: ExamSimulationRecord
+): UserProgressState {
+  const today = getTodayDateString();
+  const existingMap = state.studyActivityByDate || {};
+  const nextState: UserProgressState = {
+    ...state,
+    examHistory: [examRecord, ...(state.examHistory || [])].slice(0, 15),
+    studyActivityByDate: {
+      ...existingMap,
+      [today]: (existingMap[today] || 0) + 5,
     },
   };
   saveUserProgress(nextState);
@@ -391,7 +547,6 @@ export function updateMistakeNote(
   return nextState;
 }
 
-
 export function toggleSavedWord(state: UserProgressState, wordId: string): UserProgressState {
   const exists = state.savedWordIds.includes(wordId);
   const savedWordIds = exists
@@ -446,11 +601,15 @@ export function recordDailyChallengeCompletion(
   state: UserProgressState,
   correctCount: number
 ): UserProgressState {
-  const { currentStreakDays, lastStudyDate } = calculateUpdatedStreak(state);
+  const { currentStreakDays, lastStudyDate, streakFreezeShields } = calculateUpdatedStreak(state);
   const today = getTodayDateString();
   const existingMap = state.studyActivityByDate || {};
   const nextStreak =
     correctCount >= 2 ? (state.dailyChallengeStreak || 0) + 1 : Math.max(1, state.dailyChallengeStreak || 0);
+  const nextTotal = (state.dailyChallengeTotalCompleted || 0) + 1;
+
+  // Award +1 Streak Freeze Shield every 3 Daily Challenges completed
+  const bonusShield = nextTotal % 3 === 0 ? 1 : 0;
 
   const nextState: UserProgressState = {
     ...state,
@@ -458,7 +617,8 @@ export function recordDailyChallengeCompletion(
     lastStudyDate,
     lastDailyChallengeAt: new Date().toISOString(),
     dailyChallengeStreak: nextStreak,
-    dailyChallengeTotalCompleted: (state.dailyChallengeTotalCompleted || 0) + 1,
+    dailyChallengeTotalCompleted: nextTotal,
+    streakFreezeShields: Math.min(5, streakFreezeShields + bonusShield),
     studyActivityByDate: {
       ...existingMap,
       [today]: (existingMap[today] || 0) + 3,
@@ -602,4 +762,5 @@ export async function flushPendingSyncQueue(
     return state;
   }
 }
+
 

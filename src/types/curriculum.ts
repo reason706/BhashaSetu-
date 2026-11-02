@@ -222,6 +222,19 @@ export interface CustomVocabItem {
   createdAt: string;
 }
 
+export interface ExamSimulationRecord {
+  id: string;
+  completedAt: string;
+  overallBand: number;
+  cefrEstimate: CEFRLevel;
+  pteScore: number;
+  dictationScore: number;
+  proofreadingScore: number;
+  grammarScore: number;
+  speakingScore: number;
+  weakestSkill: 'dictation' | 'proofreading' | 'grammar' | 'speaking';
+}
+
 export interface UserProgressState {
   selectedLevel: CEFRLevel;
   dailyGoalMinutes: number;
@@ -232,8 +245,10 @@ export interface UserProgressState {
   completedStepsByLecture: Record<string, number[]>;
   moduleScores: Record<string, ModuleScoreRecord>;
   savedWordIds: string[];
+  masteredWordIds?: string[];
   wordSRS: Record<string, SRSRecord>;
   mistakeNotebook: MistakeItem[];
+  lectureNotes?: Record<string, string>;
   customLectures: LectureUnit[];
   customWords?: CustomVocabItem[];
   preferredSpeechRate: number;
@@ -244,9 +259,13 @@ export interface UserProgressState {
   lastDailyChallengeAt?: string | null;
   dailyChallengeStreak?: number;
   dailyChallengeTotalCompleted?: number;
+  streakFreezeShields?: number;
+  unlockedBadgeIds?: string[];
   sprintHighScore?: number;
   detectiveSolvedIds?: string[];
   rolePlayCompletedIds?: string[];
+  examHistory?: ExamSimulationRecord[];
   studyActivityByDate?: Record<string, number>;
 }
+
 

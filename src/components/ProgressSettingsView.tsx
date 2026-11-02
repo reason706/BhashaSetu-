@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Flame,
   CheckCircle2,
@@ -26,6 +26,14 @@ import {
   Sliders,
   Headphones,
   PlusCircle,
+  Trophy,
+  Lock,
+  Sparkles,
+  BookOpen,
+  Zap,
+  ShieldCheck,
+  ArrowRight,
+  Share2,
 } from 'lucide-react';
 import {
   UserProgressState,
@@ -37,6 +45,8 @@ import {
 } from '../types/curriculum';
 import { usePWAInstall } from '../hooks/usePWA';
 import { getMassiveLexicon } from '../data/massiveLexicon';
+import { getUnifiedMasteredWordsCount } from '../services/storage';
+import { ArenaToolTab } from './PracticeArenaView';
 import {
   speechService,
   DialogueCalibrationSettings,
@@ -48,12 +58,16 @@ interface ProgressSettingsViewProps {
   progress: UserProgressState;
   lectures: LectureUnit[];
   isOnline: boolean;
+  initialProgressSubView?: 'overview' | 'achievements';
   onUpdateLevel: (level: CEFRLevel) => void;
   onUpdateSpeechRate: (rate: number) => void;
   onUpdateLanguageMode: (langMode: LanguageMode) => void;
   onToggleDarkMode: () => void;
   onManualSync: () => Promise<void>;
   onOpenLecture: (lectureId: string) => void;
+  onOpenArenaTool?: (tool: ArenaToolTab) => void;
+  onOpenDictionary?: () => void;
+  onOpenDailyChallenge?: () => void;
   onUpdateDailyGoal?: (minutes: 5 | 10 | 15 | 30) => void;
   onImportProgress?: (imported: UserProgressState) => void;
   onRecordMistake?: (
@@ -300,12 +314,16 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   progress,
   lectures,
   isOnline,
+  initialProgressSubView = 'overview',
   onUpdateLevel,
   onUpdateSpeechRate,
   onUpdateLanguageMode,
   onToggleDarkMode,
   onManualSync,
   onOpenLecture,
+  onOpenArenaTool,
+  onOpenDictionary,
+  onOpenDailyChallenge,
   onUpdateDailyGoal,
   onImportProgress,
   onRecordMistake,
@@ -322,6 +340,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     text: string;
   } | null>(null);
   const [certificateTrack, setCertificateTrack] = useState<CEFRLevel | null>(null);
+  const [selectedBadgeForPrint, setSelectedBadgeForPrint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Dedicated Long-Form Dialogue Speed & Pitch Calibration State
@@ -347,6 +366,21 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   const [activePairId, setActivePairId] = useState<string>(MINIMAL_PAIR_CONTRASTS[0].id);
   const [mysteryChoice, setMysteryChoice] = useState<'A' | 'B' | null>(null);
   const [userEarGuess, setUserEarGuess] = useState<'A' | 'B' | null>(null);
+
+  // Progress Tab Sub-View ('overview' | 'achievements') & Filter State
+  const [progressSubView, setProgressSubView] = useState<'overview' | 'achievements'>(
+    initialProgressSubView
+  );
+  const [achievementStatusFilter, setAchievementStatusFilter] = useState<
+    'all' | 'unlocked' | 'locked'
+  >('all');
+  const [achievementCategoryFilter, setAchievementCategoryFilter] = useState<
+    'all' | 'curriculum' | 'streak' | 'vocabulary' | 'arena'
+  >('all');
+
+  useEffect(() => {
+    setProgressSubView(initialProgressSubView);
+  }, [initialProgressSubView]);
 
   const isFullNepali = progress.languageMode === 'full-nepali';
 
@@ -475,6 +509,322 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       return { level: lvl, total: units.length, done, pct, label };
     });
   }, [lectures, progress.completedUnitIds]);
+
+  const unifiedMasteredWordsCount = useMemo(
+    () => getUnifiedMasteredWordsCount(progress),
+    [progress]
+  );
+
+  const nextUnfinishedLecture = useMemo(() => {
+    return (
+      lectures.find((l) => !progress.completedUnitIds.includes(l.id)) ||
+      lectures[0]
+    );
+  }, [lectures, progress.completedUnitIds]);
+
+  const fluencyHeatmapCells = useMemo(() => {
+    const baseMastery = Math.min(
+      95,
+      Math.round(
+        progress.completedUnitIds.length * 7 +
+          unifiedMasteredWordsCount * 0.9 +
+          (skillMetrics.overallAccuracy || 65) * 0.25
+      )
+    );
+    const spellingBoost = skillMetrics.spellingPercent ?? 45;
+    const grammarBoost = skillMetrics.grammarPercent ?? 45;
+
+    const silentClusters = [
+      { id: 'kn', label: 'Silent K (kn-)', example: 'Knight, Knowledge', score: Math.min(100, Math.max(25, Math.round((baseMastery + spellingBoost) / 2 + 12))) },
+      { id: 'mb', label: 'Silent B (-mb/-bt)', example: 'Subtle, Plumber, Debt', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 8))) },
+      { id: 'wr', label: 'Silent W (wr-/wh-)', example: 'Wreck, Wrist, Whole', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 5))) },
+      { id: 'lk', label: 'Silent L (-lk/-lm)', example: 'Calm, Salmon, Half', score: Math.min(100, Math.max(18, Math.round((baseMastery + spellingBoost) / 2))) },
+      { id: 'gh', label: 'Silent GH (-igh/-ough)', example: 'Though, Drought, Weigh', score: Math.min(100, Math.max(15, Math.round((baseMastery + spellingBoost) / 2 - 4))) },
+      { id: 'st', label: 'Silent T (-stle/-sten)', example: 'Castle, Fasten, Whistle', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 4))) },
+      { id: 'ps', label: 'Silent P (ps-/pn-/pt)', example: 'Psychology, Receipt', score: Math.min(100, Math.max(18, Math.round((baseMastery + spellingBoost) / 2 - 2))) },
+      { id: 'h', label: 'Silent H (hon-/rh-)', example: 'Honest, Heir, Rhythm', score: Math.min(100, Math.max(22, Math.round((baseMastery + spellingBoost) / 2 + 6))) },
+      { id: 'gn', label: 'Silent G (gn-/-ign)', example: 'Foreign, Sign, Campaign', score: Math.min(100, Math.max(16, Math.round((baseMastery + spellingBoost) / 2 - 3))) },
+      { id: 'mn', label: 'Silent N (-mn)', example: 'Autumn, Column, Solemn', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 2))) },
+      { id: 'sc', label: 'Silent C (sc-)', example: 'Conscience, Muscle', score: Math.min(100, Math.max(15, Math.round((baseMastery + spellingBoost) / 2 - 6))) },
+      { id: 'd', label: 'Silent D (-dj-/-dn-)', example: 'Wednesday, Ledger', score: Math.min(100, Math.max(24, Math.round((baseMastery + spellingBoost) / 2 + 10))) },
+    ];
+
+    const syntaxPillars = [
+      { id: 'svo', label: 'SOV → SVO Word Order', sub: 'Subject + Verb + Object', score: Math.min(100, Math.max(25, Math.round((baseMastery + grammarBoost) / 2 + 8))) },
+      { id: 'articles', label: 'Article Mastery (a/an/the/Ø)', sub: 'Definite vs. Zero Article', score: Math.min(100, Math.max(20, Math.round((baseMastery + grammarBoost) / 2))) },
+      { id: 'prepositions', label: 'Nepali Postposition Traps', sub: 'मा / ले / सँग → in/on/at/by/with', score: Math.min(100, Math.max(18, Math.round((baseMastery + grammarBoost) / 2 - 4))) },
+      { id: 'stative', label: 'Stative vs. Continuous (-ing)', sub: 'Have / Know / Believe', score: Math.min(100, Math.max(22, Math.round((baseMastery + grammarBoost) / 2 + 5))) },
+    ];
+
+    return { silentClusters, syntaxPillars };
+  }, [progress.completedUnitIds.length, unifiedMasteredWordsCount, skillMetrics]);
+
+  const achievementsList = useMemo(() => {
+    const completedCount = progress.completedUnitIds.length;
+    const streakDays = progress.currentStreakDays || 0;
+    const wordsMasteredOrPracticed = unifiedMasteredWordsCount;
+    const b1Done = trackStats.find((t) => t.level === 'B1')?.done || 0;
+    const b1Total = trackStats.find((t) => t.level === 'B1')?.total || 4;
+    const b2Done = trackStats.find((t) => t.level === 'B2')?.done || 0;
+    const b2Total = trackStats.find((t) => t.level === 'B2')?.total || 4;
+    const dailyChallenges = progress.dailyChallengeTotalCompleted || 0;
+    const detectiveSolved = progress.detectiveSolvedIds?.length || 0;
+    const sprintBest = progress.sprintHighScore || 0;
+    const rolePlaysDone = progress.rolePlayCompletedIds?.length || 0;
+    const customDeckCount = progress.customWords?.length || 0;
+    const quizAcc = skillMetrics.overallAccuracy || 0;
+
+    return [
+      {
+        id: 'first-lecture-finished',
+        title: 'First Lecture Finished',
+        nepaliTitle: 'पहिलो पाठ सम्पन्न',
+        category: 'curriculum' as const,
+        categoryLabel: 'Curriculum Milestone',
+        tier: 'Bronze' as const,
+        desc: 'Finish your very first sequential curriculum lecture from Step 01 to Step 05.',
+        howToUnlock: 'Complete all 5 modules in Lecture 01 (or any lecture unit) to unlock.',
+        actionLabel: 'Resume Next Lecture',
+        onTriggerAction: () => nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(1, completedCount),
+        target: 1,
+        unit: 'lecture',
+        unlocked: completedCount >= 1,
+      },
+      {
+        id: 'ten-day-streak',
+        title: '10-Day Streak',
+        nepaliTitle: '१०-दिने निरन्तर अध्ययन',
+        category: 'streak' as const,
+        categoryLabel: 'Consistency & Habit',
+        tier: 'Gold' as const,
+        desc: 'Maintain an unbroken 10-day study streak across lectures, quizzes, or daily challenges.',
+        howToUnlock: 'Complete at least one study step or Daily Challenge every day for 10 days.',
+        actionLabel: 'Launch Daily Challenge',
+        onTriggerAction: () =>
+          onOpenDailyChallenge
+            ? onOpenDailyChallenge()
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(10, streakDays),
+        target: 10,
+        unit: 'days',
+        unlocked: streakDays >= 10,
+      },
+      {
+        id: 'fifty-words-mastered',
+        title: '50 Words Mastered',
+        nepaliTitle: '५० शब्दमा पूर्ण दक्षता',
+        category: 'vocabulary' as const,
+        categoryLabel: 'Vocabulary & SRS',
+        tier: 'Gold' as const,
+        desc: 'Master and practice 50 silent-letter and high-frequency vocabulary words.',
+        howToUnlock: 'Mark words as Mastered in Lectures/Dictionary or review SRS flashcards.',
+        actionLabel: 'Open SRS Dictionary',
+        onTriggerAction: () =>
+          onOpenDictionary
+            ? onOpenDictionary()
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(50, wordsMasteredOrPracticed),
+        target: 50,
+        unit: 'words',
+        unlocked: wordsMasteredOrPracticed >= 50,
+      },
+      {
+        id: 'three-day-streak',
+        title: '3-Day Streak Builder',
+        nepaliTitle: '३-दिने अध्ययन बानी',
+        category: 'streak' as const,
+        categoryLabel: 'Consistency & Habit',
+        tier: 'Bronze' as const,
+        desc: 'Build daily momentum by studying for 3 consecutive days.',
+        howToUnlock: 'Log in and complete a lecture step or Daily Challenge 3 days in a row.',
+        actionLabel: 'Start Daily Challenge',
+        onTriggerAction: () =>
+          onOpenDailyChallenge
+            ? onOpenDailyChallenge()
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(3, streakDays),
+        target: 3,
+        unit: 'days',
+        unlocked: streakDays >= 3,
+      },
+      {
+        id: 'twenty-five-words-collector',
+        title: '25 Words Collector',
+        nepaliTitle: '२५ शब्द संग्रहकर्ता',
+        category: 'vocabulary' as const,
+        categoryLabel: 'Vocabulary & SRS',
+        tier: 'Silver' as const,
+        desc: 'Master or bookmark 25 core English vocabulary words with silent-letter rules.',
+        howToUnlock: 'Mark words as Mastered in Step 01 or practice flashcards in the 10k+ Dictionary.',
+        actionLabel: 'Open Dictionary Deck',
+        onTriggerAction: () =>
+          onOpenDictionary
+            ? onOpenDictionary()
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(25, wordsMasteredOrPracticed),
+        target: 25,
+        unit: 'words',
+        unlocked: wordsMasteredOrPracticed >= 25,
+      },
+      {
+        id: 'b1-foundation-graduate',
+        title: 'B1 Foundation Graduate',
+        nepaliTitle: 'B1 आधारभूत तह पूरा',
+        category: 'curriculum' as const,
+        categoryLabel: 'Curriculum Milestone',
+        tier: 'Silver' as const,
+        desc: 'Complete all 4 lectures in Track 1 · B1 Lower-Intermediate (Lectures 01–04).',
+        howToUnlock: 'Finish Lectures 01, 02, 03, and 04 covering silent clusters and SVO syntax.',
+        actionLabel: 'Resume B1 Track',
+        onTriggerAction: () => nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(b1Total, b1Done),
+        target: b1Total,
+        unit: 'B1 units',
+        unlocked: b1Done >= b1Total && b1Total > 0,
+      },
+      {
+        id: 'b2-workplace-graduate',
+        title: 'B2 Workplace Graduate',
+        nepaliTitle: 'B2 कार्यस्थल तह पूरा',
+        category: 'curriculum' as const,
+        categoryLabel: 'Curriculum Milestone',
+        tier: 'Gold' as const,
+        desc: 'Complete all 4 lectures in Track 2 · B2 Upper-Intermediate (Lectures 05–08).',
+        howToUnlock: 'Finish Lectures 05–08 covering schwa reduction, passive voice, and reported speech.',
+        actionLabel: 'Resume B2 Track',
+        onTriggerAction: () => nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(b2Total, b2Done),
+        target: b2Total,
+        unit: 'B2 units',
+        unlocked: b2Done >= b2Total && b2Total > 0,
+      },
+      {
+        id: 'c1-master-linguist',
+        title: 'C1 Master Linguist',
+        nepaliTitle: 'C1 उच्च तह विशेषज्ञ',
+        category: 'curriculum' as const,
+        categoryLabel: 'Curriculum Milestone',
+        tier: 'Platinum' as const,
+        desc: 'Complete all 12 core curriculum lectures across B1, B2, and C1 tracks.',
+        howToUnlock: 'Complete every unit from Lecture 01 through Lecture 12.',
+        actionLabel: 'Resume Next Lecture',
+        onTriggerAction: () => nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(12, completedCount),
+        target: 12,
+        unit: 'lectures',
+        unlocked: completedCount >= 12,
+      },
+      {
+        id: 'daily-challenge-champion',
+        title: 'Daily Challenge Champion',
+        nepaliTitle: 'दैनिक चुनौती विजेता',
+        category: 'streak' as const,
+        categoryLabel: 'Consistency & Habit',
+        tier: 'Bronze' as const,
+        desc: 'Complete the 24-Hour 3-Question Daily Challenge pop-up quiz.',
+        howToUnlock: 'Launch and finish the 3-Question Daily Challenge on the Home Dashboard.',
+        actionLabel: 'Start Daily Challenge',
+        onTriggerAction: () =>
+          onOpenDailyChallenge
+            ? onOpenDailyChallenge()
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(1, dailyChallenges),
+        target: 1,
+        unit: 'challenge',
+        unlocked: dailyChallenges >= 1,
+      },
+      {
+        id: 'silent-letter-detective',
+        title: 'Silent-Letter Detective',
+        nepaliTitle: 'मौन-अक्षर जासुस',
+        category: 'arena' as const,
+        categoryLabel: 'Fluency Arena',
+        tier: 'Silver' as const,
+        desc: 'Spot all hidden silent-letter words in a Practice Hub reading passage.',
+        howToUnlock: 'Solve at least 1 passage in the Silent-Letter Detective game in Practice Hub.',
+        actionLabel: 'Play Silent-Letter Detective',
+        onTriggerAction: () =>
+          onOpenArenaTool
+            ? onOpenArenaTool('detective')
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(1, detectiveSolved),
+        target: 1,
+        unit: 'case',
+        unlocked: detectiveSolved >= 1,
+      },
+      {
+        id: 'phonics-sprint-speedster',
+        title: '60s Phonics Speedster',
+        nepaliTitle: '६०-सेकेन्ड स्पेलिङ च्याम्पियन',
+        category: 'arena' as const,
+        categoryLabel: 'Fluency Arena',
+        tier: 'Gold' as const,
+        desc: 'Score 40+ points in the Timed 60-Second Spelling & Phonics Sprint.',
+        howToUnlock: 'Play the 60s Spelling Sprint in Practice Hub and build a combo streak.',
+        actionLabel: 'Start 60s Sprint',
+        onTriggerAction: () =>
+          onOpenArenaTool
+            ? onOpenArenaTool('sprint')
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(40, sprintBest),
+        target: 40,
+        unit: 'pts',
+        unlocked: sprintBest >= 40,
+      },
+      {
+        id: 'roleplay-deck-architect',
+        title: 'Fluency & Deck Architect',
+        nepaliTitle: 'संवाद र शब्दकोश निर्माता',
+        category: 'arena' as const,
+        categoryLabel: 'Fluency Arena',
+        tier: 'Silver' as const,
+        desc: 'Complete a Real-World Role-Play scenario or maintain 3+ Custom Flashcards.',
+        howToUnlock: 'Finish a Role-Play simulation or add 3 custom words in Practice Hub.',
+        actionLabel: 'Open Role-Play Simulator',
+        onTriggerAction: () =>
+          onOpenArenaTool
+            ? onOpenArenaTool('roleplay')
+            : nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id),
+        current: Math.min(3, Math.max(rolePlaysDone * 3, customDeckCount, quizAcc >= 85 ? 3 : 0)),
+        target: 3,
+        unit: 'milestones',
+        unlocked: rolePlaysDone >= 1 || customDeckCount >= 3 || quizAcc >= 85,
+      },
+    ];
+  }, [
+    progress.completedUnitIds.length,
+    progress.currentStreakDays,
+    progress.customWords,
+    progress.dailyChallengeTotalCompleted,
+    progress.detectiveSolvedIds,
+    progress.sprintHighScore,
+    progress.rolePlayCompletedIds,
+    unifiedMasteredWordsCount,
+    skillMetrics.overallAccuracy,
+    trackStats,
+    nextUnfinishedLecture,
+    onOpenLecture,
+    onOpenDictionary,
+    onOpenDailyChallenge,
+    onOpenArenaTool,
+  ]);
+
+  const unlockedBadgesCount = useMemo(
+    () => achievementsList.filter((b) => b.unlocked).length,
+    [achievementsList]
+  );
+
+  const filteredAchievements = useMemo(() => {
+    return achievementsList.filter((badge) => {
+      if (achievementStatusFilter === 'unlocked' && !badge.unlocked) return false;
+      if (achievementStatusFilter === 'locked' && badge.unlocked) return false;
+      if (achievementCategoryFilter !== 'all' && badge.category !== achievementCategoryFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [achievementsList, achievementStatusFilter, achievementCategoryFilter]);
 
   const handleSyncClick = async () => {
     setIsSyncing(true);
@@ -729,6 +1079,76 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     e.target.value = '';
   };
 
+  // Printable Shareable Achievement & Milestone Card View
+  if (selectedBadgeForPrint) {
+    const badgeInfo =
+      achievementsList.find((b) => b.id === selectedBadgeForPrint) || achievementsList[0];
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 print:hidden">
+          <button
+            onClick={() => setSelectedBadgeForPrint(null)}
+            className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold inline-flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Achievements View</span>
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print / Save Achievement Card as PDF</span>
+          </button>
+        </div>
+
+        <div className="bg-white text-[#1C1917] border-4 border-double border-[#D97706] rounded-2xl p-8 sm:p-12 text-center space-y-6">
+          <div className="w-20 h-20 rounded-2xl bg-[#15803D] text-white flex items-center justify-center mx-auto shadow-md">
+            <Trophy className="w-10 h-10" />
+          </div>
+          <div className="font-ipa text-xs uppercase tracking-widest text-[#B91C1C] font-semibold">
+            BhashaSetu · Official Milestone Achievement Card ({badgeInfo.tier} Tier)
+          </div>
+          <h1 className="font-serif-display text-3xl sm:text-4xl font-bold text-[#1C1917]">
+            {badgeInfo.title}
+          </h1>
+          <div className="font-nepali text-lg text-[#57534E] font-medium">
+            {badgeInfo.nepaliTitle}
+          </div>
+          <p className="text-sm sm:text-base text-[#57534E] max-w-xl mx-auto">
+            {badgeInfo.desc}
+          </p>
+
+          <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto pt-4 border-t border-b border-[#E7E0D6] py-4">
+            <div>
+              <div className="font-ipa text-xl font-bold text-[#15803D]">
+                {badgeInfo.current} / {badgeInfo.target}
+              </div>
+              <div className="text-xs text-[#57534E]">Milestone Progress ({badgeInfo.unit})</div>
+            </div>
+            <div>
+              <div className="font-ipa text-xl font-bold text-[#B91C1C]">
+                {unifiedMasteredWordsCount} Words
+              </div>
+              <div className="text-xs text-[#57534E]">Words Mastered</div>
+            </div>
+            <div>
+              <div className="font-ipa text-xl font-bold text-[#D97706]">
+                {progress.currentStreakDays} Days
+              </div>
+              <div className="text-xs text-[#57534E]">Active Study Streak</div>
+            </div>
+          </div>
+
+          <div className="text-xs font-ipa text-[#57534E] pt-2">
+            Verified Milestone Card · Issued on {new Date().toLocaleDateString()} · BhashaSetu English Mastery
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Printable CEFR Certificate View
   if (certificateTrack) {
     const trackInfo = trackStats.find((t) => t.level === certificateTrack) || trackStats[0];
@@ -803,359 +1223,866 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   // DEDICATED PROGRESS & ANALYTICS VIEW (mode === 'progress')
   // ===========================================================================
   if (mode === 'progress') {
+    const achievementCompletionPct = Math.round(
+      (unlockedBadgesCount / achievementsList.length) * 100
+    );
+    const scholarRankTitle =
+      unlockedBadgesCount >= 10
+        ? 'C1 Grandmaster Linguist'
+        : unlockedBadgesCount >= 6
+        ? 'B2 Syntax & Phonics Architect'
+        : unlockedBadgesCount >= 3
+        ? 'B1 Silent-Letter Scholar'
+        : 'Phonics & Bridge Initiate';
+
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-8">
-        {/* Page Header */}
-        <div className="pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-          <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
-            Learning Analytics & Syllabus Mastery
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            Your Study Progress & Skill Breakdown
-          </h1>
-          <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-            Track your daily streak, visual skill charts across Vocabulary, Spelling, Grammar, and Dialogue, and unit-by-unit mastery from B1 to C1.
-          </p>
-        </div>
-
-        {/* 4 KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-            <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-              <span>Daily Streak</span>
-              <Flame className="w-4 h-4 text-[#D97706]" />
+        {/* Page Header + Segmented View Switcher (Overview vs. Achievements) */}
+        <div className="pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924] flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+              Learning Analytics, Milestones & Syllabus Mastery
             </div>
-            <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {progress.currentStreakDays} {progress.currentStreakDays === 1 ? 'Day' : 'Days'}
-            </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-              Daily goal: {progress.dailyGoalMinutes || 15} mins/day
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              {progressSubView === 'achievements'
+                ? 'Achievements & Unlockable Milestones'
+                : 'Your Study Progress & Skill Breakdown'}
+            </h1>
+            <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
+              {progressSubView === 'achievements'
+                ? 'Track your unlockable badges across First Lecture Finished, 10-Day Streak, 50 Words Mastered, and CEFR track milestones.'
+                : 'Track your daily streak, visual skill charts across Vocabulary, Spelling, Grammar, and Dialogue, and unit-by-unit mastery from B1 to C1.'}
+            </p>
           </div>
 
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-            <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-              <span>Lectures Completed</span>
-              <CheckCircle2 className="w-4 h-4 text-[#15803D]" />
-            </div>
-            <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {progress.completedUnitIds.length} / {lectures.length}
-            </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-              {overallCoursePercent}% of B1–C1 syllabus
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-            <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-              <span>Overall Quiz Accuracy</span>
-              <BarChart3 className="w-4 h-4 text-[#B91C1C]" />
-            </div>
-            <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {skillMetrics.overallAccuracy !== null ? `${skillMetrics.overallAccuracy}%` : '—'}
-            </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-              {skillMetrics.totalCorrect}/{skillMetrics.totalQuestions} questions correct
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-            <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-              <span>Saved / Total Lexicon</span>
-              <BookmarkCheck className="w-4 h-4 text-[#B91C1C]" />
-            </div>
-            <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {progress.savedWordIds.length} / {totalLexiconCount.toLocaleString()}+
-            </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-              {progress.mistakeNotebook.length} active mistake notes
-            </div>
+          {/* Sub-View Switcher Tabs inside Progress */}
+          <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] self-start lg:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setProgressSubView('overview')}
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-all ${
+                progressSubView === 'overview'
+                  ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] shadow-xs'
+                  : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Overview & Analytics</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setProgressSubView('achievements')}
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-all ${
+                progressSubView === 'achievements'
+                  ? 'bg-[#B91C1C] text-white shadow-xs'
+                  : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
+              }`}
+            >
+              <Trophy className="w-4 h-4 text-[#D97706]" />
+              <span>
+                Achievements ({unlockedBadgesCount}/{achievementsList.length})
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Visual Skill Breakdown Charts + Recommended Focus Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-8 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
-            <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                4-Skill Mastery Analytics
-              </div>
-              <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                Visual Skill Breakdown Charts
-              </h2>
-              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
-                Performance across each module pillar based on your completed quizzes, dictation bees, and vocabulary practice:
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {[
-                {
-                  label: '01 · Vocabulary & Silent-Letter Phonics',
-                  pct: skillMetrics.vocabPercent,
-                  detail: `${skillMetrics.practicedWordsCount} / ${skillMetrics.totalCoreWords} core words practiced`,
-                  color: 'bg-[#B91C1C]',
-                },
-                {
-                  label: '02 & 03 · Spelling Rules & Audio Dictation Bee',
-                  pct: skillMetrics.spellingPercent ?? 0,
-                  detail:
-                    skillMetrics.spellingTotal > 0
-                      ? `${skillMetrics.spellingCorrect}/${skillMetrics.spellingTotal} correct (${skillMetrics.spellingPercent}%)`
-                      : 'Complete a Step 03 Spelling & Dictation quiz to record score',
-                  color: 'bg-[#D97706]',
-                },
-                {
-                  label: '04 · Grammar Syntax & Sentence Builder',
-                  pct: skillMetrics.grammarPercent ?? 0,
-                  detail:
-                    skillMetrics.grammarTotal > 0
-                      ? `${skillMetrics.grammarCorrect}/${skillMetrics.grammarTotal} correct (${skillMetrics.grammarPercent}%)`
-                      : 'Complete a Step 04 Grammar Capstone quiz to record score',
-                  color: 'bg-[#15803D]',
-                },
-                {
-                  label: '05 · Real-Life Dialogue Comprehension',
-                  pct: skillMetrics.dialoguePercent ?? 0,
-                  detail:
-                    skillMetrics.dialogueTotal > 0
-                      ? `${skillMetrics.dialogueCorrect}/${skillMetrics.dialogueTotal} correct (${skillMetrics.dialoguePercent}%)`
-                      : 'Complete a Step 05 Dialogue Comprehension quiz to record score',
-                  color: 'bg-sky-700',
-                },
-              ].map((bar) => (
-                <div key={bar.label} className="space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      {bar.label}
-                    </span>
-                    <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
-                      {bar.detail}
-                    </span>
+        {progressSubView === 'achievements' ? (
+          /* ================================================================= */
+          /* DEDICATED ACHIEVEMENTS & MILESTONE BADGES VIEW                    */
+          /* ================================================================= */
+          <div className="space-y-8">
+            {/* Hero Achievement Banner & Rank Card */}
+            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                <div className="lg:col-span-8 space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs font-semibold text-[#D97706]">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Current Scholar Rank: {scholarRankTitle}</span>
                   </div>
-                  <div className="w-full h-3 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                    <div
-                      className={`h-full ${bar.color} rounded-full transition-all duration-300`}
-                      style={{ width: `${Math.max(4, bar.pct)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                  <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                    {unlockedBadgesCount} of {achievementsList.length} Milestone Badges Unlocked ({achievementCompletionPct}%)
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
+                    Every lecture you finish, daily streak you maintain, and vocabulary word you master progresses your permanent BhashaSetu achievement badges.
+                  </p>
 
-          {/* Recommended Focus Area & Track Certificates */}
-          <div className="lg:col-span-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                <Target className="w-4 h-4" />
-                <span>Recommended Focus Area</span>
-              </div>
-              <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                {skillMetrics.focusArea.name}
-              </h3>
-              <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                {skillMetrics.focusArea.hint}
-              </p>
-
-              <div className="pt-2 space-y-2.5">
-                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  CEFR Track Progress & Certificates:
-                </div>
-                {trackStats.map((t) => (
-                  <div
-                    key={t.level}
-                    className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
-                  >
+                  <div className="pt-2 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                        Level {t.level} ({t.done}/{t.total})
+                        Overall Trophy Case Completion
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setCertificateTrack(t.level)}
-                        className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                      >
-                        <Award className="w-3 h-3" />
-                        <span>View Certificate</span>
-                      </button>
+                      <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                        {unlockedBadgesCount}/{achievementsList.length} Badges ({achievementCompletionPct}%)
+                      </span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden">
+                    <div className="w-full h-3 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
                       <div
-                        className="h-full bg-[#B91C1C] rounded-full"
-                        style={{ width: `${Math.max(5, t.pct)}%` }}
+                        className="h-full bg-[#B91C1C] rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(5, achievementCompletionPct)}%` }}
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Featured Core 3 Milestones Spotlight */}
+                <div className="lg:col-span-4 p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
+                  <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
+                    <span>Core Milestone Tracker</span>
+                    <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
+                  </div>
+                  <div className="space-y-2">
+                    {achievementsList.slice(0, 3).map((core) => {
+                      const pct = Math.min(100, Math.round((core.current / core.target) * 100));
+                      return (
+                        <div
+                          key={core.id}
+                          className="p-2.5 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {core.title}
+                            </span>
+                            <span
+                              className={`font-ipa text-[11px] font-semibold ${
+                                core.unlocked
+                                  ? 'text-[#15803D] dark:text-emerald-400'
+                                  : 'text-[#B91C1C] dark:text-[#F87171]'
+                              }`}
+                            >
+                              {core.unlocked ? '✓ Unlocked' : `${core.current}/${core.target}`}
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                core.unlocked ? 'bg-[#15803D]' : 'bg-[#D97706]'
+                              }`}
+                              style={{ width: `${Math.max(6, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar for Achievements */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-3">
+              {/* Status Filter */}
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
+                {(
+                  [
+                    { id: 'all', label: `All Badges (${achievementsList.length})` },
+                    { id: 'unlocked', label: `Unlocked (${unlockedBadgesCount})` },
+                    {
+                      id: 'locked',
+                      label: `In Progress (${achievementsList.length - unlockedBadgesCount})`,
+                    },
+                  ] as const
+                ).map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setAchievementStatusFilter(st.id)}
+                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                      achievementStatusFilter === st.id
+                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
+                        : 'text-[#57534E] dark:text-[#A8A29E]'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
+                {(
+                  [
+                    { id: 'all', label: 'All Categories' },
+                    { id: 'curriculum', label: 'Lectures & CEFR' },
+                    { id: 'streak', label: 'Streaks & Habits' },
+                    { id: 'vocabulary', label: 'Words Mastered' },
+                    { id: 'arena', label: 'Fluency Arena' },
+                  ] as const
+                ).map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setAchievementCategoryFilter(cat.id)}
+                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      achievementCategoryFilter === cat.id
+                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] font-semibold shadow-xs'
+                        : 'text-[#57534E] dark:text-[#A8A29E]'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
                 ))}
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* =============================================================== */}
-        {/* FEATURE #10: 14-DAY STUDY HEATMAP & MASTERY MILESTONES BADGES    */}
-        {/* =============================================================== */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* 14-Day Study Activity Heatmap */}
-          <div className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
-            <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                Feature #10 · Consistency & Daily Habit Tracker
-              </div>
-              <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                14-Day Study Activity Heatmap
-              </h2>
-              <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                Every lecture step, Daily Challenge, 60s Sprint, and Practice Arena session lights up your daily study grid:
-              </p>
-            </div>
-
-            <div className="grid grid-cols-7 gap-2 pt-2">
-              {Array.from({ length: 14 }).map((_, i) => {
-                const d = new Date(Date.now() - (13 - i) * 86400000);
-                const dateStr = d.toISOString().split('T')[0];
-                const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
-                const dayNum = d.getDate();
-                const count =
-                  progress.studyActivityByDate?.[dateStr] ||
-                  (dateStr === progress.lastStudyDate ? 2 : 0);
-
-                let cellStyle =
-                  'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E]';
-                if (count >= 4) {
-                  cellStyle = 'bg-[#B91C1C] border-[#B91C1C] text-white font-bold';
-                } else if (count >= 2) {
-                  cellStyle =
-                    'bg-[#B91C1C]/25 dark:bg-[#B91C1C]/40 border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB] font-semibold';
-                } else if (count >= 1) {
-                  cellStyle =
-                    'bg-amber-100 dark:bg-amber-950/50 border-[#D97706] text-[#1C1917] dark:text-[#F5F2EB]';
-                }
-
-                return (
-                  <div
-                    key={dateStr}
-                    title={`${dateStr}: ${count} study actions`}
-                    className={`p-2 rounded-xl border text-center space-y-0.5 ${cellStyle}`}
-                  >
-                    <div className="text-[10px] opacity-80">{dayLabel}</div>
-                    <div className="font-ipa text-xs">{dayNum}</div>
-                    <div className="text-[9px] font-ipa">{count > 0 ? `${count}pt` : '—'}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-              <span>
-                Daily Challenges Completed:{' '}
-                <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
-                  {progress.dailyChallengeTotalCompleted || 0}
-                </strong>
-              </span>
-              <span>
-                60s Sprint High Score:{' '}
-                <strong className="text-[#B91C1C] dark:text-[#F87171]">
-                  {progress.sprintHighScore || 0} pts
-                </strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Mastery Milestones Trophy Case (8 Unlockable Badges) */}
-          <div className="lg:col-span-7 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                  Phonics, Syntax & Fluency Achievements
+            {/* Unlockable Badge Cards Grid */}
+            {filteredAchievements.length === 0 ? (
+              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-8 text-center space-y-3">
+                <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  No badges match the selected filter
                 </div>
-                <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                  Mastery Milestones & Trophy Case
-                </h2>
-              </div>
-              <Award className="w-6 h-6 text-[#D97706]" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                {
-                  title: 'Silent K-W Pioneer',
-                  desc: 'Complete your first curriculum lecture or 5 saved words',
-                  unlocked:
-                    progress.completedUnitIds.length >= 1 || progress.savedWordIds.length >= 5,
-                },
-                {
-                  title: 'Daily Challenge Champion',
-                  desc: 'Complete the 24-Hour 3-Question Daily Challenge',
-                  unlocked: (progress.dailyChallengeTotalCompleted || 0) >= 1,
-                },
-                {
-                  title: 'Silent-Letter Detective',
-                  desc: 'Solve a Silent-Letter Detective reading case in Practice Arena',
-                  unlocked: (progress.detectiveSolvedIds?.length || 0) >= 1,
-                },
-                {
-                  title: '60s Phonics Speedster',
-                  desc: 'Score 40+ points in the Timed 60-Second Spelling Sprint',
-                  unlocked: (progress.sprintHighScore || 0) >= 40,
-                },
-                {
-                  title: 'Role-Play Communicator',
-                  desc: 'Complete a Real-World Situation Role-Play scenario',
-                  unlocked: (progress.rolePlayCompletedIds?.length || 0) >= 1,
-                },
-                {
-                  title: 'Custom Deck Architect',
-                  desc: 'Maintain 3+ personal flashcards in your Custom Study Deck',
-                  unlocked: (progress.customWords?.length || 0) >= 3,
-                },
-                {
-                  title: 'B1–B2 Track Scholar',
-                  desc: 'Complete 4 or more sequential curriculum lectures',
-                  unlocked: progress.completedUnitIds.length >= 4,
-                },
-                {
-                  title: 'C1 Master Linguist',
-                  desc: 'Complete all 12 core lectures across B1, B2, and C1',
-                  unlocked: progress.completedUnitIds.length >= 12,
-                },
-              ].map((badge) => (
-                <div
-                  key={badge.title}
-                  className={`p-3.5 rounded-xl border flex items-start gap-3 ${
-                    badge.unlocked
-                      ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800'
-                      : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] opacity-75'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAchievementStatusFilter('all');
+                    setAchievementCategoryFilter('all');
+                  }}
+                  className="min-h-[38px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
                 >
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      badge.unlocked
-                        ? 'bg-[#15803D] text-white'
-                        : 'bg-[#E7E0D6] dark:bg-[#2E2924] text-[#57534E]'
-                    }`}
-                  >
-                    <Award className="w-4 h-4" />
+                  Show All Achievements
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredAchievements.map((badge) => {
+                  const pct = Math.min(100, Math.round((badge.current / badge.target) * 100));
+                  const tierStyles =
+                    badge.tier === 'Platinum'
+                      ? 'bg-purple-100 dark:bg-purple-950/50 text-purple-900 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                      : badge.tier === 'Gold'
+                      ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                      : badge.tier === 'Silver'
+                      ? 'bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border-stone-300 dark:border-stone-700'
+                      : 'bg-orange-100 dark:bg-orange-950/40 text-orange-900 dark:text-orange-300 border-orange-300 dark:border-orange-800';
+
+                  return (
+                    <article
+                      key={badge.id}
+                      className={`rounded-2xl border p-5 flex flex-col justify-between transition-all ${
+                        badge.unlocked
+                          ? 'bg-white dark:bg-[#1F1C18] border-emerald-400 dark:border-emerald-700 shadow-xs'
+                          : 'bg-white/80 dark:bg-[#1F1C18]/80 border-[#E7E0D6] dark:border-[#2E2924]'
+                      }`}
+                    >
+                      <div className="space-y-3.5">
+                        {/* Top Badge Icon + Tier & Unlock Status */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                              badge.unlocked
+                                ? 'bg-[#15803D] text-white border-[#15803D]'
+                                : 'bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] border-[#E7E0D6] dark:border-[#2E2924]'
+                            }`}
+                          >
+                            {badge.unlocked ? (
+                              <Trophy className="w-6 h-6" />
+                            ) : badge.category === 'streak' ? (
+                              <Flame className="w-6 h-6 text-[#D97706]" />
+                            ) : badge.category === 'vocabulary' ? (
+                              <BookmarkCheck className="w-6 h-6 text-[#B91C1C]" />
+                            ) : badge.category === 'curriculum' ? (
+                              <BookOpen className="w-6 h-6 text-[#B91C1C]" />
+                            ) : (
+                              <Zap className="w-6 h-6 text-[#D97706]" />
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-md border text-[10px] font-ipa font-semibold ${tierStyles}`}
+                            >
+                              {badge.tier}
+                            </span>
+                            {badge.unlocked ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-[#15803D] dark:text-emerald-400 text-[10px] font-ipa font-semibold inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Unlocked</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] text-[10px] font-ipa inline-flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                <span>Locked</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Title & Description */}
+                        <div>
+                          <div className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                            {badge.categoryLabel}
+                          </div>
+                          <h3 className="text-base sm:text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                            {badge.title}
+                          </h3>
+                          {isFullNepali && (
+                            <div className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
+                              {badge.nepaliTitle}
+                            </div>
+                          )}
+                          <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1.5 leading-relaxed">
+                            {badge.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar, Direct 1-Click Action Button & Shareable Card */}
+                      <div className="pt-4 mt-4 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-2.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#57534E] dark:text-[#A8A29E]">
+                              Milestone Progress
+                            </span>
+                            <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {badge.current} / {badge.target} {badge.unit} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                badge.unlocked ? 'bg-[#15803D]' : 'bg-[#B91C1C]'
+                              }`}
+                              style={{ width: `${Math.max(6, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[11px] text-[#57534E] dark:text-[#A8A29E] space-y-2">
+                          <div>{badge.howToUnlock}</div>
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#E7E0D6]/70 dark:border-[#2E2924]">
+                            {badge.unlocked ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBadgeForPrint(badge.id)}
+                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#15803D] text-white text-xs font-semibold hover:bg-emerald-800 inline-flex items-center gap-1.5 w-full justify-center transition-colors"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span>Print / Share Achievement Card</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={badge.onTriggerAction}
+                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 w-full justify-center transition-colors"
+                              >
+                                <span>{badge.actionLabel}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ================================================================= */
+          /* OVERVIEW & ANALYTICS SUB-VIEW                                     */
+          /* ================================================================= */
+          <>
+            {/* 4 KPI Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
+                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
+                  <span>Daily Streak & Grace Shield</span>
+                  <Flame className="w-4 h-4 text-[#D97706]" />
+                </div>
+                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  {progress.currentStreakDays} {progress.currentStreakDays === 1 ? 'Day' : 'Days'}
+                </div>
+                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 flex items-center justify-between">
+                  <span>Goal: {progress.dailyGoalMinutes || 15}m/day</span>
+                  <span className="inline-flex items-center gap-1 font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{progress.streakFreezeShields ?? 1} Shield</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
+                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
+                  <span>Lectures Completed</span>
+                  <CheckCircle2 className="w-4 h-4 text-[#15803D]" />
+                </div>
+                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  {progress.completedUnitIds.length} / {lectures.length}
+                </div>
+                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
+                  {overallCoursePercent}% of B1–C1 syllabus
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
+                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
+                  <span>Unified Words Mastered</span>
+                  <Trophy className="w-4 h-4 text-[#D97706]" />
+                </div>
+                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  {unifiedMasteredWordsCount} Words
+                </div>
+                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
+                  {Math.min(50, unifiedMasteredWordsCount)}/50 toward Gold Badge ({progress.masteredWordIds?.length || 0} manual)
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
+                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
+                  <span>Saved / Total Lexicon</span>
+                  <BookmarkCheck className="w-4 h-4 text-[#B91C1C]" />
+                </div>
+                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  {progress.savedWordIds.length} / {totalLexiconCount.toLocaleString()}+
+                </div>
+                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
+                  {progress.mistakeNotebook.length} active mistake notes
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Skill Breakdown Charts + Recommended Focus Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+                <div>
+                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    4-Skill Mastery Analytics
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#1C1917] dark:text-[#F5F2EB] flex items-center gap-1.5">
-                      <span>{badge.title}</span>
-                      {badge.unlocked && (
-                        <span className="text-[10px] font-ipa text-[#15803D] dark:text-emerald-400">
-                          ✓ Unlocked
+                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                    Visual Skill Breakdown Charts
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
+                    Performance across each module pillar based on your completed quizzes, dictation bees, and vocabulary practice:
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    {
+                      label: '01 · Vocabulary & Silent-Letter Phonics',
+                      pct: skillMetrics.vocabPercent,
+                      detail: `${skillMetrics.practicedWordsCount} / ${skillMetrics.totalCoreWords} core words practiced`,
+                      color: 'bg-[#B91C1C]',
+                    },
+                    {
+                      label: '02 & 03 · Spelling Rules & Audio Dictation Bee',
+                      pct: skillMetrics.spellingPercent ?? 0,
+                      detail:
+                        skillMetrics.spellingTotal > 0
+                          ? `${skillMetrics.spellingCorrect}/${skillMetrics.spellingTotal} correct (${skillMetrics.spellingPercent}%)`
+                          : 'Complete a Step 03 Spelling & Dictation quiz to record score',
+                      color: 'bg-[#D97706]',
+                    },
+                    {
+                      label: '04 · Grammar Syntax & Sentence Builder',
+                      pct: skillMetrics.grammarPercent ?? 0,
+                      detail:
+                        skillMetrics.grammarTotal > 0
+                          ? `${skillMetrics.grammarCorrect}/${skillMetrics.grammarTotal} correct (${skillMetrics.grammarPercent}%)`
+                          : 'Complete a Step 04 Grammar Capstone quiz to record score',
+                      color: 'bg-[#15803D]',
+                    },
+                    {
+                      label: '05 · Real-Life Dialogue Comprehension',
+                      pct: skillMetrics.dialoguePercent ?? 0,
+                      detail:
+                        skillMetrics.dialogueTotal > 0
+                          ? `${skillMetrics.dialogueCorrect}/${skillMetrics.dialogueTotal} correct (${skillMetrics.dialoguePercent}%)`
+                          : 'Complete a Step 05 Dialogue Comprehension quiz to record score',
+                      color: 'bg-sky-700',
+                    },
+                  ].map((bar) => (
+                    <div key={bar.label} className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                          {bar.label}
                         </span>
-                      )}
+                        <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
+                          {bar.detail}
+                        </span>
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
+                        <div
+                          className={`h-full ${bar.color} rounded-full transition-all duration-300`}
+                          style={{ width: `${Math.max(4, bar.pct)}%` }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                      {badge.desc}
-                    </p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommended Focus Area & Track Certificates */}
+              <div className="lg:col-span-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    <Target className="w-4 h-4" />
+                    <span>Recommended Focus Area</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                    {skillMetrics.focusArea.name}
+                  </h3>
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
+                    {skillMetrics.focusArea.hint}
+                  </p>
+
+                  <div className="pt-2 space-y-2.5">
+                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      CEFR Track Progress & Certificates:
+                    </div>
+                    {trackStats.map((t) => (
+                      <div
+                        key={t.level}
+                        className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            Level {t.level} ({t.done}/{t.total})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCertificateTrack(t.level)}
+                            className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                          >
+                            <Award className="w-3 h-3" />
+                            <span>View Certificate</span>
+                          </button>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden">
+                          <div
+                            className="h-full bg-[#B91C1C] rounded-full"
+                            style={{ width: `${Math.max(5, t.pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        </div>
+
+            {/* =============================================================== */}
+            {/* 14-DAY STUDY HEATMAP & ACHIEVEMENTS PREVIEW                     */}
+            {/* =============================================================== */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* 14-Day Study Activity Heatmap */}
+              <div className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    Consistency & Daily Habit Tracker
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                    14-Day Study Activity Heatmap
+                  </h2>
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
+                    Every lecture step, Daily Challenge, 60s Sprint, and Practice Arena session lights up your daily study grid:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-7 gap-2 pt-2">
+                  {Array.from({ length: 14 }).map((_, i) => {
+                    const d = new Date(Date.now() - (13 - i) * 86400000);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = d.getDate();
+                    const count =
+                      progress.studyActivityByDate?.[dateStr] ||
+                      (dateStr === progress.lastStudyDate ? 2 : 0);
+
+                    let cellStyle =
+                      'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E]';
+                    if (count >= 4) {
+                      cellStyle = 'bg-[#B91C1C] border-[#B91C1C] text-white font-bold';
+                    } else if (count >= 2) {
+                      cellStyle =
+                        'bg-[#B91C1C]/25 dark:bg-[#B91C1C]/40 border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB] font-semibold';
+                    } else if (count >= 1) {
+                      cellStyle =
+                        'bg-amber-100 dark:bg-amber-950/50 border-[#D97706] text-[#1C1917] dark:text-[#F5F2EB]';
+                    }
+
+                    return (
+                      <div
+                        key={dateStr}
+                        title={`${dateStr}: ${count} study actions`}
+                        className={`p-2 rounded-xl border text-center space-y-0.5 ${cellStyle}`}
+                      >
+                        <div className="text-[10px] opacity-80">{dayLabel}</div>
+                        <div className="font-ipa text-xs">{dayNum}</div>
+                        <div className="text-[9px] font-ipa">{count > 0 ? `${count}pt` : '—'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  <span>
+                    Daily Challenges Completed:{' '}
+                    <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                      {progress.dailyChallengeTotalCompleted || 0}
+                    </strong>
+                  </span>
+                  <span>
+                    60s Sprint High Score:{' '}
+                    <strong className="text-[#B91C1C] dark:text-[#F87171]">
+                      {progress.sprintHighScore || 0} pts
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Mastery Milestones Trophy Case Preview + Link to Full Achievements View */}
+              <div className="lg:col-span-7 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                        Unlockable Badges ({unlockedBadgesCount}/{achievementsList.length} Unlocked)
+                      </div>
+                      <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                        Achievements & Mastery Milestones
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProgressSubView('achievements')}
+                      className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
+                    >
+                      <Trophy className="w-3.5 h-3.5" />
+                      <span>Open Achievements View</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {achievementsList.slice(0, 6).map((badge) => {
+                      const pct = Math.min(100, Math.round((badge.current / badge.target) * 100));
+                      return (
+                        <div
+                          key={badge.id}
+                          className={`p-3.5 rounded-xl border flex items-start gap-3 ${
+                            badge.unlocked
+                              ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800'
+                              : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
+                          }`}
+                        >
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              badge.unlocked
+                                ? 'bg-[#15803D] text-white'
+                                : 'bg-[#E7E0D6] dark:bg-[#2E2924] text-[#57534E]'
+                            }`}
+                          >
+                            <Trophy className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between gap-1.5">
+                              <span className="truncate">{badge.title}</span>
+                              <span
+                                className={`text-[10px] font-ipa shrink-0 ${
+                                  badge.unlocked
+                                    ? 'text-[#15803D] dark:text-emerald-400'
+                                    : 'text-[#57534E] dark:text-[#A8A29E]'
+                                }`}
+                              >
+                                {badge.unlocked
+                                  ? '✓ Unlocked'
+                                  : `${badge.current}/${badge.target}`}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
+                              {badge.desc}
+                            </p>
+                            <div className="w-full h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden mt-2">
+                              <div
+                                className={`h-full rounded-full ${
+                                  badge.unlocked ? 'bg-[#15803D]' : 'bg-[#B91C1C]'
+                                }`}
+                                style={{ width: `${Math.max(6, pct)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  <span>Rank: {scholarRankTitle}</span>
+                  <button
+                    type="button"
+                    onClick={() => setProgressSubView('achievements')}
+                    className="font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>View all {achievementsList.length} unlockable badges</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* =============================================================== */}
+            {/* FLUENCY HEATMAP: SILENT CLUSTERS & NEPALI-TO-ENGLISH PILLARS    */}
+            {/* =============================================================== */}
+            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
+                <div>
+                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    Orthographic & Syntactic Fluency Matrix
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                    Interactive Fluency Heatmap (12 Silent Clusters & 4 Nepali-to-English Grammar Pillars)
+                  </h2>
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                    Color-coded mastery across English silent-letter families and Nepali L1 interference patterns:
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-ipa shrink-0">
+                  <span className="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    Developing (&lt;50%)
+                  </span>
+                  <span className="px-2 py-1 rounded-md bg-[#B91C1C]/15 text-[#B91C1C] dark:text-[#F87171] border border-[#B91C1C]/40">
+                    Strong (50–74%)
+                  </span>
+                  <span className="px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-[#15803D] dark:text-emerald-400 border border-emerald-400">
+                    Fluent (75%+)
+                  </span>
+                </div>
+              </div>
+
+              {/* 12 Silent-Letter Cluster Heatmap Grid */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
+                  <span>12 Silent-Letter Cluster Fluency Cells</span>
+                  {onOpenDictionary && (
+                    <button
+                      type="button"
+                      onClick={onOpenDictionary}
+                      className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Drill Silent Families in Dictionary</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                  {fluencyHeatmapCells.silentClusters.map((cell) => {
+                    const heatClass =
+                      cell.score >= 75
+                        ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-700 text-[#15803D] dark:text-emerald-300'
+                        : cell.score >= 50
+                        ? 'bg-[#B91C1C]/10 dark:bg-[#B91C1C]/25 border-[#B91C1C]/50 text-[#1C1917] dark:text-[#F5F2EB]'
+                        : 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-[#1C1917] dark:text-[#F5F2EB]';
+
+                    return (
+                      <div
+                        key={cell.id}
+                        className={`p-3 rounded-xl border space-y-1 transition-all ${heatClass}`}
+                      >
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span>{cell.label}</span>
+                          <span className="font-ipa text-[11px]">{cell.score}%</span>
+                        </div>
+                        <div className="text-[11px] opacity-80 truncate">{cell.example}</div>
+                        <div className="w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              cell.score >= 75
+                                ? 'bg-[#15803D]'
+                                : cell.score >= 50
+                                ? 'bg-[#B91C1C]'
+                                : 'bg-[#D97706]'
+                            }`}
+                            style={{ width: `${cell.score}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4 Nepali-to-English L1 Interference & Syntax Pillars */}
+              <div className="space-y-2.5 pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924]">
+                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
+                  <span>4 Nepali-to-English Translation & L1 Interference Pillars</span>
+                  {onOpenArenaTool && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenArenaTool('interference')}
+                      className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Open Nepali-to-English Translation Lab</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {fluencyHeatmapCells.syntaxPillars.map((pillar) => (
+                    <div
+                      key={pillar.id}
+                      className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        <span>{pillar.label}</span>
+                        <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
+                          {pillar.score}%
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
+                        {pillar.sub}
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden">
+                        <div
+                          className="h-full bg-[#15803D] rounded-full"
+                          style={{ width: `${pillar.score}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent 10-Min IELTS / PTE / Career Exam Simulator Results */}
+              {progress.examHistory && progress.examHistory.length > 0 && (
+                <div className="space-y-2.5 pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924]">
+                  <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
+                    <span>Recent 10-Minute IELTS / PTE / Career Readiness Mock Exam History</span>
+                    {onOpenArenaTool && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenArenaTool('exam-simulator')}
+                        className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>Retake 10-Min Exam Simulator</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {progress.examHistory.slice(0, 3).map((rec) => (
+                      <div
+                        key={rec.id}
+                        className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            {rec.estimatedBand} ({rec.cefrEquivalent})
+                          </div>
+                          <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
+                            {new Date(rec.completedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <span className="font-ipa text-sm font-bold text-[#15803D] dark:text-emerald-400">
+                          {rec.overallPercent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
         {/* Responsive Syllabus Mastery Breakdown (Mobile Cards + Desktop Table) */}
         <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
@@ -1281,6 +2208,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
     );
   }

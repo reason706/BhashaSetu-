@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
   BookMarked,
@@ -26,6 +26,9 @@ import {
   GitBranch,
   Printer,
   Headphones,
+  Trophy,
+  ShieldCheck,
+  X,
 } from 'lucide-react';
 import { CORE_SYLLABUS } from './data/syllabus';
 import { enrichSyllabusWithEnhancements } from './data/lectureEnhancements';
@@ -33,6 +36,7 @@ import { getMassiveLexicon } from './data/massiveLexicon';
 import {
   CEFRLevel,
   CustomVocabItem,
+  ExamSimulationRecord,
   LanguageMode,
   LectureUnit,
   MistakeItem,
@@ -50,6 +54,10 @@ import {
   removeMistakeFromNotebook,
   updateMistakeNote,
   toggleSavedWord,
+  toggleMasteredWord,
+  getUnifiedMasteredWordsCount,
+  updateLectureScratchpadNote,
+  recordExamSimulationResult,
   addCustomLecture,
   completeOnboarding,
   flushPendingSyncQueue,
@@ -92,6 +100,16 @@ export default function App() {
   const [isDailyChallengeOpen, setIsDailyChallengeOpen] = useState(false);
   const [hasAutoCheckedDailyChallenge, setHasAutoCheckedDailyChallenge] = useState(false);
   const [initialArenaTool, setInitialArenaTool] = useState<ArenaToolTab>('detective');
+  const [progressSubViewTarget, setProgressSubViewTarget] = useState<'overview' | 'achievements'>(
+    'overview'
+  );
+  const [liveAchievementToast, setLiveAchievementToast] = useState<{
+    id: string;
+    title: string;
+    nepaliTitle: string;
+    desc: string;
+  } | null>(null);
+  const hasSeededInitialBadgesRef = useRef(false);
 
   const isOnline = useOnlineStatus();
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
@@ -239,6 +257,18 @@ export default function App() {
     setProgress((prev) => toggleSavedWord(prev, wordId));
   };
 
+  const handleToggleMasteredWord = (wordId: string) => {
+    setProgress((prev) => toggleMasteredWord(prev, wordId));
+  };
+
+  const handleUpdateLectureNote = (lectureId: string, noteText: string) => {
+    setProgress((prev) => updateLectureScratchpadNote(prev, lectureId, noteText));
+  };
+
+  const handleRecordExamResult = (examRecord: ExamSimulationRecord) => {
+    setProgress((prev) => recordExamSimulationResult(prev, examRecord));
+  };
+
   const handleCompleteLecture = (scoreRecord: ModuleScoreRecord) => {
     setProgress((prev) => recordLectureCompletion(prev, scoreRecord));
   };
@@ -353,6 +383,179 @@ export default function App() {
 
   const handleRecordRolePlayCompleted = (scenarioId: string) => {
     setProgress((prev) => recordRolePlayCompleted(prev, scenarioId));
+  };
+
+  const unifiedMasteredWordsCount = useMemo(
+    () => getUnifiedMasteredWordsCount(progress),
+    [progress]
+  );
+
+  // Live Achievement Unlock Watcher & Toast Trigger
+  useEffect(() => {
+    const completedCount = progress.completedUnitIds.length;
+    const streakDays = progress.currentStreakDays || 0;
+    const dailyChallenges = progress.dailyChallengeTotalCompleted || 0;
+    const detectiveSolved = progress.detectiveSolvedIds?.length || 0;
+    const sprintBest = progress.sprintHighScore || 0;
+    const rolePlaysDone = progress.rolePlayCompletedIds?.length || 0;
+    const customDeckCount = progress.customWords?.length || 0;
+
+    const evaluatedBadges = [
+      {
+        id: 'first-lecture-finished',
+        title: 'First Lecture Finished',
+        nepaliTitle: 'पहिलो पाठ सम्पन्न',
+        desc: 'You completed your first sequential 5-module BhashaSetu lecture!',
+        unlocked: completedCount >= 1,
+      },
+      {
+        id: 'ten-day-streak',
+        title: '10-Day Streak',
+        nepaliTitle: '१०-दिने निरन्तर अध्ययन',
+        desc: '10 consecutive days of English phonics, spelling, and syntax study!',
+        unlocked: streakDays >= 10,
+      },
+      {
+        id: 'fifty-words-mastered',
+        title: '50 Words Mastered',
+        nepaliTitle: '५० शब्दमा पूर्ण दक्षता',
+        desc: 'You mastered 50 silent-letter and high-frequency English words!',
+        unlocked: unifiedMasteredWordsCount >= 50,
+      },
+      {
+        id: 'three-day-streak',
+        title: '3-Day Streak Builder',
+        nepaliTitle: '३-दिने अध्ययन बानी',
+        desc: '3 consecutive days of active study momentum unlocked!',
+        unlocked: streakDays >= 3,
+      },
+      {
+        id: 'twenty-five-words-collector',
+        title: '25 Words Collector',
+        nepaliTitle: '२५ शब्द संग्रहकर्ता',
+        desc: 'You mastered or bookmarked 25 core English vocabulary words!',
+        unlocked: unifiedMasteredWordsCount >= 25,
+      },
+      {
+        id: 'b1-foundation-graduate',
+        title: 'B1 Foundation Graduate',
+        nepaliTitle: 'B1 आधारभूत तह पूरा',
+        desc: 'Completed all 4 lectures in Track 1 · B1 Lower-Intermediate!',
+        unlocked: courseStats.b1Done >= courseStats.b1Total && courseStats.b1Total > 0,
+      },
+      {
+        id: 'b2-workplace-graduate',
+        title: 'B2 Workplace Graduate',
+        nepaliTitle: 'B2 कार्यस्थल तह पूरा',
+        desc: 'Completed all 4 lectures in Track 2 · B2 Upper-Intermediate!',
+        unlocked: courseStats.b2Done >= courseStats.b2Total && courseStats.b2Total > 0,
+      },
+      {
+        id: 'c1-master-linguist',
+        title: 'C1 Master Linguist',
+        nepaliTitle: 'C1 उच्च तह विशेषज्ञ',
+        desc: 'Completed all 12 core curriculum lectures from B1 to C1!',
+        unlocked: completedCount >= 12,
+      },
+      {
+        id: 'daily-challenge-champion',
+        title: 'Daily Challenge Champion',
+        nepaliTitle: 'दैनिक चुनौती विजेता',
+        desc: 'Completed the 24-Hour 3-Question Daily Challenge!',
+        unlocked: dailyChallenges >= 1,
+      },
+      {
+        id: 'silent-letter-detective',
+        title: 'Silent-Letter Detective',
+        nepaliTitle: 'मौन-अक्षर जासुस',
+        desc: 'Spotted all hidden silent-letter words in a Detective passage!',
+        unlocked: detectiveSolved >= 1,
+      },
+      {
+        id: 'phonics-sprint-speedster',
+        title: '60s Phonics Speedster',
+        nepaliTitle: '६०-सेकेन्ड स्पेलिङ च्याम्पियन',
+        desc: 'Scored 40+ points in the 60-Second Spelling Sprint!',
+        unlocked: sprintBest >= 40,
+      },
+      {
+        id: 'roleplay-deck-architect',
+        title: 'Fluency & Deck Architect',
+        nepaliTitle: 'संवाद र शब्दकोश निर्माता',
+        desc: 'Completed a Real-World Role-Play simulation or custom deck milestone!',
+        unlocked:
+          rolePlaysDone >= 1 ||
+          customDeckCount >= 3 ||
+          (courseStats.avgQuizAccuracy !== null && courseStats.avgQuizAccuracy >= 85),
+      },
+    ];
+
+    const currentlyUnlockedIds = evaluatedBadges.filter((b) => b.unlocked).map((b) => b.id);
+    const knownUnlockedIds = progress.unlockedBadgeIds || [];
+
+    if (!hasSeededInitialBadgesRef.current) {
+      hasSeededInitialBadgesRef.current = true;
+      if (currentlyUnlockedIds.length > knownUnlockedIds.length) {
+        const synced = Array.from(new Set([...knownUnlockedIds, ...currentlyUnlockedIds]));
+        setProgress((prev) => {
+          const next = { ...prev, unlockedBadgeIds: synced };
+          saveUserProgress(next);
+          return next;
+        });
+      }
+      return;
+    }
+
+    const newlyUnlocked = evaluatedBadges.find(
+      (b) => b.unlocked && !knownUnlockedIds.includes(b.id)
+    );
+
+    if (newlyUnlocked) {
+      speechService.playCelebrationChime();
+      setLiveAchievementToast({
+        id: newlyUnlocked.id,
+        title: newlyUnlocked.title,
+        nepaliTitle: newlyUnlocked.nepaliTitle,
+        desc: newlyUnlocked.desc,
+      });
+
+      const updatedIds = Array.from(new Set([...knownUnlockedIds, ...currentlyUnlockedIds]));
+      setProgress((prev) => {
+        const next = { ...prev, unlockedBadgeIds: updatedIds };
+        saveUserProgress(next);
+        return next;
+      });
+    }
+  }, [
+    progress.completedUnitIds.length,
+    progress.currentStreakDays,
+    progress.dailyChallengeTotalCompleted,
+    progress.detectiveSolvedIds,
+    progress.sprintHighScore,
+    progress.rolePlayCompletedIds,
+    progress.customWords,
+    progress.unlockedBadgeIds,
+    unifiedMasteredWordsCount,
+    courseStats,
+  ]);
+
+  const navigateTab = (tab: NavTab) => {
+    setActiveLectureId(null);
+    if (tab === 'dictionary') {
+      setDictionaryLectureFilter(null);
+    }
+    if (tab === 'progress') {
+      setProgressSubViewTarget('overview');
+    }
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openProgressSubView = (subView: 'overview' | 'achievements') => {
+    setActiveLectureId(null);
+    setProgressSubViewTarget(subView);
+    setActiveTab('progress');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const openArenaTool = (tool: ArenaToolTab) => {
@@ -517,8 +720,7 @@ export default function App() {
           href="#top"
           onClick={(e) => {
             e.preventDefault();
-            setActiveLectureId(null);
-            setActiveTab('lectures');
+            navigateTab('lectures');
           }}
           className="font-serif-display text-xl font-bold tracking-tight text-[#1C1917] dark:text-[#F5F2EB] whitespace-nowrap shrink-0"
         >
@@ -528,10 +730,7 @@ export default function App() {
         {/* Zone 2: Concise single-line text navigation links */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#57534E] dark:text-[#A8A29E]">
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setActiveTab('lectures');
-            }}
+            onClick={() => navigateTab('lectures')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
               activeTab === 'lectures'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
@@ -541,11 +740,7 @@ export default function App() {
             Lectures
           </button>
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setDictionaryLectureFilter(null);
-              setActiveTab('dictionary');
-            }}
+            onClick={() => navigateTab('dictionary')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
               activeTab === 'dictionary'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
@@ -555,10 +750,7 @@ export default function App() {
             Dictionary (10k+)
           </button>
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setActiveTab('arena');
-            }}
+            onClick={() => navigateTab('arena')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 inline-flex items-center gap-1.5 ${
               activeTab === 'arena'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2 font-semibold'
@@ -569,10 +761,7 @@ export default function App() {
             <span>Practice Hub</span>
           </button>
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setActiveTab('progress');
-            }}
+            onClick={() => navigateTab('progress')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
               activeTab === 'progress'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
@@ -582,10 +771,7 @@ export default function App() {
             Progress
           </button>
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setActiveTab('settings');
-            }}
+            onClick={() => navigateTab('settings')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
               activeTab === 'settings'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
@@ -595,10 +781,7 @@ export default function App() {
             Settings
           </button>
           <button
-            onClick={() => {
-              setActiveLectureId(null);
-              setActiveTab('about');
-            }}
+            onClick={() => navigateTab('about')}
             className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
               activeTab === 'about'
                 ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
@@ -621,6 +804,51 @@ export default function App() {
         </div>
       </header>
 
+      {/* Celebratory Live Achievement Unlock Toast Banner */}
+      {liveAchievementToast && (
+        <div className="sticky top-14 z-40 bg-emerald-900 text-white border-b border-emerald-700 px-4 py-3 shadow-lg">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-[#1C1917] flex items-center justify-center shrink-0 shadow-xs">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[11px] font-ipa uppercase tracking-wider text-amber-300 font-semibold">
+                  Achievement Unlocked! · {liveAchievementToast.nepaliTitle}
+                </div>
+                <div className="text-sm sm:text-base font-bold">
+                  {liveAchievementToast.title} —{' '}
+                  <span className="font-normal text-emerald-100 text-xs sm:text-sm">
+                    {liveAchievementToast.desc}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setLiveAchievementToast(null);
+                  openProgressSubView('achievements');
+                }}
+                className="min-h-[34px] px-3.5 py-1.5 rounded-lg bg-amber-400 text-[#1C1917] text-xs font-semibold hover:bg-amber-300 inline-flex items-center gap-1.5"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>View Badge in Trophy Case</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLiveAchievementToast(null)}
+                aria-label="Dismiss achievement notification"
+                className="p-1.5 rounded-lg hover:bg-emerald-800 text-emerald-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Offline Mode Connectivity Indicator */}
       {!isOnline && (
         <div className="bg-amber-100 dark:bg-amber-950/80 border-b border-amber-300 dark:border-amber-800 px-4 py-2 text-xs text-amber-950 dark:text-amber-200 flex items-center justify-center gap-2">
@@ -640,6 +868,8 @@ export default function App() {
             lecture={activeLecture}
             allLectures={allLectures}
             savedWordIds={progress.savedWordIds}
+            masteredWordIds={progress.masteredWordIds || []}
+            lectureNote={progress.lectureNotes?.[activeLecture.id] || ''}
             completedUnitIds={progress.completedUnitIds}
             completedSteps={progress.completedStepsByLecture?.[activeLecture.id] || []}
             mistakeNotebook={progress.mistakeNotebook}
@@ -648,6 +878,8 @@ export default function App() {
             isCompleted={progress.completedUnitIds.includes(activeLecture.id)}
             initialStep={initialModuleStep}
             onToggleSaveWord={handleToggleSaveWord}
+            onToggleMasteredWord={handleToggleMasteredWord}
+            onUpdateLectureNote={handleUpdateLectureNote}
             onCompleteLecture={handleCompleteLecture}
             onCompleteStep={handleCompleteStep}
             onSelectLecture={(id, step = 0) => openLecture(id, step)}
@@ -663,12 +895,14 @@ export default function App() {
           <DictionaryView
             lectures={allLectures}
             savedWordIds={progress.savedWordIds}
+            masteredWordIds={progress.masteredWordIds || []}
             wordSRS={progress.wordSRS}
             mistakeNotebook={progress.mistakeNotebook}
             preferredSpeechRate={progress.preferredSpeechRate}
             languageMode={languageMode}
             initialLectureFilter={dictionaryLectureFilter}
             onToggleSaveWord={handleToggleSaveWord}
+            onToggleMasteredWord={handleToggleMasteredWord}
             onUpdateWordSRS={handleUpdateWordSRS}
             onRecordMistake={handleRecordMistake}
             onPracticeMistake={handlePracticeMistake}
@@ -679,6 +913,7 @@ export default function App() {
           <PracticeArenaView
             lectures={allLectures}
             customWords={progress.customWords || []}
+            savedWordIds={progress.savedWordIds}
             mistakeNotebook={progress.mistakeNotebook}
             sprintHighScore={progress.sprintHighScore || 0}
             detectiveSolvedIds={progress.detectiveSolvedIds || []}
@@ -692,6 +927,8 @@ export default function App() {
             onRecordDetectiveSolved={handleRecordDetectiveSolved}
             onRecordRolePlayCompleted={handleRecordRolePlayCompleted}
             onRecordMistake={handleRecordMistake}
+            onRecordExamResult={handleRecordExamResult}
+            onOpenLecture={(id) => openLecture(id, 0)}
             onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
           />
         ) : activeTab === 'progress' ? (
@@ -700,6 +937,7 @@ export default function App() {
             progress={progress}
             lectures={allLectures}
             isOnline={isOnline}
+            initialProgressSubView={progressSubViewTarget}
             onUpdateLevel={handleUpdateLevel}
             onUpdateSpeechRate={handleUpdateSpeechRate}
             onUpdateLanguageMode={handleUpdateLanguageMode}
@@ -709,6 +947,9 @@ export default function App() {
             onToggleDarkMode={handleToggleDarkMode}
             onManualSync={handleManualSync}
             onOpenLecture={(id) => openLecture(id, 0)}
+            onOpenArenaTool={(tool) => openArenaTool(tool)}
+            onOpenDictionary={() => navigateTab('dictionary')}
+            onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
           />
         ) : activeTab === 'settings' ? (
           <ProgressSettingsView
@@ -725,16 +966,15 @@ export default function App() {
             onToggleDarkMode={handleToggleDarkMode}
             onManualSync={handleManualSync}
             onOpenLecture={(id) => openLecture(id, 0)}
+            onOpenArenaTool={(tool) => openArenaTool(tool)}
+            onOpenDictionary={() => navigateTab('dictionary')}
+            onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
           />
         ) : activeTab === 'about' ? (
           <AboutView
             languageMode={languageMode}
             preferredSpeechRate={progress.preferredSpeechRate}
-            onStartCurriculum={() => {
-              setActiveLectureId(null);
-              setActiveTab('lectures');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onStartCurriculum={() => navigateTab('lectures')}
           />
         ) : (
           /* HOME / LECTURES SYLLABUS DASHBOARD */
@@ -872,9 +1112,20 @@ export default function App() {
                   <div className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] inline-flex items-center gap-2">
                     <Flame className="w-4 h-4 text-[#D97706]" />
                     <span className="font-ipa font-semibold">
-                      {progress.currentStreakDays} Day Streak
+                      {progress.currentStreakDays}d Streak
+                    </span>
+                    <span className="text-[#15803D] dark:text-emerald-400 font-ipa font-semibold inline-flex items-center gap-1 pl-1 border-l border-[#E7E0D6] dark:border-[#2E2924]">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{progress.streakFreezeShields ?? 1} Shield</span>
                     </span>
                   </div>
+                  <button
+                    onClick={() => openProgressSubView('achievements')}
+                    className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-[#D97706]" />
+                    <span>Achievements & Badges</span>
+                  </button>
                   <button
                     onClick={() => openLecture(recommendedLecture.id, 0)}
                     className="px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
@@ -884,11 +1135,6 @@ export default function App() {
                     </span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-                  {courseStats.avgQuizAccuracy !== null && (
-                    <div className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
-                      Quiz Accuracy: {courseStats.avgQuizAccuracy}%
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1134,14 +1380,14 @@ export default function App() {
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Interactive Practice Arena & Master Vocabulary Hub</span>
+                    <span>Interactive Practice Arena, Translation Lab & Career Exam Simulator</span>
                   </div>
                   <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    10 Specialized Phonics, Syntax, Role-Play & Master Vocabulary Tools
+                    12 Specialized Phonics, Nepali Translation, 10-Min IELTS/PTE Exam & Commuter Audio Tools
                   </h2>
                 </div>
                 <button
-                  onClick={() => openArenaTool('detective')}
+                  onClick={() => openArenaTool('interference')}
                   className="min-h-[38px] px-4 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shrink-0"
                 >
                   <span>Open Full Practice Hub</span>
@@ -1149,8 +1395,26 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                 {[
+                  {
+                    id: 'interference' as ArenaToolTab,
+                    title: 'Nepali-to-English Lab',
+                    desc: 'SOV→SVO reordering, Articles, Prepositions (मा/ले/सँग) & Continuous traps.',
+                    badge: '4 Drill Labs',
+                  },
+                  {
+                    id: 'exam-simulator' as ArenaToolTab,
+                    title: '10-Min IELTS/PTE Sim',
+                    desc: 'Timed diagnostic mock exam with Band/CEFR score breakdown & Speaking.',
+                    badge: 'Mock Exam',
+                  },
+                  {
+                    id: 'commuter-audio' as ArenaToolTab,
+                    title: 'Commuter Audio Mode',
+                    desc: 'Hands-free podcast loop (1.0x → 2s recall → 0.75x → example sentence).',
+                    badge: 'Hands-Free',
+                  },
                   {
                     id: 'detective' as ArenaToolTab,
                     title: 'Silent-Letter Detective',
@@ -1158,28 +1422,16 @@ export default function App() {
                     badge: `${progress.detectiveSolvedIds?.length || 0}/3 Solved`,
                   },
                   {
-                    id: 'interference' as ArenaToolTab,
-                    title: 'Nepali Interference Fixer',
-                    desc: 'Fix "discussed about", "return back" & SOV traps.',
-                    badge: '6 Core Traps',
-                  },
-                  {
                     id: 'sprint' as ArenaToolTab,
                     title: '60s Spelling Sprint',
-                    desc: 'Rapid silent-cluster arcade challenge with combo multiplier.',
+                    desc: 'Timed arcade challenge with B1/B2/C1 & Mistake Notebook tiers.',
                     badge: `Best: ${progress.sprintHighScore || 0} pts`,
                   },
                   {
-                    id: 'word-trees' as ArenaToolTab,
-                    title: 'Word Family Root Trees',
-                    desc: 'See when silent letters wake up (Sign → Signature).',
-                    badge: '4 Root Families',
-                  },
-                  {
-                    id: 'cheatsheets' as ArenaToolTab,
-                    title: 'Master Vocab List & PDF',
-                    desc: 'Scannable Master Vocabulary Table & printable cheat-sheets.',
-                    badge: 'Print / Study',
+                    id: 'roleplay' as ArenaToolTab,
+                    title: 'Voice Role-Play Sim',
+                    desc: 'Speak or select responses in Job Interview, Airport, Clinic & Bank.',
+                    badge: 'Mic + Options',
                   },
                 ].map((tool) => (
                   <button
@@ -1487,10 +1739,7 @@ export default function App() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FAF7F2]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E7E0D6] dark:border-[#2E2924] grid grid-cols-6 items-center"
       >
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setActiveTab('lectures');
-          }}
+          onClick={() => navigateTab('lectures')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'lectures'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
@@ -1502,11 +1751,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setDictionaryLectureFilter(null);
-            setActiveTab('dictionary');
-          }}
+          onClick={() => navigateTab('dictionary')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'dictionary'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
@@ -1518,10 +1763,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setActiveTab('arena');
-          }}
+          onClick={() => navigateTab('arena')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'arena'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
@@ -1533,10 +1775,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setActiveTab('progress');
-          }}
+          onClick={() => navigateTab('progress')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'progress'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
@@ -1548,10 +1787,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setActiveTab('settings');
-          }}
+          onClick={() => navigateTab('settings')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'settings'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
@@ -1563,10 +1799,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveLectureId(null);
-            setActiveTab('about');
-          }}
+          onClick={() => navigateTab('about')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'about'
               ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'

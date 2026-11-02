@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
   Volume2,
@@ -21,6 +21,10 @@ import {
   Sparkles,
   Trash2,
   Check,
+  Play,
+  Square,
+  Radio,
+  SkipForward,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -34,12 +38,14 @@ import { getMassiveLexicon, EnrichedLexiconItem } from '../data/massiveLexicon';
 interface DictionaryViewProps {
   lectures: LectureUnit[];
   savedWordIds: string[];
+  masteredWordIds?: string[];
   wordSRS?: Record<string, SRSRecord>;
   mistakeNotebook?: MistakeItem[];
   preferredSpeechRate: number;
   languageMode: LanguageMode;
   initialLectureFilter?: number | null;
   onToggleSaveWord: (wordId: string) => void;
+  onToggleMasteredWord?: (wordId: string) => void;
   onUpdateWordSRS?: (wordId: string, wasCorrect: boolean) => void;
   onRecordMistake?: (mistake: Omit<MistakeItem, 'id' | 'consecutiveCorrect' | 'createdAt'>) => void;
   onPracticeMistake?: (mistakeId: string, wasCorrect: boolean) => void;
@@ -47,20 +53,48 @@ interface DictionaryViewProps {
   onOpenLecture: (lectureId: string) => void;
 }
 
-type FilterMode = 'all' | 'core' | 'srs' | 'saved' | 'silent' | 'B1' | 'B2' | 'C1';
+type FilterMode = 'all' | 'core' | 'srs' | 'saved' | 'mastered' | 'silent' | 'B1' | 'B2' | 'C1';
 type ViewMode = 'list' | 'table' | 'flashcards' | 'dictation' | 'quiz' | 'mistakes';
+type SilentPatternFilter =
+  | 'ALL'
+  | 'K'
+  | 'B'
+  | 'W'
+  | 'L'
+  | 'GH'
+  | 'T'
+  | 'P'
+  | 'H'
+  | 'G'
+  | 'N';
+
+const SILENT_PATTERN_PILLS: { id: SilentPatternFilter; label: string; example: string }[] = [
+  { id: 'ALL', label: 'All Patterns', example: 'All' },
+  { id: 'K', label: 'Silent K', example: 'kn- (knight)' },
+  { id: 'B', label: 'Silent B', example: '-mb/-bt (doubt)' },
+  { id: 'W', label: 'Silent W', example: 'wr-/wh- (write)' },
+  { id: 'L', label: 'Silent L', example: '-lk/-lm (calm)' },
+  { id: 'GH', label: 'Silent GH', example: '-igh/-ough (thought)' },
+  { id: 'T', label: 'Silent T', example: '-stle/-sten (listen)' },
+  { id: 'P', label: 'Silent P', example: 'ps-/pn- (psychology)' },
+  { id: 'H', label: 'Silent H', example: 'honest / hour' },
+  { id: 'G', label: 'Silent G', example: 'gn-/-gn (foreign)' },
+  { id: 'N', label: 'Silent N', example: '-mn (autumn)' },
+];
 
 const PAGE_SIZE = 24;
 
 export const DictionaryView: React.FC<DictionaryViewProps> = ({
   lectures,
   savedWordIds,
+  masteredWordIds = [],
   wordSRS = {},
   mistakeNotebook = [],
   preferredSpeechRate,
   languageMode,
   initialLectureFilter = null,
   onToggleSaveWord,
+  onToggleMasteredWord,
   onUpdateWordSRS,
   onRecordMistake,
   onPracticeMistake,
@@ -69,6 +103,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [silentPatternFilter, setSilentPatternFilter] = useState<SilentPatternFilter>('ALL');
   const [selectedLectureNum, setSelectedLectureNum] = useState<number | null>(initialLectureFilter);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +124,14 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   // Mistake Notebook Drill state
   const [mistakeAnswers, setMistakeAnswers] = useState<Record<string, string>>({});
+
+  // Hands-Free "Commuter Audio Mode" (Podcast Player) state
+  const [commuterOpen, setCommuterOpen] = useState(false);
+  const [commuterPlaying, setCommuterPlaying] = useState(false);
+  const [commuterPlaylistSource, setCommuterPlaylistSource] = useState<'filtered' | 'saved' | 'mistakes'>('filtered');
+  const [commuterIndex, setCommuterIndex] = useState(0);
+  const [commuterPhase, setCommuterPhase] = useState<'idle' | 'word-1x' | 'pause-2s' | 'word-075x' | 'sentence'>('idle');
+  const commuterCancelRef = useRef(false);
 
   useEffect(() => {
     if (initialLectureFilter !== undefined) {
@@ -112,6 +155,42 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   const srsTrackedCount = useMemo(() => Object.keys(wordSRS).length, [wordSRS]);
 
+  // Helper to get Mastery Level tag for any word
+  const getWordMasteryStatus = (wordId: string): {
+    label: 'New' | 'Learning' | 'Reviewing' | 'Mastered';
+    isMastered: boolean;
+    badgeClass: string;
+  } => {
+    const rec = wordSRS[wordId];
+    const explicitlyMastered = masteredWordIds.includes(wordId) || rec?.stage === 'mastered' || (rec?.intervalDays ?? 0) >= 7;
+    if (explicitlyMastered) {
+      return {
+        label: 'Mastered',
+        isMastered: true,
+        badgeClass: 'bg-[#15803D]/12 text-[#15803D] dark:text-emerald-400 border-[#15803D]/30',
+      };
+    }
+    if (rec?.stage === 'review' || (rec?.intervalDays ?? 0) >= 3) {
+      return {
+        label: 'Reviewing',
+        isMastered: false,
+        badgeClass: 'bg-sky-500/12 text-sky-700 dark:text-sky-300 border-sky-500/30',
+      };
+    }
+    if (rec?.stage === 'learning' || (rec?.repetitions ?? 0) > 0) {
+      return {
+        label: 'Learning',
+        isMastered: false,
+        badgeClass: 'bg-amber-500/12 text-amber-700 dark:text-amber-300 border-amber-500/30',
+      };
+    }
+    return {
+      label: 'New',
+      isMastered: false,
+      badgeClass: 'bg-[#F2ECE1] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] border-[#E7E0D6] dark:border-[#2E2924]',
+    };
+  };
+
   // Count words per lecture section for the Section Distribution Bar
   const lectureWordCounts = useMemo(() => {
     const counts: Record<number, number> = {};
@@ -131,9 +210,25 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         if (!rec && !w.isCoreLessonWord) return false;
       }
       if (filterMode === 'saved' && !savedWordIds.includes(w.id)) return false;
+      if (filterMode === 'mastered') {
+        const rec = wordSRS[w.id];
+        const isMast = masteredWordIds.includes(w.id) || rec?.stage === 'mastered' || (rec?.intervalDays ?? 0) >= 7;
+        if (!isMast) return false;
+      }
       if (filterMode === 'silent' && !w.segments?.some((s) => s.silent)) return false;
       if ((filterMode === 'B1' || filterMode === 'B2' || filterMode === 'C1') && w.level !== filterMode) {
         return false;
+      }
+
+      if (silentPatternFilter !== 'ALL') {
+        const targetSilent = silentPatternFilter.toLowerCase();
+        const hasSilentSegment = w.segments?.some(
+          (seg) => seg.silent && seg.text.toLowerCase().includes(targetSilent)
+        );
+        const summaryMatch = w.silentLettersSummary
+          ?.toLowerCase()
+          .includes(`silent ${targetSilent}`);
+        if (!hasSilentSegment && !summaryMatch) return false;
       }
 
       if (!q) return true;
@@ -145,7 +240,90 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         w.englishExample.toLowerCase().includes(q)
       );
     });
-  }, [allWords, selectedLectureNum, filterMode, savedWordIds, searchQuery, wordSRS]);
+  }, [
+    allWords,
+    selectedLectureNum,
+    filterMode,
+    silentPatternFilter,
+    savedWordIds,
+    masteredWordIds,
+    searchQuery,
+    wordSRS,
+  ]);
+
+  // Build playlist for Commuter Audio Mode
+  const commuterPlaylist = useMemo(() => {
+    if (commuterPlaylistSource === 'saved') {
+      const savedList = allWords.filter((w) => savedWordIds.includes(w.id));
+      return savedList.length > 0 ? savedList : filteredWords.slice(0, 50);
+    }
+    if (commuterPlaylistSource === 'mistakes') {
+      const mistakeTargetWords = new Set(
+        mistakeNotebook.map((m) => m.correctAnswer.trim().toLowerCase())
+      );
+      const matched = allWords.filter((w) => mistakeTargetWords.has(w.word.toLowerCase()));
+      return matched.length > 0 ? matched : filteredWords.slice(0, 50);
+    }
+    return filteredWords.slice(0, 100);
+  }, [commuterPlaylistSource, allWords, savedWordIds, mistakeNotebook, filteredWords]);
+
+  const currentCommuterWord =
+    commuterPlaylist[commuterIndex % Math.max(1, commuterPlaylist.length)] || null;
+
+  // Hands-Free Commuter Audio Loop: 1.0x -> 2s Mental Recall Pause -> 0.75x -> Example Sentence
+  useEffect(() => {
+    if (!commuterPlaying || !currentCommuterWord) {
+      setCommuterPhase('idle');
+      return;
+    }
+
+    commuterCancelRef.current = false;
+    let pauseTimer: number | null = null;
+    let nextTimer: number | null = null;
+
+    const runSequence = () => {
+      if (commuterCancelRef.current) return;
+      setCommuterPhase('word-1x');
+      speechService.speak(currentCommuterWord.word, {
+        rate: 1.0,
+        onEnd: () => {
+          if (commuterCancelRef.current) return;
+          setCommuterPhase('pause-2s');
+          pauseTimer = window.setTimeout(() => {
+            if (commuterCancelRef.current) return;
+            setCommuterPhase('word-075x');
+            speechService.speak(currentCommuterWord.word, {
+              rate: 0.75,
+              onEnd: () => {
+                if (commuterCancelRef.current) return;
+                setCommuterPhase('sentence');
+                speechService.speak(currentCommuterWord.englishExample, {
+                  rate: preferredSpeechRate,
+                  onEnd: () => {
+                    if (commuterCancelRef.current) return;
+                    nextTimer = window.setTimeout(() => {
+                      if (!commuterCancelRef.current) {
+                        setCommuterIndex((prev) => (prev + 1) % Math.max(1, commuterPlaylist.length));
+                      }
+                    }, 900);
+                  },
+                });
+              },
+            });
+          }, 2000);
+        },
+      });
+    };
+
+    runSequence();
+
+    return () => {
+      commuterCancelRef.current = true;
+      if (pauseTimer) window.clearTimeout(pauseTimer);
+      if (nextTimer) window.clearTimeout(nextTimer);
+      speechService.stop();
+    };
+  }, [commuterPlaying, commuterIndex, currentCommuterWord, commuterPlaylist.length, preferredSpeechRate]);
 
   const totalPages = Math.max(1, Math.ceil(filteredWords.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -463,6 +641,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   { id: 'srs', label: `SRS Deck (${Math.max(coreWordsCount, srsTrackedCount)})` },
                   { id: 'silent', label: 'Silent Letters' },
                   { id: 'saved', label: `Saved (${savedWordIds.length})` },
+                  { id: 'mastered', label: `Mastered (${masteredWordIds.length})` },
                   { id: 'B1', label: 'B1' },
                   { id: 'B2', label: 'B2' },
                   { id: 'C1', label: 'C1' },
@@ -486,6 +665,190 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Silent-Letter Family Filter Pills + Commuter Audio Mode Toggle Bar */}
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                <Sparkles className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <span>Silent-Letter Orthographic Family Filter Pills:</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCommuterOpen((prev) => !prev)}
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
+                  commuterOpen || commuterPlaying
+                    ? 'bg-[#B91C1C] text-white'
+                    : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
+                }`}
+              >
+                <Radio className={`w-3.5 h-3.5 ${commuterPlaying ? 'animate-pulse' : 'text-[#B91C1C]'}`} />
+                <span>
+                  {commuterPlaying
+                    ? 'Commuter Audio Playing (Hands-Free)'
+                    : 'Hands-Free Commuter Audio Mode (Podcast Loop)'}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {SILENT_PATTERN_PILLS.map((pill) => {
+                const isSelected = silentPatternFilter === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => {
+                      setSilentPatternFilter(pill.id);
+                      setCurrentPage(1);
+                      setCardIndex(0);
+                    }}
+                    className={`min-h-[36px] px-3 py-1 rounded-xl border text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'border-[#B91C1C] bg-[#B91C1C] text-white font-semibold shadow-xs'
+                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B91C1C]/50'
+                    }`}
+                  >
+                    <span>{pill.label}</span>
+                    {pill.id !== 'ALL' && (
+                      <span
+                        className={`font-ipa text-[10px] ${
+                          isSelected ? 'text-white/80' : 'text-[#B91C1C] dark:text-[#F87171]'
+                        }`}
+                      >
+                        ({pill.example})
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Hands-Free Commuter Audio Mode (Podcast Player) Drawer */}
+            {commuterOpen && (
+              <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] rounded-xl p-4 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <Headphones className="w-4 h-4" />
+                      <span>Hands-Free Commuter Audio Mode (Podcast Loop)</span>
+                    </div>
+                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                      Loops automatically: <strong>1.0x Word</strong> → <strong>2s Mental Recall Pause</strong> → <strong>0.75x Slow Phoneme</strong> → <strong>Example Sentence</strong>.
+                    </p>
+                  </div>
+
+                  {/* Playlist Source Selector */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(
+                      [
+                        { id: 'filtered', label: `Current Filter (${Math.min(100, filteredWords.length)})` },
+                        { id: 'saved', label: `Saved Words (${savedWordIds.length})` },
+                        { id: 'mistakes', label: `Mistake Notebook (${mistakeNotebook.length})` },
+                      ] as const
+                    ).map((src) => (
+                      <button
+                        key={src.id}
+                        type="button"
+                        onClick={() => {
+                          setCommuterPlaylistSource(src.id);
+                          setCommuterIndex(0);
+                        }}
+                        className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                          commuterPlaylistSource === src.id
+                            ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] border-transparent'
+                            : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                        }`}
+                      >
+                        {src.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {currentCommuterWord ? (
+                  <div className="p-4 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
+                          Track {(commuterIndex % Math.max(1, commuterPlaylist.length)) + 1} / {commuterPlaylist.length}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171] font-ipa text-[11px] font-semibold">
+                          {commuterPhase === 'word-1x' && '1/4 · Speaking Word (1.0x)...'}
+                          {commuterPhase === 'pause-2s' && '2/4 · 2s Mental Recall Pause...'}
+                          {commuterPhase === 'word-075x' && '3/4 · Slow Articulation (0.75x)...'}
+                          {commuterPhase === 'sentence' && '4/4 · Reading Example Sentence...'}
+                          {commuterPhase === 'idle' && 'Ready to Play'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-baseline gap-2.5">
+                        <span className="text-xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                          {currentCommuterWord.word}
+                        </span>
+                        <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
+                          {currentCommuterWord.ipa}
+                        </span>
+                        <span className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                          {currentCommuterWord.nepaliMeaning}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                        “{currentCommuterWord.englishExample}”
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (commuterPlaying) {
+                            setCommuterPlaying(false);
+                            speechService.stop();
+                          } else {
+                            setCommuterPlaying(true);
+                          }
+                        }}
+                        className={`min-h-[42px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 ${
+                          commuterPlaying
+                            ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917]'
+                            : 'bg-[#B91C1C] text-white'
+                        }`}
+                      >
+                        {commuterPlaying ? (
+                          <>
+                            <Square className="w-3.5 h-3.5" />
+                            <span>Stop Loop</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5" />
+                            <span>Start Loop</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCommuterIndex((prev) => (prev + 1) % Math.max(1, commuterPlaylist.length))
+                        }
+                        className="min-h-[42px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold inline-flex items-center gap-1"
+                      >
+                        <SkipForward className="w-3.5 h-3.5" />
+                        <span>Next</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                    No words in the selected playlist source. Try switching to Current Filter.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1149,14 +1512,15 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                       <th className="py-3 px-4 font-semibold">Word (Silent Highlight)</th>
                       <th className="py-3 px-4 font-semibold">IPA & POS</th>
                       <th className="py-3 px-4 font-semibold">Nepali Meaning</th>
-                      <th className="py-3 px-4 font-semibold">Phonics / Silent Rule</th>
+                      <th className="py-3 px-4 font-semibold">Mastery Stage</th>
                       <th className="py-3 px-4 font-semibold">Unit</th>
-                      <th className="py-3 px-4 font-semibold">Audio & Save</th>
+                      <th className="py-3 px-4 font-semibold">Audio, Save & Mastered</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E7E0D6] dark:divide-[#2E2924]">
                     {paginatedWords.map((item) => {
                       const isSaved = savedWordIds.includes(item.id);
+                      const mastery = getWordMasteryStatus(item.id);
                       return (
                         <tr
                           key={item.id}
@@ -1182,8 +1546,13 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           <td className="py-3 px-4 font-nepali font-semibold text-[#15803D] dark:text-emerald-400">
                             {item.nepaliMeaning}
                           </td>
-                          <td className="py-3 px-4 text-xs text-[#B91C1C] dark:text-[#F87171]">
-                            {item.silentLettersSummary}
+                          <td className="py-3 px-4 text-xs">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-ipa text-[11px] font-semibold ${mastery.badgeClass}`}
+                            >
+                              {mastery.isMastered && <CheckCircle2 className="w-3 h-3" />}
+                              <span>{mastery.label}</span>
+                            </span>
                           </td>
                           <td className="py-3 px-4 font-ipa text-xs">
                             <button
@@ -1216,6 +1585,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onToggleSaveWord(item.id)}
+                                title="Save Word"
                                 className={`min-h-[34px] px-2 py-1 rounded-lg border ${
                                   isSaved
                                     ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C]'
@@ -1228,6 +1598,25 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                                   <Bookmark className="w-3.5 h-3.5" />
                                 )}
                               </button>
+                              {onToggleMasteredWord && (
+                                <button
+                                  type="button"
+                                  onClick={() => onToggleMasteredWord(item.id)}
+                                  title={
+                                    mastery.isMastered ? 'Mastered (Click to unmark)' : 'Mark Word as Mastered'
+                                  }
+                                  className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-semibold inline-flex items-center gap-1 ${
+                                    mastery.isMastered
+                                      ? 'border-[#15803D] bg-[#15803D] text-white'
+                                      : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] hover:border-[#15803D]'
+                                  }`}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span className="hidden xl:inline">
+                                    {mastery.isMastered ? 'Mastered' : 'Master'}
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1242,7 +1631,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               {paginatedWords.map((item) => {
                 const isSaved = savedWordIds.includes(item.id);
                 const showMeaning = showMeaningsByDefault || Boolean(revealedIds[item.id]);
-                const srsStage = wordSRS[item.id]?.stage;
+                const mastery = getWordMasteryStatus(item.id);
 
                 return (
                 <div
@@ -1250,26 +1639,24 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                      <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           onClick={() => onOpenLecture(item.lectureId)}
                           className="hover:underline text-[#B91C1C] dark:text-[#F87171] font-medium"
                         >
                           Lecture {String(item.lectureNumber).padStart(2, '0')}
                         </button>
-                        <span className="mx-1.5" aria-hidden="true">·</span>
+                        <span aria-hidden="true">·</span>
                         <span>Level {item.level}</span>
-                        <span className="mx-1.5" aria-hidden="true">·</span>
+                        <span aria-hidden="true">·</span>
                         <span>{item.partOfSpeech}</span>
-                        {srsStage && (
-                          <>
-                            <span className="mx-1.5" aria-hidden="true">·</span>
-                            <span className="font-ipa uppercase text-[#15803D] dark:text-emerald-400 font-semibold">
-                              {srsStage}
-                            </span>
-                          </>
-                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-ipa text-[10px] font-semibold ${mastery.badgeClass}`}
+                        >
+                          {mastery.isMastered && <CheckCircle2 className="w-2.5 h-2.5" />}
+                          <span>{mastery.label}</span>
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -1286,6 +1673,23 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               <Eye className="w-3.5 h-3.5" />
                             )}
                             <span>{showMeaning ? 'Hide Nepali' : 'Meaning'}</span>
+                          </button>
+                        )}
+                        {onToggleMasteredWord && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleMasteredWord(item.id)}
+                            title={
+                              mastery.isMastered ? 'Mastered (Click to unmark)' : 'Mark Word as Mastered'
+                            }
+                            className={`min-h-[36px] px-2.5 rounded-lg border text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
+                              mastery.isMastered
+                                ? 'border-[#15803D] bg-[#15803D] text-white'
+                                : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:border-[#15803D]'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{mastery.isMastered ? 'Mastered' : 'Mark Mastered'}</span>
                           </button>
                         )}
                         <button
