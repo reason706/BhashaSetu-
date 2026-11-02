@@ -1,0 +1,6 @@
+{
+  "name": "BhashaSetu — English to Nepali Learning PWA",
+  "description": "An offline-first Progressive Web App teaching intermediate English vocabulary, silent-letter phonics, pronunciation, spelling rules, and comparative grammar with Nepali explanations.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

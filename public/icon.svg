@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#B91C1C"/>
+  <rect x="36" y="36" width="440" height="440" rx="84" stroke="#FAF7F2" stroke-opacity="0.25" stroke-width="6"/>
+  <path d="M128 336C172 284 340 284 384 336" stroke="#FAF7F2" stroke-width="24" stroke-linecap="round"/>
+  <path d="M104 368H408" stroke="#FAF7F2" stroke-width="18" stroke-linecap="round"/>
+  <text x="175" y="245" fill="#FAF7F2" font-family="Georgia, serif" font-weight="bold" font-size="136" text-anchor="middle">A</text>
+  <text x="342" y="245" fill="#FDE68A" font-family="sans-serif" font-weight="bold" font-size="132" text-anchor="middle">अ</text>
+</svg>

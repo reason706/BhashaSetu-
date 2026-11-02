@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "BhashaSetu — English to Nepali Learning PWA",
+  "short_name": "BhashaSetu",
+  "description": "Step-by-step intermediate English vocabulary, pronunciation, spelling, and comparative grammar with Nepali explanations.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#B91C1C",
+  "background_color": "#FAF7F2",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
