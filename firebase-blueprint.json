@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "UserProgressDocument": {
+      "title": "UserProgressDocument",
+      "description": "Cloud-synced learner progress and study metrics for an authenticated BhashaSetu user.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The authenticated Firebase UID of the learner who owns this progress record.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Learner display name (non-PII first name or alias).",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "selectedLevel": {
+          "type": "string",
+          "description": "Active CEFR track selected by the learner.",
+          "enum": ["B1", "B2", "C1"],
+          "maxLength": 10
+        },
+        "dailyGoalMinutes": {
+          "type": "number",
+          "description": "Daily study goal in minutes (5 to 120)."
+        },
+        "currentStreakDays": {
+          "type": "number",
+          "description": "Current consecutive days of study streak."
+        },
+        "streakFreezeShields": {
+          "type": "number",
+          "description": "Available 1-day streak freeze shields."
+        },
+        "sprintHighScore": {
+          "type": "number",
+          "description": "Highest score achieved in the 60-second phonics sprint."
+        },
+        "completedUnitIdsCount": {
+          "type": "number",
+          "description": "Total number of completed lecture units."
+        },
+        "masteredWordsCount": {
+          "type": "number",
+          "description": "Unified mastered vocabulary count across SRS and lectures."
+        },
+        "progressSnapshot": {
+          "type": "object",
+          "description": "Bounded structured map containing completedUnitIds, savedWordIds, masteredWordIds, wordSRS, mistakeNotebook, lectureNotes, and studyActivityByDate."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the cloud profile was initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the cloud profile was last synchronized."
+        }
+      },
+      "required": [
+        "ownerId",
+        "displayName",
+        "selectedLevel",
+        "dailyGoalMinutes",
+        "currentStreakDays",
+        "streakFreezeShields",
+        "sprintHighScore",
+        "completedUnitIdsCount",
+        "masteredWordsCount",
+        "progressSnapshot",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProgressDocument"
+      },
+      "description": "Stores isolated per-user learning progress, SRS state, and study milestones keyed strictly by the owner's UID."
+    }
+  }
+}

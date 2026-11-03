@@ -34,7 +34,15 @@ import {
   ShieldCheck,
   ArrowRight,
   Share2,
+  Cloud,
+  LogIn,
+  LogOut,
+  UserCheck,
+  Trash2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import {
   UserProgressState,
   LectureUnit,
@@ -47,6 +55,14 @@ import { usePWAInstall } from '../hooks/usePWA';
 import { getMassiveLexicon } from '../data/massiveLexicon';
 import { getUnifiedMasteredWordsCount } from '../services/storage';
 import { ArenaToolTab } from './PracticeArenaView';
+import {
+  PrintableStudySheetModal,
+  StudySheetFocusMode,
+} from './PrintableStudySheetModal';
+import {
+  exportSavedWordsToCSV,
+  exportMistakeNotebookToCSV,
+} from '../services/studySheetExport';
 import {
   speechService,
   DialogueCalibrationSettings,
@@ -73,6 +89,15 @@ interface ProgressSettingsViewProps {
   onRecordMistake?: (
     mistake: Omit<MistakeItem, 'id' | 'consecutiveCorrect' | 'createdAt'>
   ) => void;
+  firebaseUser?: User | null;
+  isCloudSyncing?: boolean;
+  cloudSyncStatusMsg?: string | null;
+  onGoogleSignIn?: () => Promise<void>;
+  onGoogleSignOut?: () => Promise<void>;
+  onPullFromCloud?: () => Promise<void>;
+  onUpdateUserName?: (name: string) => void;
+  onToggleDailyReminder?: () => void;
+  onResetAllProgress?: (includeCloud: boolean) => Promise<void>;
 }
 
 interface CalibrationDialogueLine {
@@ -327,10 +352,29 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   onUpdateDailyGoal,
   onImportProgress,
   onRecordMistake,
+  firebaseUser = null,
+  isCloudSyncing = false,
+  cloudSyncStatusMsg = null,
+  onGoogleSignIn,
+  onGoogleSignOut,
+  onPullFromCloud,
+  onUpdateUserName,
+  onToggleDailyReminder,
+  onResetAllProgress,
 }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isEditingProfileName, setIsEditingProfileName] = useState(false);
+  const [draftProfileName, setDraftProfileName] = useState<string>(
+    progress.userName || firebaseUser?.displayName || 'Anisha Sharma'
+  );
+  const [showFullAudioLab, setShowFullAudioLab] = useState(false);
+  const [selectedActivityDate, setSelectedActivityDate] = useState<string | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetIncludeCloud, setResetIncludeCloud] = useState(true);
+  const [isResettingProgress, setIsResettingProgress] = useState(false);
+  const audioLabSectionRef = useRef<HTMLElement | null>(null);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>(
     () => speechService.getPreferredVoiceURI() || ''
   );
@@ -341,6 +385,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   } | null>(null);
   const [certificateTrack, setCertificateTrack] = useState<CEFRLevel | null>(null);
   const [selectedBadgeForPrint, setSelectedBadgeForPrint] = useState<string | null>(null);
+  const [studySheetPrintMode, setStudySheetPrintMode] = useState<StudySheetFocusMode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Dedicated Long-Form Dialogue Speed & Pitch Calibration State
@@ -489,7 +534,12 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     };
   }, [scoreEntries, progress.wordSRS, progress.savedWordIds, progress.completedUnitIds, lectures]);
 
-  const totalLexiconCount = useMemo(() => getMassiveLexicon(lectures).length, [lectures]);
+  const allLexiconWords = useMemo(() => getMassiveLexicon(lectures), [lectures]);
+  const totalLexiconCount = allLexiconWords.length;
+  const savedWordsForExport = useMemo(() => {
+    const matched = allLexiconWords.filter((w) => progress.savedWordIds.includes(w.id));
+    return matched.length > 0 ? matched : allLexiconWords.filter((w) => w.isCoreLessonWord).slice(0, 20);
+  }, [allLexiconWords, progress.savedWordIds]);
   const overallCoursePercent =
     lectures.length > 0
       ? Math.round((progress.completedUnitIds.length / lectures.length) * 100)
@@ -523,41 +573,59 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   }, [lectures, progress.completedUnitIds]);
 
   const fluencyHeatmapCells = useMemo(() => {
-    const baseMastery = Math.min(
-      95,
-      Math.round(
-        progress.completedUnitIds.length * 7 +
-          unifiedMasteredWordsCount * 0.9 +
-          (skillMetrics.overallAccuracy || 65) * 0.25
-      )
-    );
-    const spellingBoost = skillMetrics.spellingPercent ?? 45;
-    const grammarBoost = skillMetrics.grammarPercent ?? 45;
+    const hasAnyActivity =
+      progress.completedUnitIds.length > 0 ||
+      unifiedMasteredWordsCount > 0 ||
+      Object.keys(progress.completedStepsByLecture || {}).length > 0 ||
+      skillMetrics.overallAccuracy !== null;
+
+    const baseMastery = hasAnyActivity
+      ? Math.min(
+          95,
+          Math.round(
+            progress.completedUnitIds.length * 7 +
+              unifiedMasteredWordsCount * 0.9 +
+              (skillMetrics.overallAccuracy || 30) * 0.25
+          )
+        )
+      : 0;
+    const spellingBoost = hasAnyActivity ? (skillMetrics.spellingPercent ?? 20) : 0;
+    const grammarBoost = hasAnyActivity ? (skillMetrics.grammarPercent ?? 20) : 0;
+
+    const calcCellScore = (boost: number, offset: number, minWhenActive: number) => {
+      if (!hasAnyActivity) return 0;
+      return Math.min(100, Math.max(minWhenActive, Math.round((baseMastery + boost) / 2 + offset)));
+    };
 
     const silentClusters = [
-      { id: 'kn', label: 'Silent K (kn-)', example: 'Knight, Knowledge', score: Math.min(100, Math.max(25, Math.round((baseMastery + spellingBoost) / 2 + 12))) },
-      { id: 'mb', label: 'Silent B (-mb/-bt)', example: 'Subtle, Plumber, Debt', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 8))) },
-      { id: 'wr', label: 'Silent W (wr-/wh-)', example: 'Wreck, Wrist, Whole', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 5))) },
-      { id: 'lk', label: 'Silent L (-lk/-lm)', example: 'Calm, Salmon, Half', score: Math.min(100, Math.max(18, Math.round((baseMastery + spellingBoost) / 2))) },
-      { id: 'gh', label: 'Silent GH (-igh/-ough)', example: 'Though, Drought, Weigh', score: Math.min(100, Math.max(15, Math.round((baseMastery + spellingBoost) / 2 - 4))) },
-      { id: 'st', label: 'Silent T (-stle/-sten)', example: 'Castle, Fasten, Whistle', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 4))) },
-      { id: 'ps', label: 'Silent P (ps-/pn-/pt)', example: 'Psychology, Receipt', score: Math.min(100, Math.max(18, Math.round((baseMastery + spellingBoost) / 2 - 2))) },
-      { id: 'h', label: 'Silent H (hon-/rh-)', example: 'Honest, Heir, Rhythm', score: Math.min(100, Math.max(22, Math.round((baseMastery + spellingBoost) / 2 + 6))) },
-      { id: 'gn', label: 'Silent G (gn-/-ign)', example: 'Foreign, Sign, Campaign', score: Math.min(100, Math.max(16, Math.round((baseMastery + spellingBoost) / 2 - 3))) },
-      { id: 'mn', label: 'Silent N (-mn)', example: 'Autumn, Column, Solemn', score: Math.min(100, Math.max(20, Math.round((baseMastery + spellingBoost) / 2 + 2))) },
-      { id: 'sc', label: 'Silent C (sc-)', example: 'Conscience, Muscle', score: Math.min(100, Math.max(15, Math.round((baseMastery + spellingBoost) / 2 - 6))) },
-      { id: 'd', label: 'Silent D (-dj-/-dn-)', example: 'Wednesday, Ledger', score: Math.min(100, Math.max(24, Math.round((baseMastery + spellingBoost) / 2 + 10))) },
+      { id: 'kn', label: 'Silent K (kn-)', example: 'Knight, Knowledge', score: calcCellScore(spellingBoost, 12, 15) },
+      { id: 'mb', label: 'Silent B (-mb/-bt)', example: 'Subtle, Plumber, Debt', score: calcCellScore(spellingBoost, 8, 12) },
+      { id: 'wr', label: 'Silent W (wr-/wh-)', example: 'Wreck, Wrist, Whole', score: calcCellScore(spellingBoost, 5, 12) },
+      { id: 'lk', label: 'Silent L (-lk/-lm)', example: 'Calm, Salmon, Half', score: calcCellScore(spellingBoost, 0, 10) },
+      { id: 'gh', label: 'Silent GH (-igh/-ough)', example: 'Though, Drought, Weigh', score: calcCellScore(spellingBoost, -4, 10) },
+      { id: 'st', label: 'Silent T (-stle/-sten)', example: 'Castle, Fasten, Whistle', score: calcCellScore(spellingBoost, 4, 12) },
+      { id: 'ps', label: 'Silent P (ps-/pn-/pt)', example: 'Psychology, Receipt', score: calcCellScore(spellingBoost, -2, 10) },
+      { id: 'h', label: 'Silent H (hon-/rh-)', example: 'Honest, Heir, Rhythm', score: calcCellScore(spellingBoost, 6, 12) },
+      { id: 'gn', label: 'Silent G (gn-/-ign)', example: 'Foreign, Sign, Campaign', score: calcCellScore(spellingBoost, -3, 10) },
+      { id: 'mn', label: 'Silent N (-mn)', example: 'Autumn, Column, Solemn', score: calcCellScore(spellingBoost, 2, 10) },
+      { id: 'sc', label: 'Silent C (sc-)', example: 'Conscience, Muscle', score: calcCellScore(spellingBoost, -6, 10) },
+      { id: 'd', label: 'Silent D (-dj-/-dn-)', example: 'Wednesday, Ledger', score: calcCellScore(spellingBoost, 10, 14) },
     ];
 
     const syntaxPillars = [
-      { id: 'svo', label: 'SOV → SVO Word Order', sub: 'Subject + Verb + Object', score: Math.min(100, Math.max(25, Math.round((baseMastery + grammarBoost) / 2 + 8))) },
-      { id: 'articles', label: 'Article Mastery (a/an/the/Ø)', sub: 'Definite vs. Zero Article', score: Math.min(100, Math.max(20, Math.round((baseMastery + grammarBoost) / 2))) },
-      { id: 'prepositions', label: 'Nepali Postposition Traps', sub: 'मा / ले / सँग → in/on/at/by/with', score: Math.min(100, Math.max(18, Math.round((baseMastery + grammarBoost) / 2 - 4))) },
-      { id: 'stative', label: 'Stative vs. Continuous (-ing)', sub: 'Have / Know / Believe', score: Math.min(100, Math.max(22, Math.round((baseMastery + grammarBoost) / 2 + 5))) },
+      { id: 'svo', label: 'SOV → SVO Word Order', sub: 'Subject + Verb + Object', score: calcCellScore(grammarBoost, 8, 15) },
+      { id: 'articles', label: 'Article Mastery (a/an/the/Ø)', sub: 'Definite vs. Zero Article', score: calcCellScore(grammarBoost, 0, 12) },
+      { id: 'prepositions', label: 'Nepali Postposition Traps', sub: 'मा / ले / सँग → in/on/at/by/with', score: calcCellScore(grammarBoost, -4, 10) },
+      { id: 'stative', label: 'Stative vs. Continuous (-ing)', sub: 'Have / Know / Believe', score: calcCellScore(grammarBoost, 5, 12) },
     ];
 
     return { silentClusters, syntaxPillars };
-  }, [progress.completedUnitIds.length, unifiedMasteredWordsCount, skillMetrics]);
+  }, [
+    progress.completedUnitIds.length,
+    progress.completedStepsByLecture,
+    unifiedMasteredWordsCount,
+    skillMetrics,
+  ]);
 
   const achievementsList = useMemo(() => {
     const completedCount = progress.completedUnitIds.length;
@@ -835,6 +903,29 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     }
   };
 
+  const handleConfirmResetProgress = async () => {
+    if (!onResetAllProgress) return;
+    setIsResettingProgress(true);
+    try {
+      await onResetAllProgress(resetIncludeCloud);
+      setIsResetModalOpen(false);
+      setBackupMessage({
+        type: 'success',
+        text:
+          firebaseUser && resetIncludeCloud
+            ? 'All progress has been reset to 0 on both this device and your Google Cloud backup.'
+            : 'All local progress on this device has been reset to 0.',
+      });
+    } catch {
+      setBackupMessage({
+        type: 'error',
+        text: 'Could not complete reset. Please check your connection and try again.',
+      });
+    } finally {
+      setIsResettingProgress(false);
+    }
+  };
+
   const handleVoiceChange = (uri: string) => {
     setSelectedVoiceURI(uri);
     speechService.setPreferredVoiceURI(uri || null);
@@ -1079,6 +1170,21 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     e.target.value = '';
   };
 
+  // Printable Study Sheet (Saved Words & Mistake Notebook PDF / CSV) View
+  if (studySheetPrintMode) {
+    return (
+      <PrintableStudySheetModal
+        initialFocusMode={studySheetPrintMode}
+        allLexiconWords={allLexiconWords}
+        savedWordIds={progress.savedWordIds}
+        masteredWordIds={progress.masteredWordIds || []}
+        wordSRS={progress.wordSRS}
+        mistakeNotebook={progress.mistakeNotebook}
+        onClose={() => setStudySheetPrintMode(null)}
+      />
+    );
+  }
+
   // Printable Shareable Achievement & Milestone Card View
   if (selectedBadgeForPrint) {
     const badgeInfo =
@@ -1219,6 +1325,199 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     );
   }
 
+  const renderGoogleAccountProfileCard = () => {
+    const srsCount = Object.keys(progress.wordSRS || {}).length;
+    const notesCount = Object.values(progress.lectureNotes || {}).filter((n) => n && n.trim().length > 0).length;
+    const customWordsCount = (progress.customWords || []).length;
+    const customLecturesCount = (progress.customLectures || []).length;
+    const examsCount = (progress.examHistory || []).length;
+
+    return (
+      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
+          <div className="flex items-start sm:items-center gap-3.5">
+            {firebaseUser?.photoURL ? (
+              <img
+                src={firebaseUser.photoURL}
+                alt={firebaseUser.displayName || 'Google Account'}
+                referrerPolicy="no-referrer"
+                className="w-12 h-12 rounded-2xl border border-[#E7E0D6] dark:border-[#2E2924] object-cover shrink-0"
+              />
+            ) : (
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-serif-display text-lg font-bold ${
+                  firebaseUser
+                    ? 'bg-[#15803D] text-white'
+                    : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#B91C1C]'
+                }`}
+              >
+                {firebaseUser
+                  ? (firebaseUser.displayName || firebaseUser.email || 'U')[0].toUpperCase()
+                  : <Cloud className="w-6 h-6" />}
+              </div>
+            )}
+
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-[#15803D] dark:text-emerald-400 inline-flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>
+                    {firebaseUser
+                      ? 'Google Account Connected · Firebase Cloud Backup Active'
+                      : 'Google Account Cloud Login & Multi-Device Sync'}
+                  </span>
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-md font-ipa text-[10px] font-semibold ${
+                    firebaseUser
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-[#15803D] dark:text-emerald-300'
+                      : 'bg-amber-100 dark:bg-amber-950/50 text-[#D97706] dark:text-amber-300'
+                  }`}
+                >
+                  {firebaseUser ? 'Auto-Saving to Cloud' : 'Not Signed In'}
+                </span>
+              </div>
+
+              <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                {firebaseUser
+                  ? `${firebaseUser.displayName || 'BhashaSetu Learner'} (${firebaseUser.email || 'Google Account'})`
+                  : 'Sign in with Google to Save All Your Study Data & Profile Info'}
+              </h2>
+              <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                {firebaseUser
+                  ? `All your completed lectures, vocabularySRS, mistake notebook, scratchpad notes, exam scores, and audio settings are backed up under your Google account.${
+                      progress.lastSyncedAt
+                        ? ` Last synced at ${new Date(progress.lastSyncedAt).toLocaleTimeString()}.`
+                        : ''
+                    }`
+                  : 'Connect your Google account so all your progress, custom vocabulary, mistake notebook, lecture notes, and CEFR certificates stay safely backed up in Firebase Firestore across phone and computer.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {firebaseUser ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isCloudSyncing || isSyncing}
+                  onClick={handleSyncClick}
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold hover:bg-emerald-800 inline-flex items-center gap-2 transition-colors disabled:opacity-60"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${isCloudSyncing || isSyncing ? 'animate-spin' : ''}`}
+                  />
+                  <span>
+                    {isCloudSyncing || isSyncing ? 'Saving to Cloud...' : 'Save All Data Now'}
+                  </span>
+                </button>
+                {onPullFromCloud && (
+                  <button
+                    type="button"
+                    disabled={isCloudSyncing || isSyncing}
+                    onClick={onPullFromCloud}
+                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#15803D] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#15803D]" />
+                    <span>Restore / Merge from Cloud</span>
+                  </button>
+                )}
+                {onGoogleSignOut && (
+                  <button
+                    type="button"
+                    onClick={onGoogleSignOut}
+                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              onGoogleSignIn && (
+                <button
+                  type="button"
+                  disabled={isCloudSyncing}
+                  onClick={onGoogleSignIn}
+                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs sm:text-sm font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-2.5 transition-colors shadow-xs disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#EA4335"
+                      d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-2 3l3.2 2.5c1.9-1.7 3-4.3 3-7.4 0-.7-.1-1.4-.2-2H12z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.3H2.9v2.6C4.6 19.8 8 22 12 22z"
+                    />
+                    <path
+                      fill="#4A90E2"
+                      d="M6.2 13.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V7.6H2.9C2.3 8.9 2 10.4 2 12s.3 3.1.9 4.4l3.3-2.6z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M12 5.9c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 2.9 14.7 2 12 2 8 2 4.6 4.2 2.9 7.6l3.3 2.6c.8-2.5 3.1-4.3 5.8-4.3z"
+                    />
+                  </svg>
+                  <span>
+                    {isCloudSyncing ? 'Connecting Google Account...' : 'Continue with Google Account'}
+                  </span>
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Inventory of All User Data & Info Saved to Cloud */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Lectures & Quizzes</div>
+            <div className="font-ipa font-bold text-sm text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+              {progress.completedUnitIds.length} Units · {Object.keys(progress.moduleScores).length} Scores
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Words & SRS Queue</div>
+            <div className="font-ipa font-bold text-sm text-[#15803D] dark:text-emerald-400 mt-0.5">
+              {unifiedMasteredWordsCount} Mastered · {srsCount} SRS
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Mistakes & Notes</div>
+            <div className="font-ipa font-bold text-sm text-[#B91C1C] dark:text-[#F87171] mt-0.5">
+              {progress.mistakeNotebook.length} Mistakes · {notesCount} Notes
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Custom & Exams</div>
+            <div className="font-ipa font-bold text-sm text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+              {customWordsCount} Deck · {customLecturesCount} AI · {examsCount} Exams
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Streaks & Badges</div>
+            <div className="font-ipa font-bold text-sm text-[#D97706] mt-0.5">
+              {progress.currentStreakDays}d Streak · {unlockedBadgesCount} Badges
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Profile & Voice</div>
+            <div className="font-ipa font-bold text-sm text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+              Level {progress.selectedLevel} · {progress.dailyGoalMinutes}m · {progress.preferredSpeechRate}x
+            </div>
+          </div>
+        </div>
+
+        {cloudSyncStatusMsg && (
+          <div className="text-xs font-medium text-[#15803D] dark:text-emerald-400 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>{cloudSyncStatusMsg}</span>
+          </div>
+        )}
+      </section>
+    );
+  };
+
   // ===========================================================================
   // DEDICATED PROGRESS & ANALYTICS VIEW (mode === 'progress')
   // ===========================================================================
@@ -1285,6 +1584,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Google Account Login & Cloud Data Backup Card */}
+        {renderGoogleAccountProfileCard()}
 
         {progressSubView === 'achievements' ? (
           /* ================================================================= */
@@ -1635,8 +1937,16 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   {progress.savedWordIds.length} / {totalLexiconCount.toLocaleString()}+
                 </div>
-                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                  {progress.mistakeNotebook.length} active mistake notes
+                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 flex items-center justify-between gap-2">
+                  <span>{progress.mistakeNotebook.length} mistake notes</span>
+                  <button
+                    type="button"
+                    onClick={() => setStudySheetPrintMode('combined')}
+                    className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                  >
+                    <Printer className="w-3 h-3" />
+                    <span>PDF/CSV</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1765,57 +2075,151 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             {/* 14-DAY STUDY HEATMAP & ACHIEVEMENTS PREVIEW                     */}
             {/* =============================================================== */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* 14-Day Study Activity Heatmap */}
-              <div className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+              {/* Interactive 7-Day Bar Chart + 14-Day Study Activity Heatmap */}
+              <div className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="text-xs font-semibold text-[#A82020] dark:text-[#F87171]">
                     Consistency & Daily Habit Tracker
                   </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    14-Day Study Activity Heatmap
+                  <h2 className="text-lg sm:text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                    Interactive Weekly Bar Chart & 14-Day Heatmap
                   </h2>
                   <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                    Every lecture step, Daily Challenge, 60s Sprint, and Practice Arena session lights up your daily study grid:
+                    Click any day bar below to inspect your study actions or launch a quick daily drill:
                   </p>
                 </div>
 
-                <div className="grid grid-cols-7 gap-2 pt-2">
+                {/* Interactive 7-Day Vertical Capsule Bar Chart */}
+                <div className="p-4 rounded-2xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
+                  <div className="flex items-center justify-between text-xs mb-3">
+                    <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      Last 7 Days Study Volume
+                    </span>
+                    <span className="font-ipa text-[11px] text-[#78716C]">
+                      Goal: {progress.dailyGoalMinutes || 15}m/day
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2 items-end h-32 pt-2 px-1">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const d = new Date(Date.now() - (6 - i) * 86400000);
+                      const dateStr = d.toISOString().split('T')[0];
+                      const dayShort = d
+                        .toLocaleDateString('en-US', { weekday: 'short' })
+                        .slice(0, 1);
+                      const dayFull = d.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      });
+                      const count = progress.studyActivityByDate?.[dateStr] ?? 0;
+                      const heightPct = count > 0 ? Math.min(100, Math.max(18, count * 20)) : 8;
+                      const isToday = i === 6;
+                      const isSelected = selectedActivityDate === dateStr;
+
+                      return (
+                        <button
+                          key={`bar-${dateStr}`}
+                          type="button"
+                          onClick={() =>
+                            setSelectedActivityDate((prev) =>
+                              prev === dateStr ? null : dateStr
+                            )
+                          }
+                          className="group flex flex-col items-center gap-1.5 h-full justify-end focus:outline-none"
+                          title={`${dayFull}: ${count * 5} mins (${count} actions)`}
+                        >
+                          <span className="text-[10px] font-ipa text-[#78716C] group-hover:text-[#A82020]">
+                            {count * 5}m
+                          </span>
+                          <div className="w-full max-w-[26px] h-20 rounded-full bg-[#ECE6DA] dark:bg-[#26221E] p-0.5 flex items-end overflow-hidden">
+                            <div
+                              className={`w-full rounded-full transition-all duration-300 ${
+                                isSelected
+                                  ? 'bg-[#1F5C3D]'
+                                  : count >= 3
+                                  ? 'bg-[#A82020]'
+                                  : count >= 1
+                                  ? 'bg-[#A82020]/65'
+                                  : 'bg-[#D6CFC2] dark:bg-[#3A342E]'
+                              }`}
+                              style={{ height: `${heightPct}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`text-[11px] font-semibold ${
+                              isToday
+                                ? 'text-[#A82020] font-bold'
+                                : 'text-[#57534E] dark:text-[#A8A29E]'
+                            }`}
+                          >
+                            {dayShort}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedActivityDate && (
+                    <div className="mt-3 pt-2.5 border-t border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-between text-xs">
+                      <span className="text-[#57534E] dark:text-[#A8A29E]">
+                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                          {selectedActivityDate}
+                        </strong>
+                        :{' '}
+                        {(progress.studyActivityByDate?.[selectedActivityDate] || 0) * 5} mins logged (
+                        {progress.studyActivityByDate?.[selectedActivityDate] || 0} study units)
+                      </span>
+                      {onOpenDailyChallenge && (
+                        <button
+                          type="button"
+                          onClick={onOpenDailyChallenge}
+                          className="text-[#A82020] font-semibold hover:underline"
+                        >
+                          + Add Study Session
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 14-Day Grid */}
+                <div className="grid grid-cols-7 gap-1.5">
                   {Array.from({ length: 14 }).map((_, i) => {
                     const d = new Date(Date.now() - (13 - i) * 86400000);
                     const dateStr = d.toISOString().split('T')[0];
                     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
                     const dayNum = d.getDate();
-                    const count =
-                      progress.studyActivityByDate?.[dateStr] ||
-                      (dateStr === progress.lastStudyDate ? 2 : 0);
+                    const count = progress.studyActivityByDate?.[dateStr] || 0;
 
                     let cellStyle =
-                      'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E]';
+                      'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E]';
                     if (count >= 4) {
-                      cellStyle = 'bg-[#B91C1C] border-[#B91C1C] text-white font-bold';
+                      cellStyle = 'bg-[#A82020] border-[#A82020] text-white font-bold';
                     } else if (count >= 2) {
                       cellStyle =
-                        'bg-[#B91C1C]/25 dark:bg-[#B91C1C]/40 border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB] font-semibold';
+                        'bg-[#A82020]/20 dark:bg-[#A82020]/40 border-[#A82020] text-[#1C1917] dark:text-[#F5F2EB] font-semibold';
                     } else if (count >= 1) {
                       cellStyle =
                         'bg-amber-100 dark:bg-amber-950/50 border-[#D97706] text-[#1C1917] dark:text-[#F5F2EB]';
                     }
 
                     return (
-                      <div
+                      <button
                         key={dateStr}
+                        type="button"
+                        onClick={() => setSelectedActivityDate(dateStr)}
                         title={`${dateStr}: ${count} study actions`}
-                        className={`p-2 rounded-xl border text-center space-y-0.5 ${cellStyle}`}
+                        className={`p-1.5 rounded-xl border text-center space-y-0.5 transition-transform hover:scale-105 ${cellStyle}`}
                       >
-                        <div className="text-[10px] opacity-80">{dayLabel}</div>
+                        <div className="text-[9px] opacity-80">{dayLabel}</div>
                         <div className="font-ipa text-xs">{dayNum}</div>
                         <div className="text-[9px] font-ipa">{count > 0 ? `${count}pt` : '—'}</div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E6E0D4] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
                   <span>
                     Daily Challenges Completed:{' '}
                     <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
@@ -1824,7 +2228,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   </span>
                   <span>
                     60s Sprint High Score:{' '}
-                    <strong className="text-[#B91C1C] dark:text-[#F87171]">
+                    <strong className="text-[#A82020] dark:text-[#F87171]">
                       {progress.sprintHighScore || 0} pts
                     </strong>
                   </span>
@@ -2215,27 +2619,620 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   }
 
   // ===========================================================================
-  // DEDICATED SETTINGS VIEW (mode === 'settings')
+  // DEDICATED SETTINGS VIEW (mode === 'settings') — Warm Editorial 2x2 Design
   // ===========================================================================
+  const displayUserName =
+    progress.userName || firebaseUser?.displayName || 'Anisha Sharma';
+  const userInitials = displayUserName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'AS';
+
+  const currentVoicePitchPreset =
+    dialogueCalibration.speakerAPitch < 1.0
+      ? 'Warm'
+      : dialogueCalibration.speakerAPitch > 1.02
+      ? 'Clear'
+      : 'Natural';
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-8">
-      {/* Header */}
-      <div className="pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-        <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
-          Application Preferences, Audio Calibration & Voice Practice Lab
+    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-10">
+      {/* Hidden JSON Restore Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleImportFileChange}
+        className="hidden"
+      />
+
+      {/* Editorial Header matching Screenshot 3 */}
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-2">
+          MAKE BHASHASETU YOURS
         </div>
-        <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-          Settings, Audio Speed Calibration & Sound Practice
+        <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+          Settings &amp; preferences
         </h1>
-        <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-          Calibrate long-form dialogue speeds (0.5x, 0.75x, 1.0x) and pitch shifts, test your pronunciation in the live Sound Practice Lab, and manage your language and backup preferences.
+        <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
+          Your learning space should feel comfortable and personal.
         </p>
       </div>
 
-      {/* ===================================================================== */}
-      {/* 1. DEDICATED AUDIO SPEED TEST & LONG-FORM DIALOGUE CALIBRATION CARD   */}
-      {/* ===================================================================== */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
+      {/* Backup / Restore Toast Notification if present */}
+      {backupMessage && (
+        <div
+          className={`p-4 rounded-2xl border text-xs font-medium flex items-center justify-between ${
+            backupMessage.type === 'success'
+              ? 'bg-[#E2EFE7] border-[#2E6F4E]/30 text-[#1F5C3D]'
+              : 'bg-red-50 border-red-300 text-red-900'
+          }`}
+        >
+          <span>{backupMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setBackupMessage(null)}
+            className="text-xs font-bold underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* 2x2 Editorial Settings Grid (Exact match to Screenshot 3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* CARD 1: Profile & Learning Preferences */}
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          {/* Avatar + Name + Edit button */}
+          <div className="pb-6 border-b border-[#EFEAE0] dark:border-[#2E2924]">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                {firebaseUser?.photoURL ? (
+                  <img
+                    src={firebaseUser.photoURL}
+                    alt={displayUserName}
+                    referrerPolicy="no-referrer"
+                    className="w-12 h-12 rounded-full object-cover border border-[#E6E0D4]"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#E5DEC9] dark:bg-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-center font-semibold text-sm shrink-0">
+                    {userInitials}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                    {displayUserName}
+                  </div>
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate">
+                    {firebaseUser?.email
+                      ? `Synced with ${firebaseUser.email}`
+                      : 'Learning at your own pace'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftProfileName(displayUserName);
+                  setIsEditingProfileName((prev) => !prev);
+                }}
+                className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
+              >
+                {isEditingProfileName ? 'Close' : 'Edit'}
+              </button>
+            </div>
+
+            {isEditingProfileName && (
+              <div className="mt-4 pt-4 border-t border-[#EFEAE0] dark:border-[#2E2924] space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1">
+                    Your Display Name (Used on Certificates &amp; Greeting)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={draftProfileName}
+                      onChange={(e) => setDraftProfileName(e.target.value)}
+                      placeholder="Enter your name"
+                      className="flex-1 px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-[#FAF8F4] dark:bg-[#141210] text-sm text-[#1C1917] dark:text-[#F5F2EB]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onUpdateUserName && draftProfileName.trim()) {
+                          onUpdateUserName(draftProfileName.trim());
+                        }
+                        setIsEditingProfileName(false);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#A82020] text-white text-xs font-semibold"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Google Account Cloud Login inside Profile Edit */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                  <span className="text-xs text-[#78716C]">
+                    {firebaseUser
+                      ? `Signed in as ${firebaseUser.email}`
+                      : 'Sign in with Google to back up your progress across devices'}
+                  </span>
+                  {firebaseUser ? (
+                    <button
+                      type="button"
+                      onClick={onGoogleSignOut}
+                      className="px-3 py-1.5 rounded-lg border border-[#E6E0D4] text-xs font-semibold text-[#57534E] hover:text-[#1C1917]"
+                    >
+                      Sign out
+                    </button>
+                  ) : (
+                    onGoogleSignIn && (
+                      <button
+                        type="button"
+                        onClick={onGoogleSignIn}
+                        className="px-3.5 py-1.5 rounded-lg bg-[#1C1917] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>Sign in with Google</span>
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Row 1: Learning level */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Learning level
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Choose the right challenge
+              </div>
+            </div>
+            <select
+              aria-label="Learning level"
+              value={progress.currentLevel}
+              onChange={(e) => onUpdateLevel(e.target.value as CEFRLevel)}
+              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
+            >
+              <option value="B1">B1 · Foundation</option>
+              <option value="B2">B2 · Workplace</option>
+              <option value="C1">C1 · Advanced</option>
+            </select>
+          </div>
+
+          {/* Row 2: Daily study goal */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Daily study goal
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                A small, achievable habit
+              </div>
+            </div>
+            <select
+              aria-label="Daily study goal"
+              value={progress.dailyGoalMinutes || 15}
+              onChange={(e) =>
+                onUpdateDailyGoal &&
+                onUpdateDailyGoal(Number(e.target.value) as 5 | 10 | 15 | 30)
+              }
+              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
+            >
+              <option value={5}>5 minutes</option>
+              <option value={10}>10 minutes</option>
+              <option value={15}>15 minutes</option>
+              <option value={30}>30 minutes</option>
+            </select>
+          </div>
+
+          {/* Row 3: Display language */}
+          <div className="pt-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Display language
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Explanations and navigation
+              </div>
+            </div>
+            <select
+              aria-label="Display language"
+              value={progress.languageMode}
+              onChange={(e) => onUpdateLanguageMode(e.target.value as LanguageMode)}
+              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
+            >
+              <option value="full-nepali">English + नेपाली</option>
+              <option value="english-only">English Only</option>
+            </select>
+          </div>
+        </section>
+
+        {/* CARD 2: Your study environment */}
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+            YOUR STUDY ENVIRONMENT
+          </div>
+
+          {/* Row 1: Daily reminder */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Daily reminder
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                A gentle nudge to practise
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={progress.dailyReminderEnabled !== false}
+              onClick={() => onToggleDailyReminder && onToggleDailyReminder()}
+              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                progress.dailyReminderEnabled !== false
+                  ? 'bg-[#2E6F4E] justify-end'
+                  : 'bg-[#A8A29E]/50 justify-start'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+            </button>
+          </div>
+
+          {/* Row 2: Dark appearance */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Dark appearance
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Easy on the eyes
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={progress.darkMode}
+              onClick={onToggleDarkMode}
+              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                progress.darkMode
+                  ? 'bg-[#2E6F4E] justify-end'
+                  : 'bg-[#9CA3AF] justify-start'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+            </button>
+          </div>
+
+          {/* Row 3: Offline mode */}
+          <div className="pt-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Offline mode
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Lessons available without internet
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncClick}
+              className="px-3.5 py-1.5 rounded-full bg-[#E2EFE7] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium"
+            >
+              {isSyncing ? 'Checking...' : 'Ready'}
+            </button>
+          </div>
+        </section>
+
+        {/* CARD 3: Audio & pronunciation lab */}
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+            AUDIO &amp; PRONUNCIATION LAB
+          </div>
+
+          {/* Row 1: Dialogue playback speed */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Dialogue playback speed
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Listen at your comfortable pace
+              </div>
+            </div>
+            <select
+              aria-label="Dialogue playback speed"
+              value={dialogueCalibration.dialogueRate}
+              onChange={(e) => {
+                const r = Number(e.target.value) as 0.5 | 0.75 | 1.0;
+                handleUpdateCalibration({ dialogueRate: r });
+                onUpdateSpeechRate(r);
+              }}
+              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
+            >
+              <option value={0.5}>0.5×</option>
+              <option value={0.75}>0.75×</option>
+              <option value={1.0}>1.0×</option>
+            </select>
+          </div>
+
+          {/* Row 2: Voice pitch */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Voice pitch
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Find a sound that feels clear
+              </div>
+            </div>
+            <select
+              aria-label="Voice pitch"
+              value={currentVoicePitchPreset}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'Warm') {
+                  handleUpdateCalibration({ speakerAPitch: 0.92, speakerBPitch: 1.0 });
+                } else if (val === 'Clear') {
+                  handleUpdateCalibration({ speakerAPitch: 1.08, speakerBPitch: 1.14 });
+                } else {
+                  handleUpdateCalibration({ speakerAPitch: 1.0, speakerBPitch: 1.06 });
+                }
+              }}
+              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
+            >
+              <option value="Natural">Natural</option>
+              <option value="Warm">Warm</option>
+              <option value="Clear">Clear</option>
+            </select>
+          </div>
+
+          {/* Row 3: Test your pronunciation */}
+          <div className="pt-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Test your pronunciation
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Try the live voice practice
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowFullAudioLab((prev) => !prev);
+                setTimeout(() => {
+                  audioLabSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+            >
+              {showFullAudioLab ? 'Hide lab' : 'Open lab'}
+            </button>
+          </div>
+        </section>
+
+        {/* CARD 4: Your data, in your hands */}
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+            YOUR DATA, IN YOUR HANDS
+          </div>
+
+          {/* Row 1: Export a backup */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Export a backup
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Save your progress as a file
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStudySheetPrintMode('combined')}
+                className="px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]"
+                title="Print or export Saved Words & Mistake Notebook as PDF/CSV"
+              >
+                PDF / CSV
+              </button>
+              <button
+                type="button"
+                onClick={handleExportProgressJSON}
+                className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Restore a backup */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Restore a backup
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Bring your learning history back
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+            >
+              Choose file
+            </button>
+          </div>
+
+          {/* Row 3: Sync status */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Sync status
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                {cloudSyncStatusMsg || 'Last checked just now'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => (firebaseUser && onPullFromCloud ? onPullFromCloud() : handleSyncClick())}
+              className="px-3.5 py-1.5 rounded-full bg-[#E2EFE7] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium"
+            >
+              {isCloudSyncing || isSyncing ? 'Syncing...' : 'Up to date'}
+            </button>
+          </div>
+
+          {/* Row 4: Reset all progress (Local & Cloud) */}
+          <div className="pt-4 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#A82020] dark:text-[#F87171]">
+                Reset progress
+              </div>
+              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Start fresh from 0 locally{firebaseUser ? ' and in Google Cloud' : ''}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setResetIncludeCloud(true);
+                setIsResetModalOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl border border-[#A82020]/40 dark:border-red-800/60 bg-[#FAF2F0] dark:bg-red-950/30 text-xs font-semibold text-[#A82020] dark:text-red-300 hover:bg-[#A82020] hover:text-white transition-colors inline-flex items-center gap-1.5 shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Reset progress</span>
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {/* Confirmation Popup Modal for Resetting Local & Cloud Progress */}
+      {isResetModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-progress-modal-title"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-2xl p-6 space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#FAF2F0] dark:bg-red-950/50 border border-[#A82020]/30 text-[#A82020] dark:text-red-300 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2
+                    id="reset-progress-modal-title"
+                    className="font-serif text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]"
+                  >
+                    Reset all study progress?
+                  </h2>
+                  <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                    This action resets your learning journey back to 0.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                aria-label="Close confirmation popup"
+                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E] space-y-2">
+              <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                The following items will be cleared back to 0:
+              </div>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Completed lessons ({progress.completedUnitIds.length} of {lectures.length}) &amp; step checkpoints
+                </li>
+                <li>
+                  Mastered words ({unifiedMasteredWordsCount}), saved words ({progress.savedWordIds.length}) &amp; SRS review history
+                </li>
+                <li>
+                  Study streak ({progress.currentStreakDays} days), weekly minutes &amp; unlocked badges
+                </li>
+                <li>
+                  Mistake notebook ({progress.mistakeNotebook.length}), lecture notes &amp; arena high scores
+                </li>
+              </ul>
+            </div>
+
+            {/* Option to also clear Cloud Backup (Firestore) */}
+            <div className="p-3.5 rounded-xl bg-[#F5F2EB] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={resetIncludeCloud}
+                  onChange={(e) => setResetIncludeCloud(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#A82020] rounded"
+                />
+                <div className="text-xs">
+                  <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                    Reset both Local Device Storage &amp; Google Cloud Backup
+                  </div>
+                  <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                    {firebaseUser
+                      ? `Signed in as ${firebaseUser.email}. When checked, your Firestore cloud backup will also be reset to 0 so old completed lessons do not come back on reload.`
+                      : 'Clears local browser & offline IndexedDB storage (and cloud backup if signed in).'}
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button
+                type="button"
+                disabled={isResettingProgress}
+                onClick={() => setIsResetModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1A1714] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isResettingProgress}
+                onClick={handleConfirmResetProgress}
+                className="px-5 py-2.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors shadow-xs disabled:opacity-60"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>
+                  {isResettingProgress
+                    ? 'Resetting...'
+                    : resetIncludeCloud && firebaseUser
+                    ? 'Confirm Delete (Local & Cloud)'
+                    : 'Confirm Delete & Reset to 0'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expandable Full Audio Speed Calibration, Cloud Account & Live Pronunciation Studio */}
+      {showFullAudioLab && (
+        <div ref={audioLabSectionRef as React.RefObject<HTMLDivElement>} className="space-y-8 pt-4 border-t border-[#E6E0D4] dark:border-[#2E2924]">
+          {renderGoogleAccountProfileCard()}
+
+          {/* ===================================================================== */}
+          {/* 1. DEDICATED AUDIO SPEED TEST & LONG-FORM DIALOGUE CALIBRATION CARD   */}
+          {/* ===================================================================== */}
+          <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
@@ -3324,6 +4321,48 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <span>Restore from Backup File</span>
             </button>
           </div>
+
+          {/* Physical Study Sheets Export (Saved Words & Mistake Notebook — PDF & CSV) */}
+          <div className="pt-4 mt-2 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-2.5">
+            <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              Physical On-The-Go Study Sheets (Formatted PDF & CSV Export):
+            </div>
+            <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+              Export your Saved Words ({progress.savedWordIds.length}) and Mistake Notebook ({progress.mistakeNotebook.length}) as printable PDF worksheets or UTF-8 CSV spreadsheets.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStudySheetPrintMode('combined')}
+                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print / Save PDF Study Sheet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  exportSavedWordsToCSV(
+                    savedWordsForExport,
+                    progress.masteredWordIds || [],
+                    progress.wordSRS
+                  )
+                }
+                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5"
+              >
+                <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <span>Saved Words (.CSV)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => exportMistakeNotebookToCSV(progress.mistakeNotebook)}
+                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5"
+              >
+                <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <span>Mistake Notebook (.CSV)</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* PWA Installation & Offline Sync Card */}
@@ -3422,6 +4461,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 };

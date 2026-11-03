@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
+  Home,
   BookOpen,
   BookMarked,
   BarChart3,
@@ -9,27 +10,32 @@ import {
   CheckCircle2,
   Volume2,
   Download,
-  Smartphone,
   WifiOff,
-  Compass,
-  Globe,
   Search,
-  LayoutGrid,
-  ListChecks,
-  Layers,
   Flame,
-  Award,
   Info,
-  AlertCircle,
   Sparkles,
   Zap,
-  GitBranch,
-  Printer,
-  Headphones,
   Trophy,
   ShieldCheck,
   X,
+  Cloud,
+  RefreshCw,
+  LogOut,
+  LogIn,
+  Brain,
+  Check,
+  Mic,
+  Lock,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Sun,
+  Moon,
+  Sliders,
+  Puzzle,
 } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import { CORE_SYLLABUS } from './data/syllabus';
 import { enrichSyllabusWithEnhancements } from './data/lectureEnhancements';
 import { getMassiveLexicon } from './data/massiveLexicon';
@@ -67,9 +73,10 @@ import {
   recordSprintScore,
   recordDetectiveSolved,
   recordRolePlayCompleted,
+  resetAllUserProgress,
 } from './services/storage';
 import { speechService } from './services/speech';
-import { usePWAInstall, useOnlineStatus } from './hooks/usePWA';
+import { useOnlineStatus } from './hooks/usePWA';
 import { LecturePlayer, ModuleStep } from './components/LecturePlayer';
 import { DictionaryView } from './components/DictionaryView';
 import { AILessonModal } from './components/AILessonModal';
@@ -77,26 +84,47 @@ import { ProgressSettingsView } from './components/ProgressSettingsView';
 import { AboutView } from './components/AboutView';
 import { DailyChallengeModal } from './components/DailyChallengeModal';
 import { PracticeArenaView, ArenaToolTab } from './components/PracticeArenaView';
+import {
+  PrintableStudySheetModal,
+  StudySheetFocusMode,
+} from './components/PrintableStudySheetModal';
+import {
+  subscribeToAuthState,
+  signInWithGooglePopup,
+  signOutFirebaseUser,
+  syncProgressToCloud,
+  pullAndMergeCloudProgress,
+  resetCloudProgress,
+} from './services/firebase';
 
-type NavTab = 'lectures' | 'dictionary' | 'arena' | 'progress' | 'settings' | 'about';
-type SyllabusDisplayMode = 'tracks' | 'grid' | 'table';
-type StatusFilter = 'ALL' | 'TODO' | 'COMPLETED';
+type NavTab = 'home' | 'lessons' | 'dictionary' | 'arena' | 'progress' | 'settings' | 'about';
 
 export default function App() {
   const [progress, setProgress] = useState<UserProgressState>(() => loadUserProgress());
-  const [activeTab, setActiveTab] = useState<NavTab>('lectures');
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [activeLectureId, setActiveLectureId] = useState<string | null>(null);
   const [initialModuleStep, setInitialModuleStep] = useState<ModuleStep>(0);
   const [dictionaryLectureFilter, setDictionaryLectureFilter] = useState<number | null>(null);
 
-  // Managed Lecture Syllabus Controls
-  const [levelFilter, setLevelFilter] = useState<'ALL' | CEFRLevel | 'CUSTOM'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [lectureSearch, setLectureSearch] = useState('');
-  const [syllabusDisplayMode, setSyllabusDisplayMode] = useState<SyllabusDisplayMode>('tracks');
+  // Lessons Curriculum Filter ('ALL' | 'B1' | 'B2' | 'C1')
+  const [levelFilter, setLevelFilter] = useState<'ALL' | CEFRLevel>('ALL');
+  const [expandedLessonPreviewId, setExpandedLessonPreviewId] = useState<string | null>(null);
+
+  // Global Top Search Bar State
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Top-Right User Avatar Dropdown State
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const [isEditingAvatarName, setIsEditingAvatarName] = useState(false);
+  const [avatarDraftName, setAvatarDraftName] = useState('');
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Home Weekly Bar Chart Interactive Selection
+  const [selectedWeekDayIdx, setSelectedWeekDayIdx] = useState<number | null>(null);
 
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [showInstallHelpModal, setShowInstallHelpModal] = useState(false);
   const [isDailyChallengeOpen, setIsDailyChallengeOpen] = useState(false);
   const [hasAutoCheckedDailyChallenge, setHasAutoCheckedDailyChallenge] = useState(false);
   const [initialArenaTool, setInitialArenaTool] = useState<ArenaToolTab>('detective');
@@ -109,13 +137,41 @@ export default function App() {
     nepaliTitle: string;
     desc: string;
   } | null>(null);
+  const [dashboardStudySheetMode, setDashboardStudySheetMode] =
+    useState<StudySheetFocusMode | null>(null);
   const hasSeededInitialBadgesRef = useRef(false);
 
-  const isOnline = useOnlineStatus();
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  // Firebase Cloud Sync & Multi-Device Account State
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const [cloudSyncStatusMsg, setCloudSyncStatusMsg] = useState<string | null>(null);
 
-  const languageMode: LanguageMode = progress.languageMode || 'english-meanings';
-  const isFullNepali = languageMode === 'full-nepali';
+  // Home SRS Quick-Review Interactive Card State
+  const [srsQuickIdx, setSrsQuickIdx] = useState(0);
+  const [srsQuickFlipped, setSrsQuickFlipped] = useState(false);
+
+  const isOnline = useOnlineStatus();
+  const languageMode: LanguageMode = progress.languageMode || 'full-nepali';
+
+  // Close search & avatar popovers on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        avatarMenuRef.current &&
+        !avatarMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsAvatarMenuOpen(false);
+      }
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Sync dark mode class on <html>
   useEffect(() => {
@@ -127,24 +183,6 @@ export default function App() {
     }
   }, [progress.darkMode]);
 
-  // 24-Hour Daily Challenge Pop-Up Auto-Trigger on the Home Page
-  useEffect(() => {
-    if (hasAutoCheckedDailyChallenge) return;
-    if (activeTab === 'lectures' && !activeLectureId) {
-      const last = progress.lastDailyChallengeAt
-        ? Date.parse(progress.lastDailyChallengeAt)
-        : 0;
-      const isDue = !last || Number.isNaN(last) || Date.now() - last >= 24 * 60 * 60 * 1000;
-      setHasAutoCheckedDailyChallenge(true);
-      if (isDue) {
-        const timer = window.setTimeout(() => {
-          setIsDailyChallengeOpen(true);
-        }, 650);
-        return () => window.clearTimeout(timer);
-      }
-    }
-  }, [activeTab, activeLectureId, progress.lastDailyChallengeAt, hasAutoCheckedDailyChallenge]);
-
   // Sync offline queue when back online
   useEffect(() => {
     if (isOnline && progress.pendingSyncQueue.length > 0) {
@@ -154,6 +192,77 @@ export default function App() {
     }
   }, [isOnline]);
 
+  // Subscribe to Firebase Auth & automatically merge cloud progress on sign-in
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthState(async (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        setIsCloudSyncing(true);
+        try {
+          const merged = await pullAndMergeCloudProgress(user, loadUserProgress());
+          setProgress(merged);
+          setCloudSyncStatusMsg('Cloud progress synced across devices');
+        } catch (err) {
+          console.error('Initial cloud merge failed:', err);
+          setCloudSyncStatusMsg('Cloud sync temporarily unavailable (offline-safe)');
+        } finally {
+          setIsCloudSyncing(false);
+        }
+      } else {
+        setCloudSyncStatusMsg(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Debounced background push of ALL user data & info to Firestore when signed in
+  useEffect(() => {
+    if (!firebaseUser || !isOnline) return;
+    const timer = window.setTimeout(() => {
+      void syncProgressToCloud(firebaseUser, progress)
+        .then((syncedState) => {
+          setProgress((prev) => ({
+            ...prev,
+            lastSyncedAt: syncedState.lastSyncedAt,
+            pendingSyncQueue: [],
+          }));
+        })
+        .catch((err) => {
+          console.warn('Background cloud sync skipped:', err);
+        });
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [
+    firebaseUser,
+    isOnline,
+    progress.userName,
+    progress.dailyReminderEnabled,
+    progress.selectedLevel,
+    progress.dailyGoalMinutes,
+    progress.onboardingComplete,
+    progress.currentStreakDays,
+    progress.streakFreezeShields,
+    progress.sprintHighScore,
+    progress.preferredSpeechRate,
+    progress.darkMode,
+    progress.languageMode,
+    progress.completedUnitIds,
+    progress.completedStepsByLecture,
+    progress.moduleScores,
+    progress.savedWordIds,
+    progress.masteredWordIds,
+    progress.wordSRS,
+    progress.mistakeNotebook,
+    progress.lectureNotes,
+    progress.customLectures,
+    progress.customWords,
+    progress.unlockedBadgeIds,
+    progress.detectiveSolvedIds,
+    progress.rolePlayCompletedIds,
+    progress.examHistory,
+    progress.studyActivityByDate,
+  ]);
+
   const allLectures: LectureUnit[] = useMemo(() => {
     return [...CORE_SYLLABUS, ...enrichSyllabusWithEnhancements(progress.customLectures)];
   }, [progress.customLectures]);
@@ -162,18 +271,10 @@ export default function App() {
     return getMassiveLexicon(allLectures);
   }, [allLectures]);
 
-  const sectionWordCountMap = useMemo(() => {
-    const counts: Record<number, number> = {};
-    for (const item of massiveLexicon) {
-      counts[item.lectureNumber] = (counts[item.lectureNumber] || 0) + 1;
-    }
-    return counts;
-  }, [massiveLexicon]);
-
   // Overall Course Progress Metrics
   const courseStats = useMemo(() => {
-    const totalUnits = allLectures.length;
-    const completedCount = allLectures.filter((l) =>
+    const totalUnits = CORE_SYLLABUS.length;
+    const completedCount = CORE_SYLLABUS.filter((l) =>
       progress.completedUnitIds.includes(l.id)
     ).length;
     const overallPercent = totalUnits > 0 ? Math.round((completedCount / totalUnits) * 100) : 0;
@@ -217,32 +318,6 @@ export default function App() {
     if (!activeLectureId) return null;
     return allLectures.find((l) => l.id === activeLectureId) || null;
   }, [allLectures, activeLectureId]);
-
-  const filteredLectures = useMemo(() => {
-    const q = lectureSearch.toLowerCase().trim();
-    return allLectures.filter((l) => {
-      if (levelFilter === 'CUSTOM' && !l.isCustomAI) return false;
-      if ((levelFilter === 'B1' || levelFilter === 'B2' || levelFilter === 'C1') && l.level !== levelFilter) {
-        return false;
-      }
-      const isDone = progress.completedUnitIds.includes(l.id);
-      if (statusFilter === 'TODO' && isDone) return false;
-      if (statusFilter === 'COMPLETED' && !isDone) return false;
-
-      if (!q) return true;
-      const inWords = l.moduleA_vocabulary.some(
-        (v) => v.word.toLowerCase().includes(q) || v.nepaliMeaning.toLowerCase().includes(q)
-      );
-      return (
-        l.title.toLowerCase().includes(q) ||
-        l.subtitle.toLowerCase().includes(q) ||
-        l.category.toLowerCase().includes(q) ||
-        l.moduleC_spelling.ruleTitle.toLowerCase().includes(q) ||
-        l.moduleD_grammar.topicTitle.toLowerCase().includes(q) ||
-        inWords
-      );
-    });
-  }, [allLectures, levelFilter, statusFilter, lectureSearch, progress.completedUnitIds]);
 
   const recommendedLecture = useMemo(() => {
     const matchingUnfinished = allLectures.find(
@@ -303,17 +378,31 @@ export default function App() {
     setProgress((prev) => addCustomLecture(prev, newLecture));
     setInitialModuleStep(0);
     setActiveLectureId(newLecture.id);
-    setActiveTab('lectures');
-  };
-
-  const handleSelectOnboardingLevel = (level: CEFRLevel) => {
-    setProgress((prev) => completeOnboarding(prev, level, prev.dailyGoalMinutes));
-    setLevelFilter(level);
+    setActiveTab('lessons');
   };
 
   const handleUpdateLevel = (level: CEFRLevel) => {
     setProgress((prev) => {
-      const next = { ...prev, selectedLevel: level };
+      const next = { ...prev, selectedLevel: level, currentLevel: level };
+      saveUserProgress(next);
+      return next;
+    });
+  };
+
+  const handleUpdateUserName = (name: string) => {
+    setProgress((prev) => {
+      const next = { ...prev, userName: name };
+      saveUserProgress(next);
+      return next;
+    });
+  };
+
+  const handleToggleDailyReminder = () => {
+    setProgress((prev) => {
+      const next = {
+        ...prev,
+        dailyReminderEnabled: prev.dailyReminderEnabled === false ? true : false,
+      };
       saveUserProgress(next);
       return next;
     });
@@ -357,8 +446,61 @@ export default function App() {
   };
 
   const handleManualSync = async () => {
-    const updated = await flushPendingSyncQueue(progress);
-    setProgress(updated);
+    setIsCloudSyncing(true);
+    try {
+      let updated = await flushPendingSyncQueue(progress);
+      if (firebaseUser) {
+        updated = await syncProgressToCloud(firebaseUser, updated);
+        setCloudSyncStatusMsg('All progress backed up to Firebase Cloud');
+      } else {
+        setCloudSyncStatusMsg('Offline queue flushed locally');
+      }
+      setProgress(updated);
+    } catch (err) {
+      console.error('Manual sync error:', err);
+      setCloudSyncStatusMsg('Sync failed — saved locally');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsCloudSyncing(true);
+    setCloudSyncStatusMsg(null);
+    try {
+      const user = await signInWithGooglePopup();
+      if (user) {
+        const merged = await pullAndMergeCloudProgress(user, progress);
+        setProgress(merged);
+        setCloudSyncStatusMsg(`Signed in as ${user.displayName || user.email}`);
+      }
+    } catch (err) {
+      console.error('Google Sign-In error:', err);
+      setCloudSyncStatusMsg('Google Sign-In was cancelled or blocked by popup settings');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  const handleGoogleSignOut = async () => {
+    await signOutFirebaseUser();
+    setFirebaseUser(null);
+    setCloudSyncStatusMsg('Signed out — local progress remains safe on this device');
+  };
+
+  const handlePullFromCloud = async () => {
+    if (!firebaseUser) return;
+    setIsCloudSyncing(true);
+    try {
+      const merged = await pullAndMergeCloudProgress(firebaseUser, progress);
+      setProgress(merged);
+      setCloudSyncStatusMsg('Restored & merged all study data from your Google Account');
+    } catch (err) {
+      console.error('Cloud restore error:', err);
+      setCloudSyncStatusMsg('Could not pull from cloud — using local copy');
+    } finally {
+      setIsCloudSyncing(false);
+    }
   };
 
   const handleCompleteDailyChallenge = (correctCount: number) => {
@@ -385,10 +527,91 @@ export default function App() {
     setProgress((prev) => recordRolePlayCompleted(prev, scenarioId));
   };
 
+  const handleResetAllProgress = async (includeCloud: boolean) => {
+    setIsCloudSyncing(true);
+    try {
+      const freshLocal = resetAllUserProgress({
+        userName: progress.userName,
+        darkMode: progress.darkMode,
+        languageMode: progress.languageMode,
+        selectedLevel: progress.selectedLevel,
+        dailyGoalMinutes: progress.dailyGoalMinutes,
+      });
+
+      if (includeCloud && firebaseUser) {
+        const syncedFresh = await resetCloudProgress(firebaseUser, freshLocal);
+        setProgress(syncedFresh);
+        setCloudSyncStatusMsg('All progress reset to 0 locally and in Google Cloud');
+      } else {
+        setProgress(freshLocal);
+        setCloudSyncStatusMsg('Local progress reset to 0');
+      }
+      setLiveAchievementToast(null);
+    } catch (err) {
+      console.error('Reset progress error:', err);
+      setCloudSyncStatusMsg('Local progress reset to 0 (cloud sync skipped)');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
   const unifiedMasteredWordsCount = useMemo(
     () => getUnifiedMasteredWordsCount(progress),
     [progress]
   );
+
+  // Words learned count starting cleanly from 0 and growing with user progress
+  const wordsLearnedDisplayCount = useMemo(() => {
+    return unifiedMasteredWordsCount;
+  }, [unifiedMasteredWordsCount]);
+
+  // Spaced Repetition (wordSRS) "Words Due Today" Queue
+  const dueSRSWords = useMemo(() => {
+    const nowMs = Date.now();
+    const srsMap = progress.wordSRS || {};
+    const masteredSet = new Set(progress.masteredWordIds || []);
+
+    const explicitlyDueIds = Object.values(srsMap)
+      .filter((rec) => {
+        if (masteredSet.has(rec.wordId)) return false;
+        const dueTime = Date.parse(rec.nextReviewDue);
+        return Number.isNaN(dueTime) || dueTime <= nowMs;
+      })
+      .sort((a, b) => Date.parse(a.nextReviewDue) - Date.parse(b.nextReviewDue))
+      .map((rec) => rec.wordId);
+
+    const dueSet = new Set(explicitlyDueIds);
+
+    for (const savedId of progress.savedWordIds) {
+      if (!masteredSet.has(savedId) && !srsMap[savedId]) {
+        dueSet.add(savedId);
+      }
+    }
+
+    if (dueSet.size < 5 && recommendedLecture) {
+      for (const vocab of recommendedLecture.moduleA_vocabulary) {
+        if (!masteredSet.has(vocab.id) && !srsMap[vocab.id]) {
+          dueSet.add(vocab.id);
+        }
+        if (dueSet.size >= 8) break;
+      }
+    }
+
+    const lexiconById = new Map(massiveLexicon.map((w) => [w.id, w]));
+    return Array.from(dueSet)
+      .map((id) => lexiconById.get(id))
+      .filter((w): w is NonNullable<typeof w> => Boolean(w))
+      .slice(0, 12);
+  }, [
+    progress.wordSRS,
+    progress.savedWordIds,
+    progress.masteredWordIds,
+    recommendedLecture,
+    massiveLexicon,
+  ]);
+
+  const activeSRSQuickWord =
+    dueSRSWords.length > 0 ? dueSRSWords[srsQuickIdx % dueSRSWords.length] : null;
 
   // Live Achievement Unlock Watcher & Toast Trigger
   useEffect(() => {
@@ -568,7 +791,7 @@ export default function App() {
   const openLecture = (id: string, step: ModuleStep = 0) => {
     setInitialModuleStep(step);
     setActiveLectureId(id);
-    setActiveTab('lectures');
+    setActiveTab('lessons');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -579,246 +802,633 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const renderLectureCard = (lecture: LectureUnit) => {
-    const isDone = progress.completedUnitIds.includes(lecture.id);
-    const score = progress.moduleScores[lecture.id];
-    const previewWords = lecture.moduleA_vocabulary.slice(0, 4);
+  // Global Top Search Bar Instant Results (Words, Lessons, Practice Arena Activities)
+  const globalSearchResults = useMemo(() => {
+    const q = globalSearchQuery.trim().toLowerCase();
+    if (!q) return null;
 
-    return (
-      <article
-        key={lecture.id}
-        className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 flex flex-col justify-between hover:border-[#B91C1C]/60 transition-colors"
-      >
-        <div>
-          {/* Clean Top Metadata Line (No word count heading after lecture number) */}
-          <div className="flex items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-            <div>
-              <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                Lecture {String(lecture.lectureNumber).padStart(2, '0')}
-              </span>
-              <span className="mx-1.5" aria-hidden="true">·</span>
-              <span>Level {lecture.level}</span>
-              <span className="mx-1.5" aria-hidden="true">·</span>
-              <span>{lecture.category}</span>
-            </div>
-            {isDone ? (
-              <span className="text-[#15803D] dark:text-emerald-400 font-semibold inline-flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Completed</span>
-              </span>
-            ) : (
-              <span className="font-ipa text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                {lecture.estimatedMinutes} min
-              </span>
-            )}
-          </div>
+    const matchingLectures = allLectures
+      .filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          l.subtitle.toLowerCase().includes(q) ||
+          l.moduleC_spelling.ruleTitle.toLowerCase().includes(q) ||
+          l.moduleD_grammar.topicTitle.toLowerCase().includes(q)
+      )
+      .slice(0, 4);
 
-          <h3 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            {lecture.title}
-          </h3>
-          {isFullNepali && (
-            <p className="font-nepali text-sm font-medium text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-              {lecture.nepaliTitle}
-            </p>
-          )}
-          <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1.5 mb-4 line-clamp-2">
-            {lecture.subtitle}
-          </p>
+    const matchingWords = massiveLexicon
+      .filter(
+        (w) =>
+          w.word.toLowerCase().includes(q) ||
+          w.nepaliMeaning.toLowerCase().includes(q) ||
+          w.silentLettersSummary.toLowerCase().includes(q)
+      )
+      .slice(0, 5);
 
-          {/* Concise Lecture Focus Summary Box */}
-          <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2 mb-4 text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB] mr-1">
-                Focus Words:
-              </span>
-              {previewWords.map((v) => (
-                <span
-                  key={v.id}
-                  className="px-2 py-0.5 rounded-md bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] font-medium text-[#1C1917] dark:text-[#F5F2EB]"
-                >
-                  {v.segments?.map((s, sIdx) =>
-                    s.silent ? (
-                      <span
-                        key={sIdx}
-                        className="text-[#B91C1C] dark:text-[#F87171] underline decoration-dotted"
-                      >
-                        {s.text}
-                      </span>
-                    ) : (
-                      <span key={sIdx}>{s.text}</span>
-                    )
-                  )}
-                </span>
-              ))}
-              {lecture.moduleA_vocabulary.length > 4 && (
-                <span className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                  +{lecture.moduleA_vocabulary.length - 4} more
-                </span>
-              )}
-            </div>
+    const arenaActivities: { id: ArenaToolTab; title: string; subtitle: string }[] = [
+      { id: 'sprint', title: '60-Second Word Sprint', subtitle: 'Timed silent-letter spelling game' },
+      { id: 'detective', title: 'Silent-Letter Detective', subtitle: 'Spot silent letters in passages' },
+      { id: 'roleplay', title: 'Voice Role-Play Simulator', subtitle: 'Interactive workplace & interview dialogues' },
+      { id: 'interference', title: 'Nepali-to-English Translation Lab', subtitle: 'SOV to SVO, articles & prepositions' },
+      { id: 'exam-simulator', title: '10-Min IELTS / PTE Simulator', subtitle: 'Full diagnostic mock test' },
+      { id: 'shadowing', title: 'Audio Shadowing & Pitch Trainer', subtitle: 'Compare waveform & F0 contour' },
+      { id: 'minimal-pairs', title: 'Minimal Pair Ear & Voice Lab', subtitle: '/v/ vs /w/, /s/ vs /ʃ/, /f/ vs /p/' },
+      { id: 'commuter-audio', title: 'Commuter Audio Podcast Player', subtitle: 'Hands-free vocabulary recall loop' },
+    ];
+    const matchingActivities = arenaActivities
+      .filter(
+        (a) =>
+          a.title.toLowerCase().includes(q) || a.subtitle.toLowerCase().includes(q)
+      )
+      .slice(0, 3);
 
-            <div className="truncate">
-              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Spelling:{' '}
-              </span>
-              <span className="text-[#57534E] dark:text-[#A8A29E]">
-                {lecture.moduleC_spelling.ruleTitle}
-              </span>
-            </div>
+    return { matchingLectures, matchingWords, matchingActivities };
+  }, [globalSearchQuery, allLectures, massiveLexicon]);
 
-            <div className="truncate">
-              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Grammar:{' '}
-              </span>
-              <span className="text-[#57534E] dark:text-[#A8A29E]">
-                {lecture.moduleD_grammar.topicTitle}
-              </span>
-            </div>
-          </div>
-        </div>
+  // Display Name & Initials for Greeting & Top-Right Avatar
+  const fullDisplayName =
+    progress.userName || firebaseUser?.displayName || 'Anisha Sharma';
+  const firstName = fullDisplayName.split(' ')[0] || 'Anisha';
+  const userInitials =
+    fullDisplayName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'AS';
 
-        {/* Clean Footer Action Row */}
-        <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924]">
-          <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-            {score ? (
-              <span className="font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
-                Quiz Accuracy:{' '}
-                {Math.round(
-                  ((score.spellingScore + score.grammarScore + (score.dialogueScore || 0)) /
-                    Math.max(
-                      1,
-                      score.spellingTotal + score.grammarTotal + (score.dialogueTotal || 0)
-                    )) *
-                    100
-                )}
-                %
-              </span>
-            ) : (
-              <span>5 Modules · {lecture.estimatedMinutes} min</span>
-            )}
-          </div>
-          <button
-            onClick={() => openLecture(lecture.id, 0)}
-            className="min-h-[40px] px-4 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
-          >
-            <span>{isDone ? 'Review Lecture' : 'Start Lecture'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </article>
-    );
+  // 7-Day Weekly Bar Chart Data for Home Screen ("Your week" M T W T F S S)
+  const homeWeekBars = useMemo(() => {
+    const entries = Array.from({ length: 7 }).map((_, idx) => {
+      const d = new Date(Date.now() - (6 - idx) * 86400000);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+      const letter = d.toLocaleDateString('en-US', { weekday: 'short' })[0] || 'D';
+      const loggedCount = progress.studyActivityByDate?.[dateStr] || 0;
+      const minutes = loggedCount * 5;
+      const pct = loggedCount > 0 ? Math.min(95, Math.max(22, loggedCount * 20)) : 10;
+      return {
+        idx,
+        letter,
+        dayName,
+        dateStr,
+        minutes,
+        loggedCount,
+        pct,
+        isFilled: loggedCount > 0,
+      };
+    });
+    const totalMinutes = entries.reduce((acc, item) => acc + item.minutes, 0);
+    return { entries, totalMinutes };
+  }, [progress.studyActivityByDate]);
+
+  // 4-Pillar Language Mastery Data for Home Interactive Chart
+  const homeSkillPillars = useMemo(() => {
+    const scoreRecords = Object.values(progress.moduleScores) as ModuleScoreRecord[];
+    const spellingCorrect = scoreRecords.reduce((acc, r) => acc + r.spellingScore, 0);
+    const spellingTotal = scoreRecords.reduce((acc, r) => acc + r.spellingTotal, 0);
+    const grammarCorrect = scoreRecords.reduce((acc, r) => acc + r.grammarScore, 0);
+    const grammarTotal = scoreRecords.reduce((acc, r) => acc + r.grammarTotal, 0);
+    const dialogueCorrect = scoreRecords.reduce((acc, r) => acc + (r.dialogueScore || 0), 0);
+    const dialogueTotal = scoreRecords.reduce((acc, r) => acc + (r.dialogueTotal || 0), 0);
+
+    const stepValues = Object.values(progress.completedStepsByLecture || {}) as number[][];
+    const totalStepsCompleted = stepValues.reduce((acc, arr) => acc + arr.length, 0);
+
+    const vocabPct = Math.min(100, Math.round((unifiedMasteredWordsCount / 50) * 100));
+    const phonicsPct =
+      spellingTotal > 0
+        ? Math.round((spellingCorrect / spellingTotal) * 100)
+        : Math.min(100, (progress.sprintHighScore || 0) * 2 + totalStepsCompleted * 4);
+    const grammarPct =
+      grammarTotal > 0
+        ? Math.round((grammarCorrect / grammarTotal) * 100)
+        : Math.min(100, totalStepsCompleted * 5);
+    const dialoguePct =
+      dialogueTotal > 0
+        ? Math.round((dialogueCorrect / dialogueTotal) * 100)
+        : Math.min(100, (progress.rolePlayCompletedIds?.length || 0) * 25 + totalStepsCompleted * 4);
+
+    return [
+      {
+        id: 'vocab',
+        label: 'Vocabulary & Silent-Letter Lexicon',
+        pct: vocabPct,
+        metricLabel: `${unifiedMasteredWordsCount} / 50 words mastered`,
+        color: 'bg-[#A82020]',
+        actionLabel: 'Open Dictionary',
+        onAction: () => navigateTab('dictionary'),
+      },
+      {
+        id: 'phonics',
+        label: 'Silent-Letter Phonics & Spelling',
+        pct: phonicsPct,
+        metricLabel:
+          spellingTotal > 0
+            ? `${spellingCorrect}/${spellingTotal} quiz score`
+            : `Sprint best: ${progress.sprintHighScore || 0} pts`,
+        color: 'bg-[#D97706]',
+        actionLabel: '60s Word Sprint',
+        onAction: () => openArenaTool('sprint'),
+      },
+      {
+        id: 'grammar',
+        label: 'SVO Grammar & Nepali-to-English Syntax',
+        pct: grammarPct,
+        metricLabel:
+          grammarTotal > 0
+            ? `${grammarCorrect}/${grammarTotal} quiz score`
+            : `${progress.completedUnitIds.length} grammar units done`,
+        color: 'bg-[#2E6F4E]',
+        actionLabel: 'Translation Lab',
+        onAction: () => openArenaTool('interference'),
+      },
+      {
+        id: 'fluency',
+        label: 'Spoken Dialogue & Pronunciation',
+        pct: dialoguePct,
+        metricLabel:
+          dialogueTotal > 0
+            ? `${dialogueCorrect}/${dialogueTotal} dialogue score`
+            : `${progress.rolePlayCompletedIds?.length || 0} role-plays completed`,
+        color: 'bg-[#284B7A]',
+        actionLabel: 'Role-Play Lab',
+        onAction: () => openArenaTool('roleplay'),
+      },
+    ];
+  }, [
+    progress.moduleScores,
+    progress.completedStepsByLecture,
+    progress.sprintHighScore,
+    progress.completedUnitIds.length,
+    progress.rolePlayCompletedIds,
+    unifiedMasteredWordsCount,
+  ]);
+
+  // Editorial Curriculum Metadata mapping for Lessons 01–12 matching Screenshot 2
+  const getEditorialLessonPresentation = (lecture: LectureUnit) => {
+    const num = lecture.lectureNumber;
+    const editorialTitles: Record<number, { title: string; sub: string; duration: number }> = {
+      1: {
+        title: 'Silent K, W & P · Start speaking clearly',
+        sub: 'Vocabulary · Phonics · SVO word order',
+        duration: 15,
+      },
+      2: {
+        title: 'Past and present · Tell your story',
+        sub: 'Silent B, T & N · Present perfect',
+        duration: 18,
+      },
+      3: {
+        title: 'Describe more · Words that paint a picture',
+        sub: 'Vowel patterns · Comparatives · Clear examples',
+        duration: 16,
+      },
+      4: {
+        title: 'Listen closely · The quiet T and L',
+        sub: 'Often, whistle, castle · Spelling patterns',
+        duration: 12,
+      },
+      5: {
+        title: 'Sound natural · Stress, schwa & polite questions',
+        sub: 'Connected speech · Indirect questions',
+        duration: 20,
+      },
+      6: {
+        title: 'Words that sound alike · Choose with care',
+        sub: 'Spelling families · Workplace English',
+        duration: 17,
+      },
+    };
+    const preset = editorialTitles[num];
+    return {
+      displayTitle: preset ? preset.title : lecture.title,
+      displaySub: preset
+        ? preset.sub
+        : `${lecture.moduleC_spelling.ruleTitle} · ${lecture.moduleD_grammar.topicTitle}`,
+      duration: preset ? preset.duration : lecture.estimatedMinutes,
+    };
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB]">
+    <div className="min-h-screen flex flex-col bg-[#FAF8F4] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB]">
       {/* =================================================================== */}
-      {/* TOP BAR CONTRACT: [1-line Brand] — [5 Nav Links] — [1 Primary CTA]  */}
+      {/* TOP HEADER BAR: [भ BhashaSetu] — [Global Search] — [Streak + Avatar] */}
       {/* =================================================================== */}
-      <header className="sticky top-0 z-30 h-14 bg-[#FAF7F2]/95 dark:bg-[#141210]/95 backdrop-blur-md border-b border-[#E7E0D6] dark:border-[#2E2924] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-8">
-        {/* Zone 1: Single text element wordmark */}
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            navigateTab('lectures');
-          }}
-          className="font-serif-display text-xl font-bold tracking-tight text-[#1C1917] dark:text-[#F5F2EB] whitespace-nowrap shrink-0"
+      <header className="sticky top-0 z-40 h-16 bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-b border-[#E6E0D4] dark:border-[#2E2924] px-4 sm:px-6 flex items-center justify-between gap-4">
+        {/* Left: Brand Mark (भ in crimson rounded square + BhashaSetu) */}
+        <div className="flex items-center gap-6 shrink-0">
+          <a
+            href="#home"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateTab('home');
+            }}
+            className="flex items-center gap-3 group focus:outline-none"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#A82020] text-white flex items-center justify-center font-nepali font-bold text-base shadow-xs">
+              भ
+            </div>
+            <span className="text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EB]">
+              BhashaSetu
+            </span>
+          </a>
+        </div>
+
+        {/* Center: Interactive Global Search Bar */}
+        <div
+          ref={searchContainerRef}
+          className="relative flex-1 max-w-md mx-auto hidden sm:block"
         >
-          BhashaSetu
-        </a>
+          <div className="relative">
+            <Search className="w-4 h-4 text-[#78716C] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={globalSearchQuery}
+              onFocus={() => setIsSearchDropdownOpen(true)}
+              onChange={(e) => {
+                setGlobalSearchQuery(e.target.value);
+                setIsSearchDropdownOpen(true);
+              }}
+              placeholder="Search words, lessons, or activities"
+              className="w-full h-10 pl-10 pr-8 rounded-xl bg-[#F3EFE6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#78716C] focus:outline-none focus:border-[#A82020] transition-colors"
+            />
+            {globalSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setGlobalSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        {/* Zone 2: Concise single-line text navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#57534E] dark:text-[#A8A29E]">
-          <button
-            onClick={() => navigateTab('lectures')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
-              activeTab === 'lectures'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
-                : ''
-            }`}
-          >
-            Lectures
-          </button>
-          <button
-            onClick={() => navigateTab('dictionary')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
-              activeTab === 'dictionary'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
-                : ''
-            }`}
-          >
-            Dictionary (10k+)
-          </button>
-          <button
-            onClick={() => navigateTab('arena')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 inline-flex items-center gap-1.5 ${
-              activeTab === 'arena'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2 font-semibold'
-                : ''
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#B91C1C]" />
-            <span>Practice Hub</span>
-          </button>
-          <button
-            onClick={() => navigateTab('progress')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
-              activeTab === 'progress'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
-                : ''
-            }`}
-          >
-            Progress
-          </button>
-          <button
-            onClick={() => navigateTab('settings')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
-              activeTab === 'settings'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
-                : ''
-            }`}
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => navigateTab('about')}
-            className={`hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0 py-1 ${
-              activeTab === 'about'
-                ? 'text-[#B91C1C] dark:text-[#F87171] underline underline-offset-8 decoration-2'
-                : ''
-            }`}
-          >
-            About
-          </button>
-        </nav>
+          {/* Instant Global Search Results Popover */}
+          {isSearchDropdownOpen && globalSearchResults && (
+            <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl shadow-xl p-3 space-y-3 z-50 max-h-[420px] overflow-y-auto">
+              {globalSearchResults.matchingLectures.length === 0 &&
+              globalSearchResults.matchingWords.length === 0 &&
+              globalSearchResults.matchingActivities.length === 0 ? (
+                <div className="p-3 text-center text-xs text-[#78716C]">
+                  No matching lessons, words, or activities found for “{globalSearchQuery}”.
+                </div>
+              ) : (
+                <>
+                  {globalSearchResults.matchingLectures.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#A82020] px-2 mb-1">
+                        Lessons
+                      </div>
+                      {globalSearchResults.matchingLectures.map((lec) => (
+                        <button
+                          key={lec.id}
+                          type="button"
+                          onClick={() => {
+                            openLecture(lec.id, 0);
+                            setIsSearchDropdownOpen(false);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              Lesson {String(lec.lectureNumber).padStart(2, '0')} · {lec.title}
+                            </div>
+                            <div className="text-[11px] text-[#78716C]">{lec.subtitle}</div>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-[#78716C]" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center shrink-0">
+                  {globalSearchResults.matchingWords.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#A82020] px-2 mb-1">
+                        Dictionary Words
+                      </div>
+                      {globalSearchResults.matchingWords.map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => {
+                            speechService.speak(w.word, { rate: progress.preferredSpeechRate });
+                            navigateTab('dictionary');
+                            setIsSearchDropdownOpen(false);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {w.word}
+                            </span>{' '}
+                            <span className="font-ipa text-[#78716C]">{w.ipa}</span>
+                            <span className="mx-1.5 text-[#78716C]">·</span>
+                            <span className="font-nepali text-[#1F5C3D] dark:text-emerald-400">
+                              {w.nepaliMeaning}
+                            </span>
+                          </div>
+                          <Volume2 className="w-3.5 h-3.5 text-[#A82020]" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {globalSearchResults.matchingActivities.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#A82020] px-2 mb-1">
+                        Practice Arena Activities
+                      </div>
+                      {globalSearchResults.matchingActivities.map((act) => (
+                        <button
+                          key={act.id}
+                          type="button"
+                          onClick={() => {
+                            openArenaTool(act.id);
+                            setIsSearchDropdownOpen(false);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {act.title}
+                            </div>
+                            <div className="text-[11px] text-[#78716C]">{act.subtitle}</div>
+                          </div>
+                          <ArrowRight className="w-3.5 h-3.5 text-[#A82020]" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Streak Indicator + Interactive User Avatar Menu */}
+        <div className="flex items-center gap-4 shrink-0">
           <button
-            onClick={() => setIsAIModalOpen(true)}
-            className="min-h-[38px] px-4 py-2 text-xs font-semibold text-white bg-[#B91C1C] rounded-lg hover:bg-[#991B1B] transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1.5"
+            type="button"
+            onClick={() => openProgressSubView('overview')}
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors"
+            title="View your study streak and shields"
           >
-            <Wand2 className="w-3.5 h-3.5" />
-            <span>Create AI Lecture</span>
+            <Flame className="w-4 h-4 text-[#A82020]" />
+            <span>{progress.currentStreakDays || 0} day streak</span>
           </button>
+
+          {/* User Avatar Button + Rich User Profile, Login & Settings Popover */}
+          <div ref={avatarMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setAvatarDraftName(fullDisplayName);
+                setIsAvatarMenuOpen((prev) => !prev);
+              }}
+              aria-label="Open user account, login, and settings menu"
+              className="w-9 h-9 rounded-full bg-[#E5DEC9] dark:bg-[#2E2924] border border-[#1C1917]/30 dark:border-[#F5F2EB]/30 text-[#1C1917] dark:text-[#F5F2EB] text-xs font-semibold flex items-center justify-center hover:ring-2 hover:ring-[#A82020]/30 transition-all overflow-hidden"
+            >
+              {firebaseUser?.photoURL ? (
+                <img
+                  src={firebaseUser.photoURL}
+                  alt={fullDisplayName}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{userInitials}</span>
+              )}
+            </button>
+
+            {isAvatarMenuOpen && (
+              <div className="absolute right-0 mt-2.5 w-80 sm:w-96 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl shadow-2xl p-5 z-50 space-y-4">
+                {/* 1. User Identity Header + Inline Edit */}
+                <div className="flex items-start justify-between gap-3 pb-4 border-b border-[#EFEAE0] dark:border-[#2E2924]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {firebaseUser?.photoURL ? (
+                      <img
+                        src={firebaseUser.photoURL}
+                        alt={fullDisplayName}
+                        referrerPolicy="no-referrer"
+                        className="w-11 h-11 rounded-full object-cover border border-[#E6E0D4]"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-[#E5DEC9] dark:bg-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] font-semibold text-sm flex items-center justify-center shrink-0">
+                        {userInitials}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                        {fullDisplayName}
+                      </div>
+                      <div className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate">
+                        {firebaseUser?.email
+                          ? firebaseUser.email
+                          : `Level ${progress.currentLevel} · ${progress.dailyGoalMinutes || 15}m daily goal`}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAvatarName((prev) => !prev)}
+                    className="px-2.5 py-1 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-medium text-[#A82020] hover:bg-[#FAF8F4]"
+                  >
+                    {isEditingAvatarName ? 'Cancel' : 'Edit Info'}
+                  </button>
+                </div>
+
+                {isEditingAvatarName && (
+                  <div className="p-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2">
+                    <label className="block text-[11px] font-semibold text-[#57534E] dark:text-[#A8A29E]">
+                      Learner Name
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={avatarDraftName}
+                        onChange={(e) => setAvatarDraftName(e.target.value)}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (avatarDraftName.trim()) {
+                            handleUpdateUserName(avatarDraftName.trim());
+                          }
+                          setIsEditingAvatarName(false);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-[#A82020] text-white text-xs font-semibold"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Learner Info & Stats Snapshot */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
+                    <div className="text-sm font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      {wordsLearnedDisplayCount}
+                    </div>
+                    <div className="text-[10px] text-[#78716C]">Words learned</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
+                    <div className="text-sm font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      {courseStats.completedCount} / {courseStats.totalUnits}
+                    </div>
+                    <div className="text-[10px] text-[#78716C]">Lessons done</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
+                    <div className="text-sm font-serif font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                      {progress.streakFreezeShields ?? 1} Shield
+                    </div>
+                    <div className="text-[10px] text-[#78716C]">{progress.currentStreakDays}d streak</div>
+                  </div>
+                </div>
+
+                {/* 3. Google Account Cloud Login & Sync */}
+                <div className="p-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5">
+                      <Cloud className="w-3.5 h-3.5 text-[#1F5C3D]" />
+                      <span>Google Cloud Backup</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#E2EFE7] text-[#1F5C3D] text-[10px] font-semibold">
+                      {firebaseUser ? 'Connected' : 'Local Safe'}
+                    </span>
+                  </div>
+
+                  {firebaseUser ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isCloudSyncing}
+                        onClick={handleManualSync}
+                        className="flex-1 py-2 px-3 rounded-lg bg-[#2E6F4E] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+                        <span>{isCloudSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGoogleSignOut}
+                        className="py-2 px-3 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] hover:text-[#1C1917] inline-flex items-center gap-1"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isCloudSyncing}
+                      onClick={handleGoogleSignIn}
+                      className="w-full py-2.5 px-3 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#A82020] transition-colors inline-flex items-center justify-center gap-2"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>{isCloudSyncing ? 'Connecting...' : 'Sign in with Google Account'}</span>
+                    </button>
+                  )}
+                  {cloudSyncStatusMsg && (
+                    <div className="text-[11px] text-[#1F5C3D] dark:text-emerald-400">
+                      {cloudSyncStatusMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Quick Settings Controls inside Avatar Menu */}
+                <div className="space-y-2 pt-1 border-t border-[#EFEAE0] dark:border-[#2E2924] text-xs">
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-[#57534E] dark:text-[#A8A29E]">Learning level</span>
+                    <div className="flex items-center gap-1">
+                      {(['B1', 'B2', 'C1'] as CEFRLevel[]).map((lvl) => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => handleUpdateLevel(lvl)}
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            progress.currentLevel === lvl
+                              ? 'bg-[#A82020] text-white'
+                              : 'bg-[#F4F0E8] dark:bg-[#141210] text-[#57534E]'
+                          }`}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-[#57534E] dark:text-[#A8A29E]">Appearance</span>
+                    <button
+                      type="button"
+                      onClick={handleToggleDarkMode}
+                      className="px-2.5 py-1 rounded-lg bg-[#F4F0E8] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] font-medium inline-flex items-center gap-1.5"
+                    >
+                      {progress.darkMode ? (
+                        <>
+                          <Sun className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Light Mode</span>
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="w-3.5 h-3.5 text-[#57534E]" />
+                          <span>Dark Mode</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Navigation Links to Full Settings, Achievements & Study Sheet */}
+                <div className="pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      openProgressSubView('achievements');
+                    }}
+                    className="py-2 px-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#A82020] inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-[#A82020]" />
+                    <span>Achievements</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAvatarMenuOpen(false);
+                      navigateTab('settings');
+                    }}
+                    className="py-2 px-3 rounded-xl bg-[#A82020] text-white text-xs font-medium hover:bg-[#8E1B1B] inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>All Settings</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Celebratory Live Achievement Unlock Toast Banner */}
       {liveAchievementToast && (
-        <div className="sticky top-14 z-40 bg-emerald-900 text-white border-b border-emerald-700 px-4 py-3 shadow-lg">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="sticky top-16 z-40 bg-[#1F5C3D] text-white border-b border-emerald-700 px-4 py-3 shadow-lg">
+          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-[#1C1917] flex items-center justify-center shrink-0 shadow-xs">
+              <div className="w-9 h-9 rounded-xl bg-amber-400 text-[#1C1917] flex items-center justify-center shrink-0">
                 <Trophy className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[11px] font-ipa uppercase tracking-wider text-amber-300 font-semibold">
+                <div className="text-[11px] font-ipa uppercase tracking-wider text-amber-200 font-semibold">
                   Achievement Unlocked! · {liveAchievementToast.nepaliTitle}
                 </div>
-                <div className="text-sm sm:text-base font-bold">
+                <div className="text-sm font-bold">
                   {liveAchievementToast.title} —{' '}
-                  <span className="font-normal text-emerald-100 text-xs sm:text-sm">
+                  <span className="font-normal text-emerald-100 text-xs">
                     {liveAchievementToast.desc}
                   </span>
                 </div>
@@ -831,16 +1441,15 @@ export default function App() {
                   setLiveAchievementToast(null);
                   openProgressSubView('achievements');
                 }}
-                className="min-h-[34px] px-3.5 py-1.5 rounded-lg bg-amber-400 text-[#1C1917] text-xs font-semibold hover:bg-amber-300 inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-amber-400 text-[#1C1917] text-xs font-semibold hover:bg-amber-300"
               >
-                <Trophy className="w-3.5 h-3.5" />
-                <span>View Badge in Trophy Case</span>
+                View Badge
               </button>
               <button
                 type="button"
                 onClick={() => setLiveAchievementToast(null)}
                 aria-label="Dismiss achievement notification"
-                className="p-1.5 rounded-lg hover:bg-emerald-800 text-emerald-200"
+                className="p-1 rounded-lg hover:bg-emerald-800 text-emerald-200"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -849,912 +1458,1295 @@ export default function App() {
         </div>
       )}
 
-      {/* Offline Mode Connectivity Indicator */}
-      {!isOnline && (
-        <div className="bg-amber-100 dark:bg-amber-950/80 border-b border-amber-300 dark:border-amber-800 px-4 py-2 text-xs text-amber-950 dark:text-amber-200 flex items-center justify-center gap-2">
-          <WifiOff className="w-3.5 h-3.5 shrink-0 text-[#D97706]" />
-          <span>
-            Offline Mode Active — All 12 core lectures, 10,400+ dictionary words, and audio pronunciation work offline.
-          </span>
-        </div>
-      )}
-
       {/* =================================================================== */}
-      {/* MAIN CONTENT WORKSPACE                                              */}
+      {/* BODY LAYOUT: PERSISTENT LEFT SIDEBAR + MAIN CONTENT WORKSPACE       */}
       {/* =================================================================== */}
-      <main className="flex-1">
-        {activeTab === 'lectures' && activeLecture ? (
-          <LecturePlayer
-            lecture={activeLecture}
-            allLectures={allLectures}
-            savedWordIds={progress.savedWordIds}
-            masteredWordIds={progress.masteredWordIds || []}
-            lectureNote={progress.lectureNotes?.[activeLecture.id] || ''}
-            completedUnitIds={progress.completedUnitIds}
-            completedSteps={progress.completedStepsByLecture?.[activeLecture.id] || []}
-            mistakeNotebook={progress.mistakeNotebook}
-            preferredSpeechRate={progress.preferredSpeechRate}
-            languageMode={languageMode}
-            isCompleted={progress.completedUnitIds.includes(activeLecture.id)}
-            initialStep={initialModuleStep}
-            onToggleSaveWord={handleToggleSaveWord}
-            onToggleMasteredWord={handleToggleMasteredWord}
-            onUpdateLectureNote={handleUpdateLectureNote}
-            onCompleteLecture={handleCompleteLecture}
-            onCompleteStep={handleCompleteStep}
-            onSelectLecture={(id, step = 0) => openLecture(id, step)}
-            onRecordMistake={handleRecordMistake}
-            onPracticeMistake={handlePracticeMistake}
-            onRemoveMistake={handleRemoveMistake}
-            onUpdateMistakeNote={handleUpdateMistakeNote}
-            onUpdateWordSRS={handleUpdateWordSRS}
-            onBackToDashboard={() => setActiveLectureId(null)}
-            onOpenSectionDictionary={openSectionInDictionary}
-          />
-        ) : activeTab === 'dictionary' ? (
-          <DictionaryView
-            lectures={allLectures}
-            savedWordIds={progress.savedWordIds}
-            masteredWordIds={progress.masteredWordIds || []}
-            wordSRS={progress.wordSRS}
-            mistakeNotebook={progress.mistakeNotebook}
-            preferredSpeechRate={progress.preferredSpeechRate}
-            languageMode={languageMode}
-            initialLectureFilter={dictionaryLectureFilter}
-            onToggleSaveWord={handleToggleSaveWord}
-            onToggleMasteredWord={handleToggleMasteredWord}
-            onUpdateWordSRS={handleUpdateWordSRS}
-            onRecordMistake={handleRecordMistake}
-            onPracticeMistake={handlePracticeMistake}
-            onRemoveMistake={handleRemoveMistake}
-            onOpenLecture={(id) => openLecture(id, 0)}
-          />
-        ) : activeTab === 'arena' ? (
-          <PracticeArenaView
-            lectures={allLectures}
-            customWords={progress.customWords || []}
-            savedWordIds={progress.savedWordIds}
-            mistakeNotebook={progress.mistakeNotebook}
-            sprintHighScore={progress.sprintHighScore || 0}
-            detectiveSolvedIds={progress.detectiveSolvedIds || []}
-            rolePlayCompletedIds={progress.rolePlayCompletedIds || []}
-            preferredSpeechRate={progress.preferredSpeechRate}
-            languageMode={languageMode}
-            initialToolTab={initialArenaTool}
-            onAddCustomWord={handleAddCustomWord}
-            onRemoveCustomWord={handleRemoveCustomWord}
-            onRecordSprintScore={handleRecordSprintScore}
-            onRecordDetectiveSolved={handleRecordDetectiveSolved}
-            onRecordRolePlayCompleted={handleRecordRolePlayCompleted}
-            onRecordMistake={handleRecordMistake}
-            onRecordExamResult={handleRecordExamResult}
-            onOpenLecture={(id) => openLecture(id, 0)}
-            onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
-          />
-        ) : activeTab === 'progress' ? (
-          <ProgressSettingsView
-            mode="progress"
-            progress={progress}
-            lectures={allLectures}
-            isOnline={isOnline}
-            initialProgressSubView={progressSubViewTarget}
-            onUpdateLevel={handleUpdateLevel}
-            onUpdateSpeechRate={handleUpdateSpeechRate}
-            onUpdateLanguageMode={handleUpdateLanguageMode}
-            onUpdateDailyGoal={handleUpdateDailyGoal}
-            onImportProgress={handleImportProgress}
-            onRecordMistake={handleRecordMistake}
-            onToggleDarkMode={handleToggleDarkMode}
-            onManualSync={handleManualSync}
-            onOpenLecture={(id) => openLecture(id, 0)}
-            onOpenArenaTool={(tool) => openArenaTool(tool)}
-            onOpenDictionary={() => navigateTab('dictionary')}
-            onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
-          />
-        ) : activeTab === 'settings' ? (
-          <ProgressSettingsView
-            mode="settings"
-            progress={progress}
-            lectures={allLectures}
-            isOnline={isOnline}
-            onUpdateLevel={handleUpdateLevel}
-            onUpdateSpeechRate={handleUpdateSpeechRate}
-            onUpdateLanguageMode={handleUpdateLanguageMode}
-            onUpdateDailyGoal={handleUpdateDailyGoal}
-            onImportProgress={handleImportProgress}
-            onRecordMistake={handleRecordMistake}
-            onToggleDarkMode={handleToggleDarkMode}
-            onManualSync={handleManualSync}
-            onOpenLecture={(id) => openLecture(id, 0)}
-            onOpenArenaTool={(tool) => openArenaTool(tool)}
-            onOpenDictionary={() => navigateTab('dictionary')}
-            onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
-          />
-        ) : activeTab === 'about' ? (
-          <AboutView
-            languageMode={languageMode}
-            preferredSpeechRate={progress.preferredSpeechRate}
-            onStartCurriculum={() => navigateTab('lectures')}
-          />
-        ) : (
-          /* HOME / LECTURES SYLLABUS DASHBOARD */
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-8">
-            {/* Step 1: Onboarding Level Selection & Add to Home Screen Card */}
-            {!progress.onboardingComplete && (
-              <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                  <div className="lg:col-span-7 space-y-3">
-                    <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                      Welcome to BhashaSetu
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      Select Your Starting English Level & Install for Offline Study
-                    </h2>
-                    <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E]">
-                      Choose your current proficiency level to personalize your recommended lectures, and add the app to your home screen for offline access.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
-                      {(
-                        [
-                          {
-                            level: 'B1' as CEFRLevel,
-                            title: 'B1 · Lower-Int',
-                            sub: 'Lectures 01–04 · Silent Letters & Plurals',
-                          },
-                          {
-                            level: 'B2' as CEFRLevel,
-                            title: 'B2 · Upper-Int',
-                            sub: 'Lectures 05–08 · Workplace & Passive',
-                          },
-                          {
-                            level: 'C1' as CEFRLevel,
-                            title: 'C1 · Advanced',
-                            sub: 'Lectures 09–12 · Academic & Inversion',
-                          },
-                        ]
-                      ).map((opt) => (
-                        <button
-                          key={opt.level}
-                          onClick={() => handleSelectOnboardingLevel(opt.level)}
-                          className={`min-h-[48px] p-3.5 rounded-xl border text-left transition-all ${
-                            progress.selectedLevel === opt.level
-                              ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                              : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C]/50'
-                          }`}
-                        >
-                          <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            {opt.title}
-                          </div>
-                          <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                            {opt.sub}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* PWA Install Callout Box */}
-                  <div className="lg:col-span-5 p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      Add to Home Screen · Offline PWA Setup
-                    </div>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      Install BhashaSetu on your phone or desktop so you can listen to pronunciations and practice quizzes even without internet.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {!isInstalled && isInstallable && (
-                        <button
-                          onClick={install}
-                          className="min-h-[44px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Install App Now</span>
-                        </button>
-                      )}
-                      {!isInstalled && !isInstallable && (
-                        <button
-                          onClick={() => setShowInstallHelpModal((prev) => !prev)}
-                          className="min-h-[44px] px-4 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-                        >
-                          <Smartphone className="w-4 h-4" />
-                          <span>{isIOS ? 'Install on iPhone/iPad' : 'Add to Home Screen Guide'}</span>
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleSelectOnboardingLevel(progress.selectedLevel)}
-                        className="min-h-[44px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
-                      >
-                        Start with {progress.selectedLevel}
-                      </button>
-                    </div>
-
-                    {showInstallHelpModal && (
-                      <div className="p-3 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E] space-y-1">
-                        <div>
-                          • <strong>Android / Chrome</strong>: Tap browser menu (⋮) →{' '}
-                          <strong>Install App / Add to Home Screen</strong>.
-                        </div>
-                        <div>
-                          • <strong>iOS Safari</strong>: Tap <strong>Share</strong> →{' '}
-                          <strong>Add to Home Screen</strong>.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* =============================================================== */}
-            {/* OVERALL COURSE PROGRESS STATUS & TRACK MASTERY BANNER           */}
-            {/* =============================================================== */}
-            <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-                <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                    <Award className="w-4 h-4" />
-                    <span>Overall Course Progress & Sequential Curriculum</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    {courseStats.completedCount} of {courseStats.totalUnits} Lectures Completed ({courseStats.overallPercent}%)
-                  </h2>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                  <button
-                    onClick={() => setIsDailyChallengeOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 font-semibold hover:border-[#D97706] inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
-                    <span>Daily 3-Q Challenge ({progress.dailyChallengeStreak || 0}d)</span>
-                  </button>
-                  <div className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] inline-flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-[#D97706]" />
-                    <span className="font-ipa font-semibold">
-                      {progress.currentStreakDays}d Streak
-                    </span>
-                    <span className="text-[#15803D] dark:text-emerald-400 font-ipa font-semibold inline-flex items-center gap-1 pl-1 border-l border-[#E7E0D6] dark:border-[#2E2924]">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>{progress.streakFreezeShields ?? 1} Shield</span>
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => openProgressSubView('achievements')}
-                    className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] font-semibold inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <Trophy className="w-3.5 h-3.5 text-[#D97706]" />
-                    <span>Achievements & Badges</span>
-                  </button>
-                  <button
-                    onClick={() => openLecture(recommendedLecture.id, 0)}
-                    className="px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <span>
-                      Resume Lecture {String(recommendedLecture.lectureNumber).padStart(2, '0')}
-                    </span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      <div className="flex-1 flex min-h-[calc(100vh-4rem)]">
+        {/* Left Sidebar (Desktop >= md) matching Screenshots 1, 2, 3 */}
+        <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-[#E6E0D4] dark:border-[#2E2924] bg-[#FAF8F4] dark:bg-[#141210] px-4 py-6 select-none">
+          <div className="space-y-6">
+            {/* Group 1: LEARN */}
+            <div>
+              <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
+                LEARN
               </div>
-
-              {/* Overall Progress Bar + 3 Sequential CEFR Track Breakdowns */}
-              <div className="pt-5 space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                    <span>
-                      Master Syllabus Completion Bar (Lectures 01–{String(courseStats.totalUnits).padStart(2, '0')})
-                    </span>
-                    <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      {courseStats.overallPercent}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2.5 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                    <div
-                      className="h-full bg-[#B91C1C] transition-all duration-300 rounded-full"
-                      style={{ width: `${Math.max(4, courseStats.overallPercent)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* 3 Sequential Track Mini-Cards (01-04 B1, 05-08 B2, 09-12 C1) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                  <button
-                    onClick={() => setLevelFilter(levelFilter === 'B1' ? 'ALL' : 'B1')}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
-                      levelFilter === 'B1'
-                        ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      <span>Track 1 · B1 Lower-Intermediate</span>
-                      <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-                        {courseStats.b1Done}/{courseStats.b1Total} Done
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
-                      Lectures 01–04 · Silent Letters, Plurals, Causatives & Quantifiers
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => setLevelFilter(levelFilter === 'B2' ? 'ALL' : 'B2')}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
-                      levelFilter === 'B2'
-                        ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      <span>Track 2 · B2 Upper-Intermediate</span>
-                      <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-                        {courseStats.b2Done}/{courseStats.b2Total} Done
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
-                      Lectures 05–08 · Workplace, Passive Voice & Reported Speech
-                    </p>
-                  </button>
-
-                  <button
-                    onClick={() => setLevelFilter(levelFilter === 'C1' ? 'ALL' : 'C1')}
-                    className={`p-3.5 rounded-xl border text-left transition-all ${
-                      levelFilter === 'C1'
-                        ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      <span>Track 3 · C1 Advanced Mastery</span>
-                      <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-                        {courseStats.c1Done}/{courseStats.c1Total} Done
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
-                      Lectures 09–12 · Prefixes, Confusables, Conditionals & Inversion
-                    </p>
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* Hero Split: Recommended Next Lecture + Study Focus & Methodology Link */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-              {/* Dominant Anchor: Today's Recommended Lecture */}
-              <div className="lg:col-span-8 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 flex flex-col justify-between">
-                <div>
-                  <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                    <span className="text-[#B91C1C] dark:text-[#F87171] font-semibold">
-                      Recommended Next Lecture
-                    </span>
-                    <span className="mx-2" aria-hidden="true">·</span>
-                    <span>Lecture {String(recommendedLecture.lectureNumber).padStart(2, '0')}</span>
-                    <span className="mx-2" aria-hidden="true">·</span>
-                    <span>Level {recommendedLecture.level}</span>
-                    <span className="mx-2" aria-hidden="true">·</span>
-                    <span className="font-ipa">{recommendedLecture.category}</span>
-                  </div>
-
-                  <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-tight">
-                    {recommendedLecture.title}
-                  </h1>
-                  {isFullNepali && (
-                    <p className="font-nepali text-base sm:text-lg text-[#57534E] dark:text-[#A8A29E] mt-1.5">
-                      {recommendedLecture.nepaliTitle}
-                    </p>
-                  )}
-                  <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed mt-2 mb-5">
-                    {recommendedLecture.subtitle}
-                  </p>
-
-                  {/* Preview of Target Silent-Letter Words in this Lecture */}
-                  <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] mb-5">
-                    <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mb-2">
-                      Key Silent-Letter Words in This Lecture (Tap to Hear):
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {recommendedLecture.moduleA_vocabulary.slice(0, 6).map((w) => (
-                        <button
-                          key={w.id}
-                          onClick={() =>
-                            speechService.speak(w.word, { rate: progress.preferredSpeechRate })
-                          }
-                          className="min-h-[38px] px-3 py-1.5 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-sm font-medium inline-flex items-center gap-2 transition-colors"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
-                          <span>
-                            {w.segments?.map((seg, i) =>
-                              seg.silent ? (
-                                <span
-                                  key={i}
-                                  className="text-[#B91C1C] dark:text-[#F87171] font-semibold underline decoration-dotted"
-                                >
-                                  {seg.text}
-                                </span>
-                              ) : (
-                                <span key={i}>{seg.text}</span>
-                              )
-                            )}
-                          </span>
-                          {languageMode !== 'english-only' && (
-                            <span className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
-                              ({w.nepaliMeaning.split('/')[0].trim()})
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#E7E0D6] dark:border-[#2E2924]">
-                  <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                    5 Connected Modules · {recommendedLecture.estimatedMinutes} mins
-                  </div>
-                  <button
-                    onClick={() => openLecture(recommendedLecture.id, 0)}
-                    className="min-h-[46px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-                  >
-                    <span>Start Lecture {String(recommendedLecture.lectureNumber).padStart(2, '0')}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Column: Study Status, Mistake Notebook & About Methodology Shortcut */}
-              <div className="lg:col-span-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      <Compass className="w-4 h-4 text-[#B91C1C]" />
-                      <span>Daily Study Companion</span>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab('settings')}
-                      className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                    >
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>
-                        {languageMode === 'english-only'
-                          ? 'English Only'
-                          : languageMode === 'english-meanings'
-                          ? 'English + Meanings'
-                          : 'Full Nepali'}
-                      </span>
-                    </button>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5">
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                      <span>Mistake Notebook Queue</span>
-                      <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-                        {progress.mistakeNotebook.length} Active
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      Words missed in Audio Dictation, Spelling, or Grammar quizzes are saved for targeted review.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5">
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                      <span>Saved Bookmarks</span>
-                      <span className="font-ipa text-[#15803D] dark:text-emerald-400">
-                        {progress.savedWordIds.length} Words
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      Review your bookmarked vocabulary and spaced-repetition flashcards anytime in the Dictionary.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] flex flex-col gap-2">
-                  <button
-                    onClick={() => setIsDailyChallengeOpen(true)}
-                    className="w-full min-h-[40px] px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 hover:border-[#D97706] text-xs font-semibold text-amber-950 dark:text-amber-200 inline-flex items-center justify-between transition-colors"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
-                      <span>Launch 24h Daily 3-Question Quiz</span>
-                    </span>
-                    <ArrowRight className="w-3.5 h-3.5 text-[#D97706]" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('about')}
-                    className="w-full min-h-[40px] px-4 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center justify-between transition-colors"
-                  >
-                    <span>Explore 4-Pillar Bridge & Silent-Letter Guide</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-[#B91C1C]" />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* =============================================================== */}
-            {/* PRACTICE ARENA & FLUENCY LAB QUICK-LAUNCH HUB                   */}
-            {/* =============================================================== */}
-            <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-3.5">
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Interactive Practice Arena, Translation Lab & Career Exam Simulator</span>
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    12 Specialized Phonics, Nepali Translation, 10-Min IELTS/PTE Exam & Commuter Audio Tools
-                  </h2>
-                </div>
+              <nav className="space-y-1">
                 <button
-                  onClick={() => openArenaTool('interference')}
-                  className="min-h-[38px] px-4 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto shrink-0"
+                  type="button"
+                  onClick={() => navigateTab('home')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'home' && !activeLectureId
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
                 >
-                  <span>Open Full Practice Hub</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <Home className="w-4 h-4 shrink-0" />
+                  <span>Home</span>
                 </button>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                {[
-                  {
-                    id: 'interference' as ArenaToolTab,
-                    title: 'Nepali-to-English Lab',
-                    desc: 'SOV→SVO reordering, Articles, Prepositions (मा/ले/सँग) & Continuous traps.',
-                    badge: '4 Drill Labs',
-                  },
-                  {
-                    id: 'exam-simulator' as ArenaToolTab,
-                    title: '10-Min IELTS/PTE Sim',
-                    desc: 'Timed diagnostic mock exam with Band/CEFR score breakdown & Speaking.',
-                    badge: 'Mock Exam',
-                  },
-                  {
-                    id: 'commuter-audio' as ArenaToolTab,
-                    title: 'Commuter Audio Mode',
-                    desc: 'Hands-free podcast loop (1.0x → 2s recall → 0.75x → example sentence).',
-                    badge: 'Hands-Free',
-                  },
-                  {
-                    id: 'detective' as ArenaToolTab,
-                    title: 'Silent-Letter Detective',
-                    desc: 'Spot hidden silent letters in realistic workplace passages.',
-                    badge: `${progress.detectiveSolvedIds?.length || 0}/3 Solved`,
-                  },
-                  {
-                    id: 'sprint' as ArenaToolTab,
-                    title: '60s Spelling Sprint',
-                    desc: 'Timed arcade challenge with B1/B2/C1 & Mistake Notebook tiers.',
-                    badge: `Best: ${progress.sprintHighScore || 0} pts`,
-                  },
-                  {
-                    id: 'roleplay' as ArenaToolTab,
-                    title: 'Voice Role-Play Sim',
-                    desc: 'Speak or select responses in Job Interview, Airport, Clinic & Bank.',
-                    badge: 'Mic + Options',
-                  },
-                ].map((tool) => (
-                  <button
-                    key={tool.id}
-                    onClick={() => openArenaTool(tool.id)}
-                    className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-left flex flex-col justify-between transition-all group"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <span className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#B91C1C] dark:group-hover:text-[#F87171]">
-                          {tool.title}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] line-clamp-2">
-                        {tool.desc}
-                      </p>
-                    </div>
-                    <div className="mt-2.5 pt-2 border-t border-[#E7E0D6]/70 dark:border-[#2E2924] flex items-center justify-between text-[11px] font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                      <span>{tool.badge}</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
+                <button
+                  type="button"
+                  onClick={() => navigateTab('lessons')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'lessons' || Boolean(activeLectureId)
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 shrink-0" />
+                  <span>Lessons</span>
+                </button>
 
-            {/* =============================================================== */}
-            {/* MANAGED CURRICULUM SYLLABUS ORGANIZER                           */}
-            {/* Hierarchy: 1. Unified Filter Bar -> 2. Search Bar -> 3. Courses */}
-            {/* =============================================================== */}
-            <section className="space-y-4">
-              <div className="border-b border-[#E7E0D6] dark:border-[#2E2924] pb-3">
-                <h2 className="text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Managed Curriculum Syllabus
-                </h2>
-                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                  Sequentially structured from B1 Foundation (01–04) to B2 Workplace (05–08) and C1 Mastery (09–12).
+                <button
+                  type="button"
+                  onClick={() => navigateTab('dictionary')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'dictionary'
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <BookMarked className="w-4 h-4 shrink-0" />
+                  <span>Dictionary</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab('arena')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'arena'
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <Puzzle className="w-4 h-4 shrink-0" />
+                  <span>Practice arena</span>
+                </button>
+              </nav>
+            </div>
+
+            <div className="border-t border-[#E6E0D4] dark:border-[#2E2924]" />
+
+            {/* Group 2: YOUR JOURNEY */}
+            <div>
+              <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
+                YOUR JOURNEY
+              </div>
+              <nav className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => navigateTab('progress')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'progress'
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span>Progress</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab('settings')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'settings'
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <Sliders className="w-4 h-4 shrink-0" />
+                  <span>Settings</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab('about')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    activeTab === 'about'
+                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
+                  }`}
+                >
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>About guide</span>
+                </button>
+              </nav>
+            </div>
+          </div>
+
+          {/* Bottom Sidebar Offline Readiness Card matching Screenshots 1, 2, 3 */}
+          <div className="p-3.5 rounded-2xl bg-[#EFECE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924]">
+            <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              Ready when you are
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isOnline ? 'bg-[#2E6F4E]' : 'bg-[#D97706]'
+                }`}
+              />
+              <span>Offline lessons available</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Workspace */}
+        <main className="flex-1 min-w-0">
+          {activeLecture ? (
+            <LecturePlayer
+              lecture={activeLecture}
+              allLectures={allLectures}
+              savedWordIds={progress.savedWordIds}
+              masteredWordIds={progress.masteredWordIds || []}
+              lectureNote={progress.lectureNotes?.[activeLecture.id] || ''}
+              completedUnitIds={progress.completedUnitIds}
+              completedSteps={progress.completedStepsByLecture?.[activeLecture.id] || []}
+              mistakeNotebook={progress.mistakeNotebook}
+              preferredSpeechRate={progress.preferredSpeechRate}
+              languageMode={languageMode}
+              isCompleted={progress.completedUnitIds.includes(activeLecture.id)}
+              initialStep={initialModuleStep}
+              onToggleSaveWord={handleToggleSaveWord}
+              onToggleMasteredWord={handleToggleMasteredWord}
+              onUpdateLectureNote={handleUpdateLectureNote}
+              onCompleteLecture={handleCompleteLecture}
+              onCompleteStep={handleCompleteStep}
+              onSelectLecture={(id, step = 0) => openLecture(id, step)}
+              onRecordMistake={handleRecordMistake}
+              onPracticeMistake={handlePracticeMistake}
+              onRemoveMistake={handleRemoveMistake}
+              onUpdateMistakeNote={handleUpdateMistakeNote}
+              onUpdateWordSRS={handleUpdateWordSRS}
+              onBackToDashboard={() => setActiveLectureId(null)}
+              onOpenSectionDictionary={openSectionInDictionary}
+            />
+          ) : activeTab === 'dictionary' ? (
+            <DictionaryView
+              lectures={allLectures}
+              savedWordIds={progress.savedWordIds}
+              masteredWordIds={progress.masteredWordIds || []}
+              wordSRS={progress.wordSRS}
+              mistakeNotebook={progress.mistakeNotebook}
+              preferredSpeechRate={progress.preferredSpeechRate}
+              languageMode={languageMode}
+              initialLectureFilter={dictionaryLectureFilter}
+              onToggleSaveWord={handleToggleSaveWord}
+              onToggleMasterWord={handleToggleMasteredWord}
+              onUpdateWordSRS={handleUpdateWordSRS}
+              onRecordMistake={handleRecordMistake}
+              onPracticeMistake={handlePracticeMistake}
+              onRemoveMistake={handleRemoveMistake}
+              onOpenLecture={(id) => openLecture(id, 0)}
+            />
+          ) : activeTab === 'arena' ? (
+            <PracticeArenaView
+              lectures={allLectures}
+              customWords={progress.customWords || []}
+              savedWordIds={progress.savedWordIds}
+              mistakeNotebook={progress.mistakeNotebook}
+              sprintHighScore={progress.sprintHighScore || 0}
+              detectiveSolvedIds={progress.detectiveSolvedIds || []}
+              rolePlayCompletedIds={progress.rolePlayCompletedIds || []}
+              preferredSpeechRate={progress.preferredSpeechRate}
+              languageMode={languageMode}
+              initialToolTab={initialArenaTool}
+              onAddCustomWord={handleAddCustomWord}
+              onRemoveCustomWord={handleRemoveCustomWord}
+              onRecordSprintScore={handleRecordSprintScore}
+              onRecordDetectiveSolved={handleRecordDetectiveSolved}
+              onRecordRolePlayCompleted={handleRecordRolePlayCompleted}
+              onRecordMistake={handleRecordMistake}
+              onRecordExamResult={handleRecordExamResult}
+              onOpenLecture={(id) => openLecture(id, 0)}
+              onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
+            />
+          ) : activeTab === 'progress' ? (
+            <ProgressSettingsView
+              mode="progress"
+              progress={progress}
+              lectures={allLectures}
+              isOnline={isOnline}
+              initialProgressSubView={progressSubViewTarget}
+              onUpdateLevel={handleUpdateLevel}
+              onUpdateSpeechRate={handleUpdateSpeechRate}
+              onUpdateLanguageMode={handleUpdateLanguageMode}
+              onUpdateDailyGoal={handleUpdateDailyGoal}
+              onImportProgress={handleImportProgress}
+              onRecordMistake={handleRecordMistake}
+              onToggleDarkMode={handleToggleDarkMode}
+              onManualSync={handleManualSync}
+              onOpenLecture={(id) => openLecture(id, 0)}
+              onOpenArenaTool={(tool) => openArenaTool(tool)}
+              onOpenDictionary={() => navigateTab('dictionary')}
+              onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
+              firebaseUser={firebaseUser}
+              isCloudSyncing={isCloudSyncing}
+              cloudSyncStatusMsg={cloudSyncStatusMsg}
+              onGoogleSignIn={handleGoogleSignIn}
+              onGoogleSignOut={handleGoogleSignOut}
+              onPullFromCloud={handlePullFromCloud}
+              onUpdateUserName={handleUpdateUserName}
+              onToggleDailyReminder={handleToggleDailyReminder}
+              onResetAllProgress={handleResetAllProgress}
+            />
+          ) : activeTab === 'settings' ? (
+            <ProgressSettingsView
+              mode="settings"
+              progress={progress}
+              lectures={allLectures}
+              isOnline={isOnline}
+              onUpdateLevel={handleUpdateLevel}
+              onUpdateSpeechRate={handleUpdateSpeechRate}
+              onUpdateLanguageMode={handleUpdateLanguageMode}
+              onUpdateDailyGoal={handleUpdateDailyGoal}
+              onImportProgress={handleImportProgress}
+              onRecordMistake={handleRecordMistake}
+              onToggleDarkMode={handleToggleDarkMode}
+              onManualSync={handleManualSync}
+              onOpenLecture={(id) => openLecture(id, 0)}
+              onOpenArenaTool={(tool) => openArenaTool(tool)}
+              onOpenDictionary={() => navigateTab('dictionary')}
+              onOpenDailyChallenge={() => setIsDailyChallengeOpen(true)}
+              firebaseUser={firebaseUser}
+              isCloudSyncing={isCloudSyncing}
+              cloudSyncStatusMsg={cloudSyncStatusMsg}
+              onGoogleSignIn={handleGoogleSignIn}
+              onGoogleSignOut={handleGoogleSignOut}
+              onPullFromCloud={handlePullFromCloud}
+              onUpdateUserName={handleUpdateUserName}
+              onToggleDailyReminder={handleToggleDailyReminder}
+              onResetAllProgress={handleResetAllProgress}
+            />
+          ) : activeTab === 'about' ? (
+            <AboutView
+              languageMode={languageMode}
+              preferredSpeechRate={progress.preferredSpeechRate}
+              onStartCurriculum={() => navigateTab('lessons')}
+            />
+          ) : dashboardStudySheetMode ? (
+            <PrintableStudySheetModal
+              initialFocusMode={dashboardStudySheetMode}
+              allLexiconWords={massiveLexicon}
+              savedWordIds={progress.savedWordIds}
+              masteredWordIds={progress.masteredWordIds || []}
+              wordSRS={progress.wordSRS}
+              mistakeNotebook={progress.mistakeNotebook}
+              onClose={() => setDashboardStudySheetMode(null)}
+            />
+          ) : activeTab === 'lessons' ? (
+            /* =============================================================== */
+            /* LESSONS VIEW (Exact Editorial Match to Screenshot 2)            */
+            /* =============================================================== */
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-8">
+              {/* Top Heading */}
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-2">
+                  YOUR CURRICULUM
+                </div>
+                <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+                  Lessons for your next step
+                </h1>
+                <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
+                  A guided path from everyday fluency to confident expression.
                 </p>
               </div>
 
-              {/* ROW 1: ALL FILTERS IN ONE UNIFIED BAR */}
-              <div className="p-3 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-3">
-                {/* Group 1: View Mode (By Track | Grid | Roadmap Table) */}
-                <div className="flex items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-                  <button
-                    onClick={() => setSyllabusDisplayMode('tracks')}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
-                      syllabusDisplayMode === 'tracks'
-                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>By Track</span>
-                  </button>
-                  <button
-                    onClick={() => setSyllabusDisplayMode('grid')}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
-                      syllabusDisplayMode === 'grid'
-                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>Grid</span>
-                  </button>
-                  <button
-                    onClick={() => setSyllabusDisplayMode('table')}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
-                      syllabusDisplayMode === 'table'
-                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    <ListChecks className="w-3.5 h-3.5" />
-                    <span>Roadmap Table</span>
-                  </button>
-                </div>
-
+              {/* Filter Pills Row + "+ Create AI lesson" Button */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Group 2: Level Filter (All | B1 | B2 | C1) */}
-                  <div className="flex flex-wrap items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-                    {(
-                      [
-                        { id: 'ALL', label: `All (${allLectures.length})` },
-                        { id: 'B1', label: 'B1' },
-                        { id: 'B2', label: 'B2' },
-                        { id: 'C1', label: 'C1' },
-                        ...(progress.customLectures.length > 0
-                          ? [{ id: 'CUSTOM', label: `AI (${progress.customLectures.length})` }]
-                          : []),
-                      ] as { id: 'ALL' | CEFRLevel | 'CUSTOM'; label: string }[]
-                    ).map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => setLevelFilter(f.id)}
-                        className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                          levelFilter === f.id
-                            ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] font-semibold shadow-xs'
-                            : 'text-[#57534E] dark:text-[#A8A29E]'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Group 3: Completion Status Filter (All Status | To Do | Completed) */}
-                  <div className="flex items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-                    {(
-                      [
-                        { id: 'ALL', label: 'All Status' },
-                        { id: 'TODO', label: 'To Do' },
-                        { id: 'COMPLETED', label: 'Completed' },
-                      ] as { id: StatusFilter; label: string }[]
-                    ).map((st) => (
-                      <button
-                        key={st.id}
-                        onClick={() => setStatusFilter(st.id)}
-                        className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                          statusFilter === st.id
-                            ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] font-semibold shadow-xs'
-                            : 'text-[#57534E] dark:text-[#A8A29E]'
-                        }`}
-                      >
-                        {st.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* ROW 2: DEDICATED SEARCH SECTION DIRECTLY BELOW FILTERS */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-[#57534E] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={lectureSearch}
-                  onChange={(e) => setLectureSearch(e.target.value)}
-                  placeholder="Search lectures by title, vocabulary word, spelling rule, or grammar topic (e.g., passive, conditionals, plumber)..."
-                  className="w-full min-h-[44px] pl-11 pr-4 py-2.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm focus:outline-none focus:border-[#B91C1C]"
-                />
-              </div>
-
-              {/* ROW 3: ALL COURSES SECTION DIRECTLY BELOW SEARCH */}
-              {filteredLectures.length === 0 ? (
-                <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-8 text-center space-y-2">
-                  <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    No lectures match your current filter
-                  </div>
-                  <button
-                    onClick={() => {
-                      setLectureSearch('');
-                      setLevelFilter('ALL');
-                      setStatusFilter('ALL');
-                    }}
-                    className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
-                  >
-                    Reset Syllabus Filters
-                  </button>
-                </div>
-              ) : syllabusDisplayMode === 'table' ? (
-                /* COMPACT SYLLABUS ROADMAP TABLE VIEW */
-                <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-[#FAF7F2] dark:bg-[#141210] border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                          <th className="py-3.5 px-4 font-semibold">Unit</th>
-                          <th className="py-3.5 px-4 font-semibold">Level</th>
-                          <th className="py-3.5 px-4 font-semibold">Focus Words</th>
-                          <th className="py-3.5 px-4 font-semibold">Spelling & Grammar Focus</th>
-                          <th className="py-3.5 px-4 font-semibold">Status</th>
-                          <th className="py-3.5 px-4 font-semibold">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E7E0D6] dark:divide-[#2E2924]">
-                        {filteredLectures.map((lec) => {
-                          const isDone = progress.completedUnitIds.includes(lec.id);
-                          const score = progress.moduleScores[lec.id];
-                          return (
-                            <tr key={lec.id} className="hover:bg-[#FAF7F2]/60 dark:hover:bg-[#141210]/40">
-                              <td className="py-3.5 px-4">
-                                <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                                  {String(lec.lectureNumber).padStart(2, '0')}. {lec.title}
-                                </div>
-                                <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                                  {lec.category}
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-4 font-ipa text-xs font-semibold">
-                                {lec.level}
-                              </td>
-                              <td className="py-3.5 px-4 text-xs text-[#1C1917] dark:text-[#F5F2EB]">
-                                {lec.moduleA_vocabulary
-                                  .slice(0, 5)
-                                  .map((w) => w.word)
-                                  .join(', ')}
-                              </td>
-                              <td className="py-3.5 px-4 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                                <div>
-                                  <strong>Spell:</strong> {lec.moduleC_spelling.ruleTitle}
-                                </div>
-                                <div>
-                                  <strong>Grammar:</strong> {lec.moduleD_grammar.topicTitle}
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-4 font-ipa text-xs">
-                                {score ? (
-                                  <span className="text-[#15803D] dark:text-emerald-400 font-semibold">
-                                    {score.spellingScore + score.grammarScore}/
-                                    {score.spellingTotal + score.grammarTotal}
-                                  </span>
-                                ) : isDone ? (
-                                  <span className="text-[#15803D]">Done</span>
-                                ) : (
-                                  <span className="text-[#57534E]">To Do</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <button
-                                  onClick={() => openLecture(lec.id, 0)}
-                                  className="min-h-[36px] px-3 py-1.5 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold whitespace-nowrap"
-                                >
-                                  {isDone ? 'Review' : 'Start'}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : syllabusDisplayMode === 'tracks' && levelFilter === 'ALL' ? (
-                /* STRUCTURED TRACK VIEW (GROUPED BY SEQUENTIAL B1, B2, C1 TRACKS) */
-                <div className="space-y-8">
                   {(
                     [
-                      {
-                        level: 'B1' as CEFRLevel,
-                        trackTitle: 'Track 1 · B1 Lower-Intermediate Foundation (Lectures 01–04)',
-                        trackDesc:
-                          'Silent consonant clusters, deceptive vowels, plural spelling transformations, SVO word order, causatives, and quantifiers.',
-                      },
-                      {
-                        level: 'B2' as CEFRLevel,
-                        trackTitle: 'Track 2 · B2 Upper-Intermediate Workplace & Media (Lectures 05–08)',
-                        trackDesc:
-                          'Consonant doubling, schwa reduction, "-ceed/-sede/-cede", polite indirect questions, passive voice, and reported speech.',
-                      },
-                      {
-                        level: 'C1' as CEFRLevel,
-                        trackTitle: 'Track 3 · C1 Advanced Academic & Executive Mastery (Lectures 09–12)',
-                        trackDesc:
-                          'Negative prefixes, confusable pairs, Greek/French loanwords, academic plurals, conditionals, contrastive clauses, and negative inversion.',
-                      },
-                    ]
-                  ).map((track) => {
-                    const trackLectures = filteredLectures.filter((l) => l.level === track.level);
-                    if (trackLectures.length === 0) return null;
-                    const doneInTrack = trackLectures.filter((l) =>
-                      progress.completedUnitIds.includes(l.id)
-                    ).length;
-
+                      { id: 'ALL', label: 'All levels' },
+                      { id: 'B1', label: 'B1 Foundation' },
+                      { id: 'B2', label: 'B2 Workplace' },
+                      { id: 'C1', label: 'C1 Advanced' },
+                    ] as { id: 'ALL' | CEFRLevel; label: string }[]
+                  ).map((pill) => {
+                    const isActive = levelFilter === pill.id;
                     return (
-                      <div key={track.level} className="space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl bg-[#F2ECE1]/70 dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924]">
-                          <div>
-                            <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                              {track.trackTitle}
-                            </h3>
-                            <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                              {track.trackDesc}
-                            </p>
-                          </div>
-                          <div className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] shrink-0">
-                            {doneInTrack} / {trackLectures.length} Track Units Completed
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          {trackLectures.map((lec) => renderLectureCard(lec))}
-                        </div>
-                      </div>
+                      <button
+                        key={pill.id}
+                        type="button"
+                        onClick={() => setLevelFilter(pill.id)}
+                        className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'bg-[#F6E6E2] dark:bg-red-950/60 text-[#A82020] dark:text-red-300 font-semibold'
+                            : 'bg-[#F2EFE9] dark:bg-[#1F1C18] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]'
+                        }`}
+                      >
+                        {pill.label}
+                      </button>
                     );
                   })}
                 </div>
-              ) : (
-                /* STANDARD 2-COLUMN CARD GRID */
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {filteredLectures.map((lecture) => renderLectureCard(lecture))}
+
+                <button
+                  type="button"
+                  onClick={() => setIsAIModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Create AI lesson</span>
+                </button>
+              </div>
+
+              {/* Level Group Containers (B1, B2, C1) */}
+              <div className="space-y-6">
+                {(
+                  [
+                    {
+                      level: 'B1' as CEFRLevel,
+                      badgeBg: 'bg-[#DCECE2] text-[#1F5C3D]',
+                      title: 'Foundation · Everyday confidence',
+                      rangeLabel: 'Lessons 01–04',
+                    },
+                    {
+                      level: 'B2' as CEFRLevel,
+                      badgeBg: 'bg-[#DCE6F2] text-[#284B7A]',
+                      title: 'Workplace · Clear communication',
+                      rangeLabel: 'Lessons 05–08',
+                    },
+                    {
+                      level: 'C1' as CEFRLevel,
+                      badgeBg: 'bg-[#F6E3DF] text-[#A82020]',
+                      title: 'Advanced · Academic & leadership',
+                      rangeLabel: 'Lessons 09–12',
+                    },
+                  ]
+                )
+                  .filter((grp) => levelFilter === 'ALL' || levelFilter === grp.level)
+                  .map((grp) => {
+                    const groupLessons = CORE_SYLLABUS.filter((l) => l.level === grp.level);
+                    return (
+                      <section
+                        key={grp.level}
+                        className="rounded-2xl bg-[#F5F2EB] dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-5 space-y-3"
+                      >
+                        {/* Track Header Row */}
+                        <div className="flex items-center justify-between gap-2 px-1 py-1">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${grp.badgeBg}`}
+                            >
+                              {grp.level}
+                            </span>
+                            <h2 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {grp.title}
+                            </h2>
+                          </div>
+                          <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            {grp.rangeLabel}
+                          </span>
+                        </div>
+
+                        {/* Lesson Cards inside Group */}
+                        <div className="space-y-2.5">
+                          {groupLessons.map((lesson) => {
+                            const isCompleted = progress.completedUnitIds.includes(lesson.id);
+                            const stepsDone =
+                              progress.completedStepsByLecture?.[lesson.id]?.length || 0;
+                            const isCurrentActive =
+                              !isCompleted &&
+                              (recommendedLecture?.id === lesson.id || stepsDone > 0);
+                            const { displayTitle, displaySub, duration } =
+                              getEditorialLessonPresentation(lesson);
+                            const isPreviewExpanded = expandedLessonPreviewId === lesson.id;
+
+                            return (
+                              <div
+                                key={lesson.id}
+                                className={`rounded-2xl bg-white dark:bg-[#141210] transition-all ${
+                                  isCurrentActive
+                                    ? 'border-[1.5px] border-[#C86D63] dark:border-[#F87171] shadow-xs'
+                                    : 'border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/50'
+                                }`}
+                              >
+                                <div
+                                  onClick={() =>
+                                    openLecture(
+                                      lesson.id,
+                                      isCurrentActive
+                                        ? (Math.min(4, stepsDone) as ModuleStep)
+                                        : 0
+                                    )
+                                  }
+                                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
+                                >
+                                  {/* Left: Number Box + Title & Subtitle */}
+                                  <div className="flex items-center gap-4 min-w-0">
+                                    <div
+                                      className={`w-12 h-12 rounded-xl flex items-center justify-center font-serif text-base font-medium shrink-0 ${
+                                        isCurrentActive
+                                          ? 'bg-[#F8E7E3] dark:bg-red-950/50 text-[#A82020] dark:text-red-300'
+                                          : 'bg-[#EDE8DC] dark:bg-[#26221E] text-[#57534E] dark:text-[#A8A29E]'
+                                      }`}
+                                    >
+                                      {String(lesson.lectureNumber).padStart(2, '0')}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                                        {displayTitle}
+                                      </h3>
+                                      <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 truncate">
+                                        {displaySub}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Steps Info + Status Pill + Action */}
+                                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                                    <span className="text-xs text-[#78716C] dark:text-[#A8A29E] whitespace-nowrap">
+                                      {isCurrentActive
+                                        ? `Step ${Math.max(1, stepsDone + 1)} of 5 · ${duration} min left`
+                                        : `5 steps · ${duration} min`}
+                                    </span>
+
+                                    {isCompleted ? (
+                                      <div className="flex items-center gap-3">
+                                        <span className="px-4 py-1.5 rounded-full bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium min-w-[115px] text-center">
+                                          Completed
+                                        </span>
+                                        <Check className="w-4 h-4 text-[#57534E]" />
+                                      </div>
+                                    ) : isCurrentActive ? (
+                                      <div className="flex items-center gap-2.5">
+                                        <span className="px-3.5 py-1.5 rounded-full bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] text-xs font-medium">
+                                          In progress
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openLecture(
+                                              lesson.id,
+                                              Math.min(4, stepsDone) as ModuleStep
+                                            );
+                                          }}
+                                          className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4]"
+                                        >
+                                          Continue
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-3">
+                                        <span className="px-4 py-1.5 rounded-full bg-[#E3ECF6] dark:bg-slate-900 text-[#3B5984] dark:text-blue-300 text-xs font-medium min-w-[115px] text-center">
+                                          Up next
+                                        </span>
+                                        <Lock className="w-4 h-4 text-[#8C857B]" />
+                                      </div>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedLessonPreviewId((prev) =>
+                                          prev === lesson.id ? null : lesson.id
+                                        );
+                                      }}
+                                      aria-label="Preview interactive lesson steps"
+                                      className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] hover:bg-[#FAF8F4] dark:hover:bg-[#1F1C18]"
+                                      title="Preview 5 interactive steps & vocabulary"
+                                    >
+                                      {isPreviewExpanded ? (
+                                        <ChevronUp className="w-4 h-4" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Interactive Step Launcher & Vocabulary Preview Drawer */}
+                                {isPreviewExpanded && (
+                                  <div className="px-5 pb-4 pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] bg-[#FAF8F4]/70 dark:bg-[#1A1714] rounded-b-2xl space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                      <span className="font-semibold text-[#57534E] dark:text-[#A8A29E]">
+                                        Jump directly to any interactive step:
+                                      </span>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {[
+                                          { step: 0 as ModuleStep, label: '01 · Vocabulary' },
+                                          { step: 1 as ModuleStep, label: '02 · Silent Phonics' },
+                                          { step: 2 as ModuleStep, label: '03 · Grammar & Syntax' },
+                                          { step: 3 as ModuleStep, label: '04 · Live Dialogue' },
+                                          { step: 4 as ModuleStep, label: '05 · Mastery Quiz' },
+                                        ].map((st) => (
+                                          <button
+                                            key={st.step}
+                                            type="button"
+                                            onClick={() => openLecture(lesson.id, st.step)}
+                                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-[11px] font-medium text-[#1C1917] dark:text-[#F5F2EB]"
+                                          >
+                                            {st.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                      <span className="text-[#78716C]">Key Words (click to hear):</span>
+                                      {lesson.moduleA_vocabulary.slice(0, 6).map((vocab) => (
+                                        <button
+                                          key={vocab.id}
+                                          type="button"
+                                          onClick={() =>
+                                            speechService.speak(vocab.word, {
+                                              rate: progress.preferredSpeechRate,
+                                            })
+                                          }
+                                          className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs inline-flex items-center gap-1 hover:border-[#A82020]"
+                                        >
+                                          <Volume2 className="w-3 h-3 text-[#A82020]" />
+                                          <span className="font-medium">{vocab.word}</span>
+                                          <span className="font-nepali text-[#1F5C3D] text-[11px]">
+                                            ({vocab.nepaliMeaning})
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    );
+                  })}
+              </div>
+
+              {/* Bottom Section: Your custom lessons (Exact match to Screenshot 2) */}
+              <section className="pt-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-serif text-xl sm:text-2xl font-normal text-[#1C1917] dark:text-[#F5F2EB]">
+                    Your custom lessons
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsAIModalOpen(true)}
+                    className="text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:underline"
+                  >
+                    + Make a lesson
+                  </button>
                 </div>
+
+                {progress.customLectures.length === 0 ? (
+                  <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 text-sm text-[#78716C] dark:text-[#A8A29E]">
+                    AI-created lessons appear here and are saved for offline study.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {enrichSyllabusWithEnhancements(progress.customLectures).map((customLec) => (
+                      <div
+                        key={customLec.id}
+                        onClick={() => openLecture(customLec.id, 0)}
+                        className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] flex items-center justify-between gap-4 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-11 h-11 rounded-xl bg-[#F8E7E3] text-[#A82020] flex items-center justify-center font-serif font-semibold text-sm">
+                            AI
+                          </div>
+                          <div>
+                            <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                              {customLec.title}
+                            </h3>
+                            <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                              {customLec.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="px-4 py-2 rounded-xl bg-[#A82020] text-white text-xs font-medium"
+                        >
+                          Open lesson
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          ) : (
+            /* =============================================================== */
+            /* HOME VIEW (Exact Editorial Match to Screenshot 1)               */
+            /* =============================================================== */
+            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-6">
+              {/* Greeting Header */}
+              <div>
+                <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+                  Namaste, {firstName}
+                </h1>
+                <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
+                  Take a quiet moment for yourself. Your next English lesson is ready.
+                </p>
+              </div>
+
+              {/* Hero Card: CONTINUE YOUR PATH + Open Book अ | A Illustration */}
+              <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-6 sm:p-8 shadow-[0_1px_2px_rgba(28,25,23,0.03)]">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                  <div className="lg:col-span-8 space-y-3">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171]">
+                      {progress.completedUnitIds.length === 0 &&
+                      (progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) === 0
+                        ? 'START YOUR PATH'
+                        : 'CONTINUE YOUR PATH'}
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#1C1917] dark:text-[#F5F2EB] leading-snug">
+                      {`Lesson ${String(recommendedLecture.lectureNumber).padStart(2, '0')} · ${
+                        getEditorialLessonPresentation(recommendedLecture).displayTitle
+                      }`}
+                    </h2>
+                    <p className="text-sm text-[#6E685F] dark:text-[#A8A29E] max-w-xl leading-relaxed">
+                      {recommendedLecture.subtitle}
+                    </p>
+
+                    <div className="pt-2 flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openLecture(
+                            recommendedLecture.id,
+                            Math.min(
+                              4,
+                              progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0
+                            ) as ModuleStep
+                          )
+                        }
+                        className="px-5 py-3 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
+                      >
+                        <span>
+                          {(progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) > 0
+                            ? 'Continue lesson'
+                            : 'Start lesson'}
+                        </span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        Step{' '}
+                        {Math.min(
+                          5,
+                          (progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) +
+                            1
+                        )}{' '}
+                        of 5 · About{' '}
+                        {getEditorialLessonPresentation(recommendedLecture).duration} minutes
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Open-Book Bridge Illustration Box (अ | A) */}
+                  <div className="lg:col-span-4 flex justify-center lg:justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        speechService.speak('Knowledge, subtle, castle', {
+                          rate: progress.preferredSpeechRate,
+                        })
+                      }
+                      title="Click to hear sample pronunciation"
+                      className="w-full max-w-[240px] h-36 rounded-2xl bg-[#F4EFE4] dark:bg-[#26221E] border border-[#E6E0D4] dark:border-[#3A342E] flex items-center justify-center p-4 hover:border-[#A82020]/50 transition-colors group"
+                    >
+                      <svg
+                        viewBox="0 0 200 120"
+                        className="w-40 h-28"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        {/* Left Page */}
+                        <path
+                          d="M100 28 C78 22, 46 22, 24 28 L24 94 C46 88, 78 88, 100 94 Z"
+                          fill="#FAF8F4"
+                          stroke="#8C7A6B"
+                          strokeWidth="2"
+                        />
+                        {/* Right Page */}
+                        <path
+                          d="M100 28 C122 22, 154 22, 176 28 L176 94 C154 88, 122 88, 100 94 Z"
+                          fill="#FAF8F4"
+                          stroke="#8C7A6B"
+                          strokeWidth="2"
+                        />
+                        {/* Center Spine */}
+                        <line
+                          x1="100"
+                          y1="28"
+                          x2="100"
+                          y2="94"
+                          stroke="#8C7A6B"
+                          strokeWidth="2"
+                        />
+                        {/* Left Character: अ */}
+                        <text
+                          x="62"
+                          y="68"
+                          textAnchor="middle"
+                          fill="#A82020"
+                          fontSize="26"
+                          fontWeight="600"
+                          fontFamily="Noto Sans Devanagari, serif"
+                        >
+                          अ
+                        </text>
+                        {/* Right Character: A */}
+                        <text
+                          x="138"
+                          y="68"
+                          textAnchor="middle"
+                          fill="#A82020"
+                          fontSize="26"
+                          fontWeight="500"
+                          fontFamily="Newsreader, Georgia, serif"
+                        >
+                          A
+                        </text>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4 KPI Summary Cards Row (Starting cleanly from 0) */}
+              <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigateTab('dictionary')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                >
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Words learned</div>
+                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
+                    {wordsLearnedDisplayCount}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab('lessons')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                >
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                    Lessons completed
+                  </div>
+                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
+                    {courseStats.completedCount}{' '}
+                    <span className="text-base font-sans text-[#78716C]">
+                      of {courseStats.totalUnits}
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openProgressSubView('overview')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                >
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Daily streak</div>
+                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
+                    {progress.currentStreakDays || 0}{' '}
+                    <span className="text-base font-sans text-[#78716C]">days</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTab('settings')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                >
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Current level</div>
+                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
+                    {progress.currentLevel || 'B1'}
+                  </div>
+                </button>
+              </section>
+
+              {/* Two-Column Middle Section: "Pick up where you left off" + "Your week" Bar Chart */}
+              <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* Left Column: Pick up where you left off (with 3 action rows) */}
+                <div className="lg:col-span-7 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2.5">
+                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                      Pick up where you left off
+                    </h2>
+
+                    {/* Row 1: Saved words or Flashcard refresher */}
+                    <button
+                      type="button"
+                      onClick={() => navigateTab('dictionary')}
+                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#F8E7E3] dark:bg-red-950/50 text-[#A82020] dark:text-red-300 flex items-center justify-center shrink-0">
+                          <BookMarked className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            {progress.savedWordIds.length > 0
+                              ? `Review ${progress.savedWordIds.length} saved words`
+                              : 'Explore silent-letter flashcards'}
+                          </div>
+                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            {progress.savedWordIds.length > 0
+                              ? 'A 3-minute flashcard refresher from your saved deck'
+                              : 'Browse 10,000+ words and bookmark your study deck'}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#A82020] transition-colors" />
+                    </button>
+
+                    {/* Row 2: Quick pronunciation check */}
+                    <button
+                      type="button"
+                      onClick={() => openArenaTool('shadowing')}
+                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#DCECE2] dark:bg-emerald-950/50 text-[#1F5C3D] dark:text-emerald-300 flex items-center justify-center shrink-0">
+                          <Mic className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            Quick pronunciation check
+                          </div>
+                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            Listen and compare your voice
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#1F5C3D] transition-colors" />
+                    </button>
+
+                    {/* Row 3: 60-second word sprint */}
+                    <button
+                      type="button"
+                      onClick={() => openArenaTool('sprint')}
+                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#F4E8D1] dark:bg-amber-950/50 text-[#B45309] dark:text-amber-300 flex items-center justify-center shrink-0">
+                          <Zap className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            60-second word sprint
+                          </div>
+                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            Warm up with a gentle spelling game
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#B45309] transition-colors" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Column: "Your week" Interactive 7-Day Vertical Capsule Bar Chart */}
+                <div className="lg:col-span-5 flex flex-col justify-between space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                      Your week
+                    </h2>
+                    {selectedWeekDayIdx !== null ? (
+                      <span className="text-xs text-[#A82020] font-medium">
+                        {homeWeekBars.entries[selectedWeekDayIdx]?.dayName}:{' '}
+                        {homeWeekBars.entries[selectedWeekDayIdx]?.minutes} mins
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#78716C]">
+                        Goal: {progress.dailyGoalMinutes || 15}m/day
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between min-h-[236px]">
+                    {/* 7 Vertical Capsule Bars M T W T F S S */}
+                    <div className="grid grid-cols-7 gap-3 items-end h-36 pt-2 px-1">
+                      {homeWeekBars.entries.map((bar) => {
+                        const isSelected = selectedWeekDayIdx === bar.idx;
+                        return (
+                          <button
+                            key={bar.idx}
+                            type="button"
+                            onClick={() =>
+                              setSelectedWeekDayIdx((prev) =>
+                                prev === bar.idx ? null : bar.idx
+                              )
+                            }
+                            title={`${bar.dayName}: ${bar.minutes} minutes studied`}
+                            className="flex flex-col items-center gap-2 h-full justify-end group focus:outline-none"
+                          >
+                            <span className="text-[10px] font-ipa text-[#78716C] group-hover:text-[#A82020]">
+                              {bar.minutes}m
+                            </span>
+                            <div className="w-full max-w-[26px] h-24 rounded-full bg-[#EFECE4] dark:bg-[#26221E] flex items-end overflow-hidden p-0.5">
+                              <div
+                                className={`w-full rounded-full transition-all duration-300 ${
+                                  isSelected
+                                    ? 'bg-[#1F5C3D]'
+                                    : bar.isFilled
+                                    ? 'bg-[#A82020] group-hover:bg-[#8E1B1B]'
+                                    : 'bg-[#E2DDD2] dark:bg-[#3A342E]'
+                                }`}
+                                style={{ height: `${bar.pct}%` }}
+                              />
+                            </div>
+                            <span
+                              className={`text-xs ${
+                                isSelected
+                                  ? 'font-bold text-[#A82020]'
+                                  : 'text-[#78716C] dark:text-[#A8A29E]'
+                              }`}
+                            >
+                              {bar.letter}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="pt-4 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      <span>{homeWeekBars.totalMinutes} minutes studied this week</span>
+                      <button
+                        type="button"
+                        onClick={() => openProgressSubView('overview')}
+                        className="text-[#A82020] dark:text-[#F87171] font-medium hover:underline"
+                      >
+                        Full analytics →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ============================================================= */}
+              {/* NEW INTERACTIVE HOME CHARTS: 4-PILLAR SKILL BREAKDOWN +       */}
+              {/* CEFR CURRICULUM ROADMAP CHART (B1 -> B2 -> C1)                */}
+              {/* ============================================================= */}
+              <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* Left Chart Card (7 cols): 4-Pillar Language Mastery Breakdown Chart */}
+                <div className="lg:col-span-7 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171]">
+                        SKILL MASTERY CHART
+                      </div>
+                      <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                        4-Pillar Language Breakdown
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openProgressSubView('overview')}
+                      className="text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:underline"
+                    >
+                      Detailed report →
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {homeSkillPillars.map((pillar) => (
+                      <div key={pillar.id} className="space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            {pillar.label}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[#78716C] dark:text-[#A8A29E]">
+                              {pillar.metricLabel}
+                            </span>
+                            <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB] min-w-[34px] text-right">
+                              {pillar.pct}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2.5 rounded-full bg-[#EFECE4] dark:bg-[#26221E] overflow-hidden">
+                            <div
+                              className={`h-full ${pillar.color} rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.max(4, pillar.pct)}%` }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={pillar.onAction}
+                            className="px-2.5 py-1 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#A82020] hover:text-[#A82020] transition-colors shrink-0"
+                          >
+                            {pillar.actionLabel}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Chart Card (5 cols): CEFR Curriculum Track Roadmap Chart */}
+                <div className="lg:col-span-5 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171]">
+                        CURRICULUM ROADMAP
+                      </div>
+                      <span className="font-ipa text-xs font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                        {courseStats.overallPercent}% Complete
+                      </span>
+                    </div>
+                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                      CEFR Track Progress
+                    </h2>
+                    <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-1">
+                      Complete all 4 lessons in each level to unlock your track certificate.
+                    </p>
+                  </div>
+
+                  {/* Visual Track Bars (B1, B2, C1) */}
+                  <div className="space-y-3">
+                    {[
+                      {
+                        level: 'B1' as CEFRLevel,
+                        title: 'B1 Foundation · Lessons 01–04',
+                        done: courseStats.b1Done,
+                        total: courseStats.b1Total,
+                        barColor: 'bg-[#2E6F4E]',
+                        badgeClass: 'bg-[#DCECE2] text-[#1F5C3D]',
+                      },
+                      {
+                        level: 'B2' as CEFRLevel,
+                        title: 'B2 Workplace · Lessons 05–08',
+                        done: courseStats.b2Done,
+                        total: courseStats.b2Total,
+                        barColor: 'bg-[#284B7A]',
+                        badgeClass: 'bg-[#DCE6F2] text-[#284B7A]',
+                      },
+                      {
+                        level: 'C1' as CEFRLevel,
+                        title: 'C1 Advanced · Lessons 09–12',
+                        done: courseStats.c1Done,
+                        total: courseStats.c1Total,
+                        barColor: 'bg-[#A82020]',
+                        badgeClass: 'bg-[#F6E3DF] text-[#A82020]',
+                      },
+                    ].map((trk) => {
+                      const pct = trk.total > 0 ? Math.round((trk.done / trk.total) * 100) : 0;
+                      return (
+                        <button
+                          key={trk.level}
+                          type="button"
+                          onClick={() => {
+                            setLevelFilter(trk.level);
+                            navigateTab('lessons');
+                          }}
+                          className="w-full p-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/50 text-left space-y-2 transition-colors"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${trk.badgeClass}`}
+                              >
+                                {trk.level}
+                              </span>
+                              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                                {trk.title}
+                              </span>
+                            </div>
+                            <span className="font-ipa text-xs text-[#78716C]">
+                              {trk.done}/{trk.total}
+                            </span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-[#ECE6DA] dark:bg-[#26221E] overflow-hidden">
+                            <div
+                              className={`h-full ${trk.barColor} rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.max(4, pct)}%` }}
+                            />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between text-xs">
+                    <span className="text-[#78716C]">
+                      Quiz accuracy:{' '}
+                      <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+                        {courseStats.avgQuizAccuracy !== null
+                          ? `${courseStats.avgQuizAccuracy}%`
+                          : 'No quizzes yet'}
+                      </strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openProgressSubView('achievements')}
+                      className="text-[#A82020] dark:text-[#F87171] font-medium hover:underline inline-flex items-center gap-1"
+                    >
+                      <Trophy className="w-3.5 h-3.5" />
+                      <span>Badges ({progress.unlockedBadgeIds.length}/12)</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Interactive Quick SRS Flashcard Strip on Home */}
+              {activeSRSQuickWord && (
+                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        speechService.speak(activeSRSQuickWord.word, {
+                          rate: progress.preferredSpeechRate,
+                        })
+                      }
+                      className="w-11 h-11 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-center text-[#A82020] hover:border-[#A82020] shrink-0"
+                      title="Listen to word"
+                    >
+                      <Volume2 className="w-5 h-5" />
+                    </button>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#A82020]">
+                          Silent-Letter Word Spotlight ({(srsQuickIdx % dueSRSWords.length) + 1}/{dueSRSWords.length})
+                        </span>
+                        <span className="font-ipa text-xs text-[#78716C]">
+                          {activeSRSQuickWord.ipa}
+                        </span>
+                      </div>
+                      <div className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        {activeSRSQuickWord.segments?.map((seg, idx) =>
+                          seg.silent ? (
+                            <span
+                              key={idx}
+                              className="text-[#A82020] underline decoration-dotted underline-offset-4"
+                            >
+                              {seg.text}
+                            </span>
+                          ) : (
+                            <span key={idx}>{seg.text}</span>
+                          )
+                        )}
+                        {srsQuickFlipped && (
+                          <span className="ml-3 font-nepali text-base text-[#1F5C3D] dark:text-emerald-400">
+                            — {activeSRSQuickWord.nepaliMeaning}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-[#78716C] mt-0.5">
+                        {activeSRSQuickWord.silentLettersSummary} · “{activeSRSQuickWord.englishExample}”
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        speechService.speak(activeSRSQuickWord.word, {
+                          rate: 0.5,
+                        })
+                      }
+                      className="px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#A82020]"
+                      title="Listen slowly at 0.5x speed"
+                    >
+                      0.5× Slow
+                    </button>
+                    {!srsQuickFlipped ? (
+                      <button
+                        type="button"
+                        onClick={() => setSrsQuickFlipped(true)}
+                        className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#A82020]"
+                      >
+                        Reveal Nepali meaning
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUpdateWordSRS(activeSRSQuickWord.id, false);
+                            setSrsQuickFlipped(false);
+                            setSrsQuickIdx((i) => i + 1);
+                          }}
+                          className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] text-xs font-medium text-[#78716C]"
+                        >
+                          Next word
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleToggleMasteredWord(activeSRSQuickWord.id);
+                            setSrsQuickFlipped(false);
+                            setSrsQuickIdx((i) => i + 1);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-[#2E6F4E] text-white text-xs font-medium"
+                        >
+                          Mark Mastered ✓
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </section>
               )}
-            </section>
-          </div>
-        )}
-      </main>
+
+              {/* Bottom Banner: "A small daily challenge" (Exact match to Screenshot 1) */}
+              <section className="rounded-2xl bg-[#F4EFE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:px-7 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                    A small daily challenge
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#6E685F] dark:text-[#A8A29E] mt-0.5">
+                    Three quick questions on silent letters — takes under two minutes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDailyChallengeOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs sm:text-sm font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] transition-colors self-start sm:self-center shrink-0"
+                >
+                  Start
+                </button>
+              </section>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* =================================================================== */}
       {/* MOBILE FIXED BOTTOM NAVIGATION BAR (6 Tabs, >= 44px Hitboxes)       */}
       {/* =================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FAF7F2]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E7E0D6] dark:border-[#2E2924] grid grid-cols-6 items-center"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E6E0D4] dark:border-[#2E2924] grid grid-cols-6 items-center"
       >
         <button
-          onClick={() => navigateTab('lectures')}
+          onClick={() => navigateTab('home')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'lectures'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
+            activeTab === 'home' && !activeLectureId
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
+              : 'text-[#57534E] dark:text-[#A8A29E]'
+          }`}
+        >
+          <Home className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Home</span>
+        </button>
+
+        <button
+          onClick={() => navigateTab('lessons')}
+          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
+            activeTab === 'lessons' || Boolean(activeLectureId)
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
           <BookOpen className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Lectures</span>
+          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Lessons</span>
         </button>
 
         <button
           onClick={() => navigateTab('dictionary')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'dictionary'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
@@ -1766,19 +2758,19 @@ export default function App() {
           onClick={() => navigateTab('arena')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'arena'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
-          <Sparkles className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Practice</span>
+          <Puzzle className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Arena</span>
         </button>
 
         <button
           onClick={() => navigateTab('progress')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'progress'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
@@ -1790,24 +2782,12 @@ export default function App() {
           onClick={() => navigateTab('settings')}
           className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'settings'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
+              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
-          <Settings className="w-5 h-5" />
+          <Sliders className="w-5 h-5" />
           <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Settings</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('about')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'about'
-              ? 'text-[#B91C1C] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <Info className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">About</span>
         </button>
       </nav>
 

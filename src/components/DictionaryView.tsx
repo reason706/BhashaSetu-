@@ -25,6 +25,11 @@ import {
   Square,
   Radio,
   SkipForward,
+  Printer,
+  FileDown,
+  Mic,
+  Shuffle,
+  Trophy,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -32,8 +37,16 @@ import {
   SRSRecord,
   MistakeItem,
 } from '../types/curriculum';
-import { speechService } from '../services/speech';
+import { speechService, PronunciationResult } from '../services/speech';
 import { getMassiveLexicon, EnrichedLexiconItem } from '../data/massiveLexicon';
+import {
+  PrintableStudySheetModal,
+  StudySheetFocusMode,
+} from './PrintableStudySheetModal';
+import {
+  exportSavedWordsToCSV,
+  exportMistakeNotebookToCSV,
+} from '../services/studySheetExport';
 
 interface DictionaryViewProps {
   lectures: LectureUnit[];
@@ -54,7 +67,7 @@ interface DictionaryViewProps {
 }
 
 type FilterMode = 'all' | 'core' | 'srs' | 'saved' | 'mastered' | 'silent' | 'B1' | 'B2' | 'C1';
-type ViewMode = 'list' | 'table' | 'flashcards' | 'dictation' | 'quiz' | 'mistakes';
+type ViewMode = 'list' | 'table' | 'flashcards' | 'match' | 'dictation' | 'quiz' | 'mistakes';
 type SilentPatternFilter =
   | 'ALL'
   | 'K'
@@ -110,6 +123,18 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  const [flashcardAutoSpeak, setFlashcardAutoSpeak] = useState(false);
+  const [flashcardSessionReviewed, setFlashcardSessionReviewed] = useState(0);
+  const [flashcardMicListening, setFlashcardMicListening] = useState(false);
+  const [flashcardMicResult, setFlashcardMicResult] = useState<PronunciationResult | null>(null);
+
+  // Interactive Silent-Letter Match Game state
+  const [matchBoardRound, setMatchBoardRound] = useState(0);
+  const [selectedMatchWordId, setSelectedMatchWordId] = useState<string | null>(null);
+  const [selectedMatchMeaningId, setSelectedMatchMeaningId] = useState<string | null>(null);
+  const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
+  const [wrongMatchFlash, setWrongMatchFlash] = useState(false);
+  const [matchGameStats, setMatchGameStats] = useState({ score: 0, combo: 0, boardsCleared: 0 });
 
   // Quick Vocab Speed Quiz state
   const [quizIndex, setQuizIndex] = useState(0);
@@ -132,6 +157,9 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [commuterIndex, setCommuterIndex] = useState(0);
   const [commuterPhase, setCommuterPhase] = useState<'idle' | 'word-1x' | 'pause-2s' | 'word-075x' | 'sentence'>('idle');
   const commuterCancelRef = useRef(false);
+
+  // Printable PDF & CSV Study Sheet Modal state
+  const [studySheetModalMode, setStudySheetModalMode] = useState<StudySheetFocusMode | null>(null);
 
   useEffect(() => {
     if (initialLectureFilter !== undefined) {
@@ -361,21 +389,150 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   const handleNextCard = () => {
     setIsFlipped(false);
-    setCardIndex((prev) => (filteredWords.length ? (prev + 1) % filteredWords.length : 0));
+    setFlashcardMicResult(null);
+    const nextIdx = filteredWords.length ? (cardIndex + 1) % filteredWords.length : 0;
+    setCardIndex(nextIdx);
+    if (flashcardAutoSpeak && filteredWords[nextIdx]) {
+      speechService.speak(filteredWords[nextIdx].word, { rate: preferredSpeechRate });
+    }
   };
 
   const handlePrevCard = () => {
     setIsFlipped(false);
-    setCardIndex((prev) =>
-      filteredWords.length ? (prev - 1 + filteredWords.length) % filteredWords.length : 0
-    );
+    setFlashcardMicResult(null);
+    const prevIdx = filteredWords.length
+      ? (cardIndex - 1 + filteredWords.length) % filteredWords.length
+      : 0;
+    setCardIndex(prevIdx);
+    if (flashcardAutoSpeak && filteredWords[prevIdx]) {
+      speechService.speak(filteredWords[prevIdx].word, { rate: preferredSpeechRate });
+    }
+  };
+
+  const handleShuffleFlashcard = () => {
+    if (!filteredWords.length) return;
+    setIsFlipped(false);
+    setFlashcardMicResult(null);
+    const randomIdx = Math.floor(Math.random() * filteredWords.length);
+    setCardIndex(randomIdx);
+    if (flashcardAutoSpeak && filteredWords[randomIdx]) {
+      speechService.speak(filteredWords[randomIdx].word, { rate: preferredSpeechRate });
+    }
   };
 
   const handleRateFlashcardSRS = (wasCorrect: boolean) => {
     if (currentFlashcard && onUpdateWordSRS) {
       onUpdateWordSRS(currentFlashcard.id, wasCorrect);
     }
+    setFlashcardSessionReviewed((prev) => prev + 1);
     handleNextCard();
+  };
+
+  const handleFlashcardMicTest = () => {
+    if (!currentFlashcard || flashcardMicListening) return;
+    setFlashcardMicListening(true);
+    setFlashcardMicResult(null);
+    speechService.listenAndEvaluate(
+      currentFlashcard.word,
+      (res) => {
+        setFlashcardMicResult(res);
+        setFlashcardMicListening(false);
+      },
+      () => {
+        setFlashcardMicListening(false);
+      }
+    );
+  };
+
+  // Interactive 6-Pair Silent-Letter Match Game Board
+  const matchBoardData = useMemo(() => {
+    const pool = filteredWords.length >= 6 ? filteredWords : allWords.slice(0, 60);
+    const startIdx = (matchBoardRound * 6) % Math.max(1, pool.length - 6);
+    const pairs = pool.slice(startIdx, startIdx + 6);
+    const shift = (matchBoardRound * 2 + 3) % Math.max(1, pairs.length);
+    const shuffledMeanings = [...pairs.slice(shift), ...pairs.slice(0, shift)];
+    return { pairs, shuffledMeanings };
+  }, [filteredWords, allWords, matchBoardRound]);
+
+  const handleSelectMatchWord = (wordId: string) => {
+    if (matchedPairIds.includes(wordId)) return;
+    const wordObj = matchBoardData.pairs.find((w) => w.id === wordId);
+    if (wordObj) {
+      speechService.speak(wordObj.word, { rate: preferredSpeechRate });
+    }
+    setSelectedMatchWordId(wordId);
+    if (selectedMatchMeaningId) {
+      if (selectedMatchMeaningId === wordId) {
+        const nextMatched = [...matchedPairIds, wordId];
+        setMatchedPairIds(nextMatched);
+        setSelectedMatchWordId(null);
+        setSelectedMatchMeaningId(null);
+        if (onUpdateWordSRS) onUpdateWordSRS(wordId, true);
+        setMatchGameStats((prev) => ({
+          roundsCompleted:
+            nextMatched.length === matchBoardData.pairs.length
+              ? prev.roundsCompleted + 1
+              : prev.roundsCompleted,
+          pairsMatched: prev.pairsMatched + 1,
+          mistakes: prev.mistakes,
+          streak: prev.streak + 1,
+        }));
+      } else {
+        setWrongMatchFlash(true);
+        setMatchGameStats((prev) => ({
+          ...prev,
+          mistakes: prev.mistakes + 1,
+          streak: 0,
+        }));
+        setTimeout(() => {
+          setWrongMatchFlash(false);
+          setSelectedMatchWordId(null);
+          setSelectedMatchMeaningId(null);
+        }, 550);
+      }
+    }
+  };
+
+  const handleSelectMatchMeaning = (wordId: string) => {
+    if (matchedPairIds.includes(wordId)) return;
+    setSelectedMatchMeaningId(wordId);
+    if (selectedMatchWordId) {
+      if (selectedMatchWordId === wordId) {
+        const nextMatched = [...matchedPairIds, wordId];
+        setMatchedPairIds(nextMatched);
+        setSelectedMatchWordId(null);
+        setSelectedMatchMeaningId(null);
+        if (onUpdateWordSRS) onUpdateWordSRS(wordId, true);
+        setMatchGameStats((prev) => ({
+          roundsCompleted:
+            nextMatched.length === matchBoardData.pairs.length
+              ? prev.roundsCompleted + 1
+              : prev.roundsCompleted,
+          pairsMatched: prev.pairsMatched + 1,
+          mistakes: prev.mistakes,
+          streak: prev.streak + 1,
+        }));
+      } else {
+        setWrongMatchFlash(true);
+        setMatchGameStats((prev) => ({
+          ...prev,
+          mistakes: prev.mistakes + 1,
+          streak: 0,
+        }));
+        setTimeout(() => {
+          setWrongMatchFlash(false);
+          setSelectedMatchWordId(null);
+          setSelectedMatchMeaningId(null);
+        }, 550);
+      }
+    }
+  };
+
+  const handleNextMatchRound = () => {
+    setMatchedPairIds([]);
+    setSelectedMatchWordId(null);
+    setSelectedMatchMeaningId(null);
+    setMatchBoardRound((prev) => prev + 1);
   };
 
   const handleAnswerQuiz = (option: string) => {
@@ -448,6 +605,25 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setDictationIndex((prev) => prev + 1);
   };
 
+  const savedWordsObjects = useMemo(() => {
+    const matched = allWords.filter((w) => savedWordIds.includes(w.id));
+    return matched.length > 0 ? matched : allWords.filter((w) => w.isCoreLessonWord).slice(0, 20);
+  }, [allWords, savedWordIds]);
+
+  if (studySheetModalMode) {
+    return (
+      <PrintableStudySheetModal
+        initialFocusMode={studySheetModalMode}
+        allLexiconWords={allWords}
+        savedWordIds={savedWordIds}
+        masteredWordIds={masteredWordIds}
+        wordSRS={wordSRS}
+        mistakeNotebook={mistakeNotebook}
+        onClose={() => setStudySheetModalMode(null)}
+      />
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
       {/* Header & Mode Switcher */}
@@ -508,12 +684,29 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
             }}
             className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
               viewMode === 'flashcards'
-                ? 'bg-[#B91C1C] text-white shadow-xs'
+                ? 'bg-[#A82020] text-white shadow-xs'
                 : 'text-[#57534E] dark:text-[#A8A29E]'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
             <span>SRS Flashcards</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setViewMode('match');
+              setMatchedPairIds([]);
+              setSelectedMatchWordId(null);
+              setSelectedMatchMeaningId(null);
+            }}
+            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+              viewMode === 'match'
+                ? 'bg-[#A82020] text-white shadow-xs'
+                : 'text-[#57534E] dark:text-[#A8A29E]'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Match Game</span>
           </button>
 
           <button
@@ -675,22 +868,44 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 <span>Silent-Letter Orthographic Family Filter Pills:</span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setCommuterOpen((prev) => !prev)}
-                className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
-                  commuterOpen || commuterPlaying
-                    ? 'bg-[#B91C1C] text-white'
-                    : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
-                }`}
-              >
-                <Radio className={`w-3.5 h-3.5 ${commuterPlaying ? 'animate-pulse' : 'text-[#B91C1C]'}`} />
-                <span>
-                  {commuterPlaying
-                    ? 'Commuter Audio Playing (Hands-Free)'
-                    : 'Hands-Free Commuter Audio Mode (Podcast Loop)'}
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStudySheetModalMode(filterMode === 'saved' ? 'saved' : 'combined')
+                  }
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Export / Print Study Sheet (PDF / CSV)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => exportSavedWordsToCSV(savedWordsObjects, masteredWordIds, wordSRS)}
+                  className="min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                  <span>Saved Words (.CSV)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommuterOpen((prev) => !prev)}
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
+                    commuterOpen || commuterPlaying
+                      ? 'bg-[#B91C1C] text-white'
+                      : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
+                  }`}
+                >
+                  <Radio className={`w-3.5 h-3.5 ${commuterPlaying ? 'animate-pulse' : 'text-[#B91C1C]'}`} />
+                  <span>
+                    {commuterPlaying
+                      ? 'Commuter Audio Playing'
+                      : 'Commuter Audio Mode'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -859,7 +1074,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       {viewMode === 'mistakes' && (
         <div className="space-y-5">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
                   Personal Weak-Words & Missed Quiz Vault
@@ -870,6 +1085,26 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
                   Every time you miss a Spelling Quiz, Grammar Capstone, Speed Quiz, or Audio Dictation item, it is saved here. Answer an item accurately <strong>twice in a row (2/2)</strong> to graduate it out of your notebook!
                 </p>
+              </div>
+
+              {/* Export & Print Mistake Notebook Controls */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setStudySheetModalMode('mistakes')}
+                  className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print / Save PDF Study Sheet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportMistakeNotebookToCSV(mistakeNotebook)}
+                  className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                  <span>Export Mistakes (.CSV)</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1325,83 +1560,160 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       {/* FLASHCARD + SRS DRILL MODE */}
       {viewMode === 'flashcards' && currentFlashcard && (
         <div className="max-w-2xl mx-auto py-4">
-          <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-3">
-            <span className="font-ipa">
-              Card {(cardIndex + 1).toLocaleString()} of {filteredWords.length.toLocaleString()}
-            </span>
-            <span>
-              Lecture {String(currentFlashcard.lectureNumber).padStart(2, '0')} · Level{' '}
-              {currentFlashcard.level} · SRS Stage:{' '}
-              <strong className="uppercase text-[#B91C1C] dark:text-[#F87171]">
-                {wordSRS[currentFlashcard.id]?.stage || 'new'}
-              </strong>
-            </span>
+          {/* Interactive Session Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-3 bg-[#F4F0E8] dark:bg-[#1A1714] px-4 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924]">
+            <div className="flex items-center gap-3">
+              <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Card {(cardIndex + 1).toLocaleString()} of {filteredWords.length.toLocaleString()}
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-medium text-[#15803D] dark:text-emerald-400">
+                Session Reviewed: {flashcardSessionReviewed}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setFlashcardAutoSpeak((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold inline-flex items-center gap-1 transition-colors ${
+                  flashcardAutoSpeak
+                    ? 'bg-[#A82020] text-white border-[#A82020]'
+                    : 'bg-white dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                }`}
+              >
+                <Volume2 className="w-3 h-3" />
+                <span>Auto-Speak {flashcardAutoSpeak ? 'ON' : 'OFF'}</span>
+              </button>
+              <button
+                onClick={handleShuffleFlashcard}
+                className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1 hover:border-[#A82020]"
+              >
+                <Shuffle className="w-3 h-3 text-[#A82020]" />
+                <span>Shuffle Card</span>
+              </button>
+            </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-10 min-h-[340px] flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                {currentFlashcard.partOfSpeech} · {currentFlashcard.silentLettersSummary}
-              </span>
-              <button
-                onClick={() => onToggleSaveWord(currentFlashcard.id)}
-                className="min-h-[40px] px-3 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1.5"
-              >
-                {savedWordIds.includes(currentFlashcard.id) ? (
-                  <>
-                    <BookmarkCheck className="w-4 h-4 text-[#B91C1C]" />
-                    <span>Saved</span>
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-4 h-4" />
-                    <span>Save</span>
-                  </>
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-10 min-h-[380px] flex flex-col justify-between shadow-xs transition-all">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#F4F0E8] dark:bg-[#141210] text-[11px] font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Lecture {String(currentFlashcard.lectureNumber).padStart(2, '0')} · {currentFlashcard.level}
+                </span>
+                <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                  {currentFlashcard.partOfSpeech} · {currentFlashcard.silentLettersSummary}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {onToggleMasterWord && (
+                  <button
+                    onClick={() => onToggleMasterWord(currentFlashcard.id)}
+                    className={`min-h-[36px] px-3 rounded-lg border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                      masteredWordIds.includes(currentFlashcard.id)
+                        ? 'bg-[#E2EFE7] border-[#2E6F4E]/30 text-[#1F5C3D] dark:bg-emerald-950/50 dark:text-emerald-300'
+                        : 'border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{masteredWordIds.includes(currentFlashcard.id) ? 'Mastered ✓' : 'Mark Mastered'}</span>
+                  </button>
                 )}
-              </button>
+                <button
+                  onClick={() => onToggleSaveWord(currentFlashcard.id)}
+                  className="min-h-[36px] px-3 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1.5"
+                >
+                  {savedWordIds.includes(currentFlashcard.id) ? (
+                    <>
+                      <BookmarkCheck className="w-4 h-4 text-[#A82020]" />
+                      <span>Saved</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="w-4 h-4" />
+                      <span>Save</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="my-8 text-center">
-              <div className="text-3xl sm:text-5xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
-                {currentFlashcard.segments?.map((seg, i) =>
-                  seg.silent ? (
-                    <span
-                      key={i}
-                      className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 underline decoration-dotted decoration-2 underline-offset-6 px-0.5 rounded"
-                    >
-                      {seg.text}
-                    </span>
-                  ) : (
-                    <span key={i}>{seg.text}</span>
-                  )
-                )}
-              </div>
-              <div className="font-ipa text-lg text-[#57534E] dark:text-[#A8A29E] mb-4">
-                {currentFlashcard.ipa}
+              <div
+                onClick={() => setIsFlipped((prev) => !prev)}
+                className="cursor-pointer select-none group inline-block px-6 py-3 rounded-2xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+                title="Click card to flip"
+              >
+                <div className="text-3xl sm:text-5xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
+                  {currentFlashcard.segments?.map((seg, i) =>
+                    seg.silent ? (
+                      <span
+                        key={i}
+                        className="text-[#A82020] dark:text-[#F87171] bg-[#A82020]/10 underline decoration-dotted decoration-2 underline-offset-6 px-0.5 rounded"
+                      >
+                        {seg.text}
+                      </span>
+                    ) : (
+                      <span key={i}>{seg.text}</span>
+                    )
+                  )}
+                </div>
+                <div className="font-ipa text-lg text-[#57534E] dark:text-[#A8A29E]">
+                  {currentFlashcard.ipa}
+                </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2.5 mb-6">
+              <div className="flex flex-wrap items-center justify-center gap-2.5 my-5">
                 <button
                   onClick={() =>
                     speechService.speak(currentFlashcard.word, { rate: preferredSpeechRate })
                   }
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-2"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-2 hover:border-[#A82020]"
                 >
-                  <Volume2 className="w-4 h-4 text-[#B91C1C]" />
-                  <span>Listen (1.0x)</span>
+                  <Volume2 className="w-4 h-4 text-[#A82020]" />
+                  <span>Listen ({preferredSpeechRate}x)</span>
                 </button>
                 <button
                   onClick={() => speechService.speak(currentFlashcard.word, { rate: 0.6 })}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-2"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-2 hover:border-[#D97706]"
                 >
                   <Turtle className="w-4 h-4 text-[#D97706]" />
-                  <span>Slow (0.65x)</span>
+                  <span>Slow (0.6x)</span>
+                </button>
+                <button
+                  onClick={handleFlashcardMicTest}
+                  disabled={flashcardMicListening}
+                  className={`min-h-[42px] px-4 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
+                    flashcardMicListening
+                      ? 'bg-[#A82020] text-white border-[#A82020] animate-pulse'
+                      : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020]/30 text-[#A82020] dark:text-red-300 hover:bg-[#A82020] hover:text-white'
+                  }`}
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>{flashcardMicListening ? 'Listening... Speak now' : 'Speak & Score'}</span>
                 </button>
               </div>
 
+              {flashcardMicResult && (
+                <div className="max-w-md mx-auto mb-5 p-3 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs">
+                  <div className="flex items-center justify-between font-semibold mb-1">
+                    <span className="text-[#1C1917] dark:text-[#F5F2EB]">
+                      Heard: “{flashcardMicResult.transcript || '—'}”
+                    </span>
+                    <span
+                      className={
+                        flashcardMicResult.score >= 80
+                          ? 'text-[#1F5C3D] dark:text-emerald-400'
+                          : 'text-[#D97706]'
+                      }
+                    >
+                      {flashcardMicResult.score}% Match
+                    </span>
+                  </div>
+                  <p className="text-[#57534E] dark:text-[#A8A29E]">{flashcardMicResult.feedback}</p>
+                </div>
+              )}
+
               {isFlipped ? (
-                <div className="pt-5 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-3 text-center">
-                  <div className="font-nepali text-xl font-semibold text-[#15803D] dark:text-emerald-400">
+                <div className="pt-5 border-t border-[#E6E0D4] dark:border-[#2E2924] space-y-3 text-center">
+                  <div className="font-nepali text-2xl font-semibold text-[#1F5C3D] dark:text-emerald-400">
                     {currentFlashcard.nepaliMeaning}
                   </div>
                   <p className="text-sm text-[#1C1917] dark:text-[#F5F2EB]">
@@ -1423,7 +1735,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     </button>
                     <button
                       onClick={() => handleRateFlashcardSRS(true)}
-                      className="min-h-[42px] px-5 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      className="min-h-[42px] px-5 py-2 rounded-xl bg-[#2E6F4E] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>Got It! (Advance SRS Stage)</span>
@@ -1433,30 +1745,188 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               ) : (
                 <button
                   onClick={() => setIsFlipped(true)}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2"
+                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2"
                 >
                   <RotateCw className="w-4 h-4" />
-                  <span>Reveal Meaning & Rate SRS</span>
+                  <span>Flip Card to Reveal Nepali Meaning</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="flex items-center justify-between pt-4 border-t border-[#E6E0D4] dark:border-[#2E2924]">
               <button
                 onClick={handlePrevCard}
-                className="min-h-[44px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Previous</span>
               </button>
+              <span className="text-[11px] text-[#78716C] hidden sm:inline">
+                SRS Stage:{' '}
+                <strong className="uppercase text-[#A82020] dark:text-[#F87171]">
+                  {wordSRS[currentFlashcard.id]?.stage || 'new'}
+                </strong>
+              </span>
               <button
                 onClick={handleNextCard}
-                className="min-h-[44px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[42px] px-5 py-2 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-1.5"
               >
                 <span>Skip / Next</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* INTERACTIVE SILENT-LETTER MATCH GAME MODE */}
+      {viewMode === 'match' && (
+        <div className="max-w-4xl mx-auto py-4">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[#E6E0D4] dark:border-[#2E2924] mb-6">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#A82020] mb-1">
+                  Interactive Word Pairing Game · Round #{matchBoardRound + 1}
+                </div>
+                <h2 className="text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Match Silent-Letter Words with Their Nepali Meanings
+                </h2>
+                <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                  Click an English word on the left (hears pronunciation) and match it with its Nepali translation on the right.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="px-3 py-1.5 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Matched: <span className="text-[#1F5C3D]">{matchedPairIds.length}/6</span>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Streak: <span className="text-[#A82020]">{matchGameStats.streak} 🔥</span>
+                </div>
+                <button
+                  onClick={handleNextMatchRound}
+                  className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>New Board</span>
+                </button>
+              </div>
+            </div>
+
+            {matchedPairIds.length === matchBoardData.pairs.length && matchBoardData.pairs.length > 0 ? (
+              <div className="text-center py-10 space-y-4 bg-[#FAF8F4] dark:bg-[#141210] rounded-2xl border border-[#E6E0D4] dark:border-[#2E2924]">
+                <div className="w-12 h-12 rounded-full bg-[#E2EFE7] text-[#1F5C3D] flex items-center justify-center mx-auto">
+                  <Trophy className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Board Cleared! All 6 Silent-Letter Pairs Matched
+                </h3>
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">
+                  All 6 words have been advanced in your Spaced Repetition (SRS) deck.
+                </p>
+                <button
+                  onClick={handleNextMatchRound}
+                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-2"
+                >
+                  <span>Play Next Round (6 New Words)</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column: English Words with Silent Letters Highlighted */}
+                <div className="space-y-2.5">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-2">
+                    1. Select English Word (Plays Audio)
+                  </div>
+                  {matchBoardData.pairs.map((item) => {
+                    const isMatched = matchedPairIds.includes(item.id);
+                    const isSelected = selectedMatchWordId === item.id;
+                    return (
+                      <button
+                        key={`word-${item.id}`}
+                        disabled={isMatched}
+                        onClick={() => handleSelectMatchWord(item.id)}
+                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                          isMatched
+                            ? 'bg-[#E2EFE7]/60 dark:bg-emerald-950/20 border-[#2E6F4E]/30 opacity-60 cursor-default'
+                            : isSelected
+                            ? wrongMatchFlash
+                              ? 'bg-red-100 border-red-500 text-red-900'
+                              : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020] ring-2 ring-[#A82020]/20'
+                            : 'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            {item.segments?.map((seg, idx) =>
+                              seg.silent ? (
+                                <span
+                                  key={idx}
+                                  className="text-[#A82020] underline decoration-dotted underline-offset-4"
+                                >
+                                  {seg.text}
+                                </span>
+                              ) : (
+                                <span key={idx}>{seg.text}</span>
+                              )
+                            )}
+                          </div>
+                          <div className="text-xs font-ipa text-[#78716C]">
+                            {item.ipa} · {item.silentLettersSummary}
+                          </div>
+                        </div>
+                        {isMatched ? (
+                          <span className="text-xs font-semibold text-[#1F5C3D] inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" /> Matched
+                          </span>
+                        ) : (
+                          <Volume2 className="w-4 h-4 text-[#A82020]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Right Column: Shuffled Nepali Meanings */}
+                <div className="space-y-2.5">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-2">
+                    2. Match Nepali Meaning (नेपाली अर्थ)
+                  </div>
+                  {matchBoardData.shuffledMeanings.map((item) => {
+                    const isMatched = matchedPairIds.includes(item.id);
+                    const isSelected = selectedMatchMeaningId === item.id;
+                    return (
+                      <button
+                        key={`meaning-${item.id}`}
+                        disabled={isMatched}
+                        onClick={() => handleSelectMatchMeaning(item.id)}
+                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between min-h-[66px] ${
+                          isMatched
+                            ? 'bg-[#E2EFE7]/60 dark:bg-emerald-950/20 border-[#2E6F4E]/30 opacity-60 cursor-default'
+                            : isSelected
+                            ? wrongMatchFlash
+                              ? 'bg-red-100 border-red-500 text-red-900'
+                              : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020] ring-2 ring-[#A82020]/20'
+                            : 'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-nepali text-base font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                            {item.nepaliMeaning}
+                          </div>
+                          <div className="text-xs text-[#78716C] line-clamp-1">
+                            {item.partOfSpeech} · Level {item.level}
+                          </div>
+                        </div>
+                        {isMatched && (
+                          <span className="text-xs font-semibold text-[#1F5C3D]">✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

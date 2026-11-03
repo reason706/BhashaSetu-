@@ -23,6 +23,7 @@ import {
   Radio,
   SkipForward,
   Check,
+  Activity,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -33,6 +34,11 @@ import {
 } from '../types/curriculum';
 import { speechService, PronunciationResult } from '../services/speech';
 import { getMassiveLexicon } from '../data/massiveLexicon';
+import { AudioShadowingTrainer } from './AudioShadowingTrainer';
+import { MinimalPairLab } from './MinimalPairLab';
+import { WritingInterferenceLinter } from './WritingInterferenceLinter';
+import { ArticulationGuideLab } from './ArticulationGuideLab';
+import { DictationPassageStudio } from './DictationPassageStudio';
 
 export type ArenaToolTab =
   | 'detective'
@@ -46,7 +52,11 @@ export type ArenaToolTab =
   | 'custom-deck'
   | 'cheatsheets'
   | 'exam-simulator'
-  | 'commuter-audio';
+  | 'commuter-audio'
+  | 'minimal-pairs'
+  | 'writing-linter'
+  | 'articulation-guide'
+  | 'dictation-studio';
 
 interface PracticeArenaViewProps {
   lectures: LectureUnit[];
@@ -1426,13 +1436,17 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   // --- Feature #7 State: Word Family Tree Explorer ---
   const [selectedTreeId, setSelectedTreeId] = useState(WORD_FAMILY_TREES[0].id);
 
-  // --- Feature #8 State: Role-Play Simulator + Voice Input Mic ---
+  // --- Feature #8 State: Role-Play Simulator + Voice Input Mic + Branching Rapport Meter ---
   const [activeScenarioIdx, setActiveScenarioIdx] = useState(0);
   const [rolePlayTurnIdx, setRolePlayTurnIdx] = useState(0);
   const [selectedRolePlayChoice, setSelectedRolePlayChoice] = useState<number | null>(null);
   const [rolePlayListening, setRolePlayListening] = useState(false);
   const [rolePlayVoiceResult, setRolePlayVoiceResult] = useState<PronunciationResult | null>(null);
   const [rolePlayMicError, setRolePlayMicError] = useState<string | null>(null);
+  const [rolePlayRapportScore, setRolePlayRapportScore] = useState<number>(80);
+  const [rolePlayPolitenessHistory, setRolePlayPolitenessHistory] = useState<
+    ('best' | 'acceptable' | 'blunt')[]
+  >([]);
 
   // --- Feature #9 State: Custom Study Deck Builder ---
   const [newWordInput, setNewWordInput] = useState('');
@@ -1854,17 +1868,82 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenDailyChallenge}
-          className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2 whitespace-nowrap self-start lg:self-auto shrink-0"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Launch Daily 3-Question Challenge</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              speechService.stop();
+              setCommuterPlaying(false);
+              setActiveTool('shadowing');
+            }}
+            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            <Activity className="w-4 h-4 text-[#D97706]" />
+            <span>Audio Shadowing Trainer (Waveform)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenDailyChallenge}
+            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Launch Daily 3-Question Challenge</span>
+          </button>
+        </div>
       </div>
 
-      {/* 12-Tool Navigation Bar */}
+      {/* Enhancement #2: Cross-Linked Mistake Notebook "Fix My Weakest 5 Patterns" Banner */}
+      {mistakeNotebook.length > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#D97706]/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+          <div className="space-y-1">
+            <div className="text-xs font-bold text-[#B91C1C] dark:text-amber-400">
+              Smart Remedial Cross-Link · {mistakeNotebook.length} Active Items in Mistake Notebook
+            </div>
+            <h2 className="text-sm sm:text-base font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+              Fix Your Weakest 5 Patterns Across Specialized Practice Studios
+            </h2>
+            <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+              Top recent targets:{' '}
+              {mistakeNotebook
+                .slice(0, 5)
+                .map((m) => `“${m.correctAnswer}”`)
+                .join(' · ')}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSprintTier('MISTAKES');
+                setActiveTool('sprint');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Drill Mistakes in 60s Sprint
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTool('writing-linter')}
+              className="px-3.5 py-2 rounded-xl bg-stone-900 dark:bg-stone-800 text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap"
+            >
+              Open Writing Linter
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCommuterSource('mistakes');
+                setActiveTool('commuter-audio');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-bold text-[#1C1917] dark:text-[#F5F2EB] cursor-pointer whitespace-nowrap"
+            >
+              Loop Mistakes in Commuter Audio
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 16-Tool Navigation Bar */}
       <div className="p-2 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center gap-1.5 print:hidden">
         {(
           [
@@ -1875,11 +1954,15 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             { id: 'sprint', label: '5. 60s Phonics Sprint' },
             { id: 'word-trees', label: '6. Word Family Root Trees' },
             { id: 'roleplay', label: '7. Role-Play Simulator (Voice)' },
-            { id: 'shadowing', label: '8. Shadowing Rhythm Studio' },
+            { id: 'shadowing', label: '8. Audio Shadowing Trainer (Waveform)' },
             { id: 'custom-deck', label: `9. Custom Deck (${customWords.length})` },
             { id: 'cheatsheets', label: '10. Master Vocab List & PDF Sheets' },
             { id: 'exam-simulator', label: '11. 10-Min Exam Simulator (IELTS/PTE)' },
             { id: 'commuter-audio', label: '12. Hands-Free Commuter Audio' },
+            { id: 'minimal-pairs', label: '13. Minimal Pair Ear & Voice Lab' },
+            { id: 'writing-linter', label: '14. Writing & Email Linter' },
+            { id: 'articulation-guide', label: '15. IPA Mouth & Tongue Guide' },
+            { id: 'dictation-studio', label: '16. Dictation Passage Studio' },
           ] as { id: ArenaToolTab; label: string }[]
         ).map((tab) => (
           <button
@@ -1891,7 +1974,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               setCommuterPlaying(false);
               setActiveTool(tab.id);
             }}
-            className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+            className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
               activeTool === tab.id
                 ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] shadow-xs'
                 : 'bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
@@ -3080,6 +3163,38 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               )}
             </div>
 
+            {/* Live Branching Rapport & Politeness Meter (Enhancement #4) */}
+            <div className="p-3.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Live Counterpart Rapport & Politeness Meter:
+                </span>
+                <span
+                  className={`font-mono font-bold tabular-nums ${
+                    rolePlayRapportScore >= 85
+                      ? 'text-[#15803D] dark:text-emerald-400'
+                      : rolePlayRapportScore >= 65
+                      ? 'text-[#D97706]'
+                      : 'text-[#B91C1C]'
+                  }`}
+                >
+                  {rolePlayRapportScore}% ({rolePlayRapportScore >= 85 ? 'Diplomatic C1 Register' : rolePlayRapportScore >= 65 ? 'Polite Standard Register' : 'Direct / Needs Softening'})
+                </span>
+              </div>
+              <div className="w-44 h-2 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    rolePlayRapportScore >= 85
+                      ? 'bg-[#15803D]'
+                      : rolePlayRapportScore >= 65
+                      ? 'bg-[#D97706]'
+                      : 'bg-[#B91C1C]'
+                  }`}
+                  style={{ width: `${rolePlayRapportScore}%` }}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -3144,7 +3259,9 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     type="button"
                     onClick={() => {
                       setSelectedRolePlayChoice(idx);
+                      setRolePlayPolitenessHistory((prev) => [...prev, ch.quality]);
                       if (ch.quality === 'best') {
+                        setRolePlayRapportScore((s) => Math.min(100, s + 10));
                         speechService.speak(ch.text, {
                           rate: preferredSpeechRate,
                           speakerIndex: 1,
@@ -3152,14 +3269,28 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         if (rolePlayTurnIdx + 1 === currentScenario.turns.length) {
                           onRecordRolePlayCompleted(currentScenario.id);
                         }
+                      } else if (ch.quality === 'acceptable') {
+                        setRolePlayRapportScore((s) => Math.min(100, Math.max(40, s + 2)));
+                      } else {
+                        setRolePlayRapportScore((s) => Math.max(30, s - 12));
                       }
                     }}
-                    className={`w-full p-4 rounded-xl border text-left text-xs sm:text-sm transition-all ${style}`}
+                    className={`w-full p-4 rounded-xl border text-left text-xs sm:text-sm transition-all cursor-pointer ${style}`}
                   >
                     <div>“{ch.text}”</div>
                     {isSelected && (
-                      <div className="mt-2 pt-2 border-t border-current/20 text-xs font-normal">
-                        <strong>Coaching Feedback:</strong> {ch.feedback}
+                      <div className="mt-2 pt-2 border-t border-current/20 text-xs font-normal space-y-1">
+                        <div>
+                          <strong>Coaching Feedback:</strong> {ch.feedback}
+                        </div>
+                        <div className="italic opacity-90">
+                          <strong>Counterpart Branching Reaction:</strong>{' '}
+                          {ch.quality === 'best'
+                            ? `“${currentRolePlayTurn.speaker} nods warmly and appreciates your polite, natural register.”`
+                            : ch.quality === 'acceptable'
+                            ? `“${currentRolePlayTurn.speaker} understands your point, though a softer modal ('Could/Would') would build stronger rapport.”`
+                            : `“${currentRolePlayTurn.speaker} looks slightly surprised by the directness; try memilih an indirect polite phrasing.”`}
+                        </div>
                       </div>
                     )}
                   </button>
@@ -3176,7 +3307,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       setRolePlayTurnIdx((prev) => prev + 1);
                       setSelectedRolePlayChoice(null);
                     }}
-                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Next Conversation Turn</span>
                     <ArrowRight className="w-4 h-4" />
@@ -3188,10 +3319,14 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       setActiveScenarioIdx((prev) => (prev + 1) % ROLEPLAY_SCENARIOS.length);
                       setRolePlayTurnIdx(0);
                       setSelectedRolePlayChoice(null);
+                      setRolePlayRapportScore(80);
+                      setRolePlayPolitenessHistory([]);
                     }}
-                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>Scenario Complete! Try Next Scenario →</span>
+                    <span>
+                      Scenario Complete (Rapport: {rolePlayRapportScore}% · {rolePlayPolitenessHistory.filter((q) => q === 'best').length} Best Turns)! Next Scenario →
+                    </span>
                   </button>
                 )}
               </div>
@@ -3201,121 +3336,14 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       )}
 
       {/* =================================================================== */}
-      {/* TOOL 8 (FEATURE #11): SHADOWING STUDIO (LISTEN-AND-REPEAT LOOP)     */}
+      {/* TOOL 8 (FEATURE #11): AUDIO SHADOWING TRAINER (WEB AUDIO WAVEFORM)  */}
       {/* =================================================================== */}
       {activeTool === 'shadowing' && (
-        <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                <Headphones className="w-4 h-4" />
-                <span>Feature #11 · Hands-Free Listen-and-Repeat Fluency Loop</span>
-              </div>
-              <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                Shadowing Studio — Automated 0.75x → Speak Aloud → 1.0x Loop
-              </h2>
-              <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                Press <strong>Start Shadowing Loop</strong>: the studio plays each line at <strong>0.75x Careful Speed</strong>, pauses 3 seconds for you to repeat aloud, replays at <strong>1.0x Natural Speed</strong>, and automatically advances!
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={shadowLectureIdx}
-                onChange={(e) => {
-                  speechService.stop();
-                  setShadowPhase('idle');
-                  setShadowLectureIdx(Number(e.target.value));
-                  setShadowLineIdx(0);
-                }}
-                className="min-h-[42px] px-3 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold"
-              >
-                {lectures.map((lec, idx) => (
-                  <option key={lec.id} value={idx}>
-                    Lecture {String(lec.lectureNumber).padStart(2, '0')}:{' '}
-                    {lec.moduleE_dialogue?.title || lec.title}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (shadowPhase !== 'idle') {
-                    speechService.stop();
-                    setShadowPhase('idle');
-                  } else {
-                    setShadowPhase('playing-slow');
-                  }
-                }}
-                className={`min-h-[42px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 ${
-                  shadowPhase !== 'idle'
-                    ? 'bg-[#D97706] text-white'
-                    : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
-                }`}
-              >
-                {shadowPhase !== 'idle' ? (
-                  <>
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>Stop Shadowing Loop</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Start Shadowing Loop</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {currentShadowLine && (
-            <div className="p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                  Line {shadowLineIdx + 1} of {shadowLines.length} · {currentShadowLine.speaker}
-                </span>
-                <span className="font-ipa font-semibold px-3 py-1 rounded-full bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924]">
-                  {shadowPhase === 'idle' && 'Ready to Start'}
-                  {shadowPhase === 'playing-slow' && '🔊 Step 1/3: Playing 0.75x Careful Audio...'}
-                  {shadowPhase === 'user-repeat-pause' &&
-                    `🎙️ Step 2/3: Speak Aloud Now! (${shadowCountdown}s)`}
-                  {shadowPhase === 'playing-natural' && '🔊 Step 3/3: Playing 1.0x Natural Audio...'}
-                </span>
-              </div>
-
-              <div className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-relaxed">
-                “{currentShadowLine.english}”
-              </div>
-              {languageMode !== 'english-only' && (
-                <div className="font-nepali text-sm text-[#57534E] dark:text-[#A8A29E]">
-                  {currentShadowLine.nepali}
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                {shadowLines.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      speechService.stop();
-                      setShadowLineIdx(idx);
-                      setShadowPhase('playing-slow');
-                    }}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-ipa font-semibold border ${
-                      shadowLineIdx === idx
-                        ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                        : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924]'
-                    }`}
-                  >
-                    Line {idx + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
+        <AudioShadowingTrainer
+          lectures={lectures}
+          languageMode={languageMode}
+          preferredSpeechRate={preferredSpeechRate}
+        />
       )}
 
       {/* =================================================================== */}
@@ -4326,6 +4354,49 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
           )}
         </section>
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 13: MINIMAL PAIR EAR-TRAINING & PRONUNCIATION LAB              */}
+      {/* =================================================================== */}
+      {activeTool === 'minimal-pairs' && (
+        <MinimalPairLab
+          languageMode={languageMode}
+          preferredSpeechRate={preferredSpeechRate}
+          onRecordMistake={onRecordMistake}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 14: PARAGRAPH & EMAIL WRITING CHECKER (INTERFERENCE LINTER)    */}
+      {/* =================================================================== */}
+      {activeTool === 'writing-linter' && (
+        <WritingInterferenceLinter
+          languageMode={languageMode}
+          preferredSpeechRate={preferredSpeechRate}
+          onRecordMistake={onRecordMistake}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 15: INTERACTIVE IPA MOUTH & TONGUE ARTICULATION GUIDE          */}
+      {/* =================================================================== */}
+      {activeTool === 'articulation-guide' && (
+        <ArticulationGuideLab
+          languageMode={languageMode}
+          preferredSpeechRate={preferredSpeechRate}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* TOOL 16: DICTATION & LISTENING COMPREHENSION PASSAGE STUDIO         */}
+      {/* =================================================================== */}
+      {activeTool === 'dictation-studio' && (
+        <DictationPassageStudio
+          languageMode={languageMode}
+          preferredSpeechRate={preferredSpeechRate}
+          onRecordMistake={onRecordMistake}
+        />
       )}
     </div>
   );

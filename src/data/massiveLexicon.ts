@@ -1079,6 +1079,148 @@ export function getMassiveLexicon(lectures: LectureUnit[]): EnrichedLexiconItem[
     { noun: 'statesman', ipa: 'ˈsteɪts.mən', nepali: 'राजनेता', translit: 'Rājnetā', lectureNumber: 12 },
   ];
 
+  const LECTURE_CONTEXT_TEMPLATES: Record<
+    number,
+    {
+      enFrames: ((phrase: string) => string)[];
+      neFrames: ((nepPhrase: string) => string)[];
+      domainNote: string;
+    }
+  > = {
+    1: {
+      enFrames: [
+        (p) => `In Himalayan villages, elders appreciate a ${p} during community gatherings.`,
+        (p) => `The master artisan demonstrated ${p} while carving the temple doorway.`,
+      ],
+      neFrames: [
+        (np) => `हिमाली गाउँहरूमा सामुदायिक भेलाका क्रममा अग्रजहरूले ${np}को कदर गर्छन्।`,
+        (np) => `मन्दिरको ढोका कुँद्ने क्रममा मुख्य कालिगडले ${np} प्रदर्शन गरे।`,
+      ],
+      domainNote: 'दैनिक जीवन, संस्कृति र शिष्टाचारमा प्रयोग हुने पदावली',
+    },
+    2: {
+      enFrames: [
+        (p) => `International travellers rely on a ${p} when transiting through Tribhuvan Airport.`,
+        (p) => `Please verify the ${p} at the reception counter before boarding.`,
+      ],
+      neFrames: [
+        (np) => `त्रिभुवन विमानस्थल हुँदै यात्रा गर्दा अन्तर्राष्ट्रिय यात्रुहरू ${np}मा भर पर्छन्।`,
+        (np) => `यात्रा सुरु गर्नुअघि कृपया स्वागत कक्षमा ${np} रुजु गर्नुहोस्।`,
+      ],
+      domainNote: 'यात्रा, समय तालिका र विमानस्थल संवादमा उपयोगी पदावली',
+    },
+    3: {
+      enFrames: [
+        (p) => `Conservation researchers documented the ${p} across the Annapurna sanctuary.`,
+        (p) => `Every high-altitude expedition requires ${p} during monsoon and winter.`,
+      ],
+      neFrames: [
+        (np) => `संरक्षण अनुसन्धानकर्ताहरूले अन्नपूर्ण संरक्षण क्षेत्रभरि ${np}को अभिलेख राखे।`,
+        (np) => `प्रत्येक उच्च हिमाली अभियानमा मनसुन र हिउँदको समयमा ${np} आवश्यक पर्छ।`,
+      ],
+      domainNote: 'प्रकृति, विज्ञान र अनुसन्धानमूलक लेखनमा प्रयोग हुने पदावली',
+    },
+    4: {
+      enFrames: [
+        (p) => `The financial advisory board approved a ${p} for the upcoming fiscal quarter.`,
+        (p) => `Maintaining a ${p} builds long-term trust with international clients.`,
+      ],
+      neFrames: [
+        (np) => `वित्तीय सल्लाहकार बोर्डले आगामी आर्थिक त्रैमासिकका लागि ${np} स्वीकृत गर्यो।`,
+        (np) => `${np} कायम राख्नाले अन्तर्राष्ट्रिय ग्राहकहरूसँग दीर्घकालीन विश्वास निर्माण हुन्छ।`,
+      ],
+      domainNote: 'बैंकिङ, वित्त र व्यावसायिक कार्यस्थलमा प्रयोग हुने पदावली',
+    },
+    5: {
+      enFrames: [
+        (p) => `University departments established a ${p} to support rural sustainability projects.`,
+        (p) => `Public infrastructure requires a ${p} to withstand heavy seasonal rainfall.`,
+      ],
+      neFrames: [
+        (np) => `विश्वविद्यालयका विभागहरूले ग्रामीण दिगोपन परियोजनाहरूलाई सघाउन ${np} स्थापना गरे।`,
+        (np) => `मौसमी भारी वर्षा थेग्न सार्वजनिक पूर्वाधारमा ${np} आवश्यक हुन्छ।`,
+      ],
+      domainNote: 'शैक्षिक प्रशासन र दिगो विकासमा प्रयोग हुने पदावली',
+    },
+    6: {
+      enFrames: [
+        (p) => `During sensitive negotiations, diplomats must maintain a ${p} at all times.`,
+        (p) => `Had the committee reviewed the ${p} earlier, the delay would have been avoided.`,
+      ],
+      neFrames: [
+        (np) => `संवेदनशील वार्ताका क्रममा कूटनीतिज्ञहरूले सधैँ ${np} कायम राख्नुपर्छ।`,
+        (np) => `समितिले समयमै ${np}को समीक्षा गरेको भए ढिलाइ टार्न सकिन्थ्यो।`,
+      ],
+      domainNote: 'उच्चस्तरीय कूटनीति र औपचारिक लेखन (C1) मा प्रयोग हुने पदावली',
+    },
+    7: {
+      enFrames: [
+        (p) => `The engineering team arranged for a ${p} before opening the mountain highway.`,
+        (p) => `Local technicians completed the ${p} ahead of the scheduled inspection.`,
+      ],
+      neFrames: [
+        (np) => `पहाडी राजमार्ग खोल्नुअघि इन्जिनियरिङ टोलीले ${np}को प्रबन्ध मिलायो।`,
+        (np) => `स्थानीय प्राविधिकहरूले निर्धारित निरीक्षणअगावै ${np} सम्पन्न गरे।`,
+      ],
+      domainNote: 'प्राविधिक मर्मत र परियोजना व्यवस्थापनमा प्रयोग हुने पदावली',
+    },
+    8: {
+      enFrames: [
+        (p) => `Renowned culinary hosts prepare a ${p} using fresh Himalayan herbs and spices.`,
+        (p) => `Guests praised the ${p} served during the heritage hospitality banquet.`,
+      ],
+      neFrames: [
+        (np) => `प्रख्यात पाककला आयोजकहरूले ताजा हिमाली जडीबुटी प्रयोग गरी ${np} तयार पार्छन्।`,
+        (np) => `सम्पदा आतिथ्य भोजमा पस्किएको ${np}को पाहुनाहरूले प्रशंसा गरे।`,
+      ],
+      domainNote: 'आतिथ्य सत्कार, पाककला र पर्यटन क्षेत्रमा प्रयोग हुने पदावली',
+    },
+    9: {
+      enFrames: [
+        (p) => `Corporate auditors demanded a ${p} before signing the annual compliance report.`,
+        (p) => `Under commercial law, a ${p} protects both shareholders and creditors.`,
+      ],
+      neFrames: [
+        (np) => `वार्षिक अनुपालन प्रतिवेदनमा हस्ताक्षर गर्नुअघि लेखापरीक्षकहरूले ${np}को माग गरे।`,
+        (np) => `व्यावसायिक कानुनअन्तर्गत ${np}ले शेयरधनी र ऋणदाता दुवैको हित रक्षा गर्छ।`,
+      ],
+      domainNote: 'कानुन, लेखापरीक्षण र कर्पोरेट प्रशासनमा प्रयोग हुने पदावली',
+    },
+    10: {
+      enFrames: [
+        (p) => `The chief editor published a ${p} in the Sunday morning symposium bulletin.`,
+        (p) => `Journalists requested a ${p} from the ministry spokesperson during the briefing.`,
+      ],
+      neFrames: [
+        (np) => `प्रधान सम्पादकले आइतबार बिहानको विचार गोष्ठी बुलेटिनमा ${np} प्रकाशित गर्नुभयो।`,
+        (np) => `पत्रकार सम्मेलनमा सञ्चारकर्मीहरूले मन्त्रालयका प्रवक्तासँग ${np}को माग गरे।`,
+      ],
+      domainNote: 'सञ्चार, पत्रकारिता र प्रकाशन क्षेत्रमा प्रयोग हुने पदावली',
+    },
+    11: {
+      enFrames: [
+        (p) => `IELTS and PTE examiners look for a ${p} in high-scoring analytical essays.`,
+        (p) => `The research paper presents a ${p} backed by empirical field data.`,
+      ],
+      neFrames: [
+        (np) => `IELTS र PTE परीक्षकहरूले उच्च अङ्क ल्याउने विश्लेषणात्मक निबन्धमा ${np} खोज्छन्।`,
+        (np) => `अनुसन्धान पत्रले क्षेत्रीय तथ्याङ्कद्वारा प्रमाणित ${np} प्रस्तुत गर्दछ।`,
+      ],
+      domainNote: 'प्राज्ञिक अनुसन्धान र IELTS/PTE लेखनमा उच्च अङ्क दिलाउने पदावली',
+    },
+    12: {
+      enFrames: [
+        (p) => `Regional ambassadors endorsed a ${p} at the Kathmandu international summit.`,
+        (p) => `Achieving a ${p} requires multilateral dialogue and institutional stewardship.`,
+      ],
+      neFrames: [
+        (np) => `काठमाडौँ अन्तर्राष्ट्रिय शिखर सम्मेलनमा क्षेत्रीय राजदूतहरूले ${np}लाई अनुमोदन गरे।`,
+        (np) => `${np} हासिल गर्न बहुपक्षीय संवाद र संस्थागत नेतृत्व आवश्यक पर्छ।`,
+      ],
+      domainNote: 'अन्तर्राष्ट्रिय सम्बन्ध, नीति निर्माण र कार्यकारी नेतृत्वमा प्रयोग हुने पदावली',
+    },
+  };
+
   let collocationCounter = 1;
   for (let mIdx = 0; mIdx < MODIFIER_SEEDS.length; mIdx++) {
     const mod = MODIFIER_SEEDS[mIdx];
@@ -1091,6 +1233,10 @@ export function getMassiveLexicon(lectures: LectureUnit[]): EnrichedLexiconItem[
 
       const meta = getLectureMeta(nounSeed.lectureNumber);
       const cleanModIpa = mod.ipa.replace(/\//g, '');
+      const ctxTpl = LECTURE_CONTEXT_TEMPLATES[nounSeed.lectureNumber] || LECTURE_CONTEXT_TEMPLATES[1];
+      const frameIdx = (mIdx + nIdx) % ctxTpl.enFrames.length;
+      const nepNounShort = nounSeed.nepali.split('/')[0].trim();
+      const nepCombined = `${mod.nepali.split('/')[0].trim()} ${nepNounShort}`;
 
       items.push({
         id: `lex-col-${collocationCounter++}`,
@@ -1101,9 +1247,9 @@ export function getMassiveLexicon(lectures: LectureUnit[]): EnrichedLexiconItem[
         silentLettersSummary: mod.silentDesc,
         nepaliMeaning: `${mod.nepali} ${nounSeed.nepali}`,
         nepaliTransliteration: `${mod.translit} ${nounSeed.translit}`,
-        englishExample: `Effective leaders value ${phrase.toLowerCase()} in professional settings.`,
-        nepaliExampleTranslation: `प्रभावकारी नेतृत्वले व्यावसायिक क्षेत्रमा ${mod.nepali} ${nounSeed.nepali.split('/')[0].trim()}लाई महत्त्व दिन्छ।`,
-        usageTipNepali: `"${mod.adj}" (${mod.nepali}) + "${nounSeed.noun}" (${nounSeed.nepali}) मिलेर बनेको उच्च-उपयोगी पदावली।`,
+        englishExample: ctxTpl.enFrames[frameIdx](phrase.toLowerCase()),
+        nepaliExampleTranslation: ctxTpl.neFrames[frameIdx](nepCombined),
+        usageTipNepali: `${ctxTpl.domainNote} — "${mod.adj}" (${mod.silentDesc}) र "${nounSeed.noun}" (${nepNounShort}) को प्राकृतिक संयोजन।`,
         ...meta,
       });
     }

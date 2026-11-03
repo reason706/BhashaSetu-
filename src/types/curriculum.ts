@@ -236,6 +236,8 @@ export interface ExamSimulationRecord {
 }
 
 export interface UserProgressState {
+  userName?: string;
+  dailyReminderEnabled?: boolean;
   selectedLevel: CEFRLevel;
   dailyGoalMinutes: number;
   onboardingComplete: boolean;
@@ -267,5 +269,6 @@ export interface UserProgressState {
   examHistory?: ExamSimulationRecord[];
   studyActivityByDate?: Record<string, number>;
 }
+
 
 

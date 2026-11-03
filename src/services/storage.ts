@@ -10,7 +10,8 @@ import {
   ExamSimulationRecord,
 } from '../types/curriculum';
 
-const STORAGE_KEY = 'bhashasetu_user_progress_v1';
+const STORAGE_KEY = 'bhashasetu_user_progress_v2';
+const LEGACY_STORAGE_KEY = 'bhashasetu_user_progress_v1';
 const DB_NAME = 'BhashaSetuOfflineDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'offline_state';
@@ -20,83 +21,27 @@ function getTodayDateString(): string {
 }
 
 export const DEFAULT_USER_PROGRESS: UserProgressState = {
+  userName: 'Anisha Sharma',
+  dailyReminderEnabled: true,
   selectedLevel: 'B1',
+  currentLevel: 'B1',
   dailyGoalMinutes: 15,
   onboardingComplete: false,
-  currentStreakDays: 1,
-  lastStudyDate: getTodayDateString(),
+  currentStreakDays: 0,
+  lastStudyDate: null,
   completedUnitIds: [],
   completedStepsByLecture: {},
   moduleScores: {},
-  savedWordIds: ['l1-v1', 'l1-v2', 'l2-v1', 'l4-v1', 'l7-v1', 'l12-v1'],
-  masteredWordIds: ['l1-v1', 'l2-v3'],
-  wordSRS: {
-    'l1-v1': {
-      wordId: 'l1-v1',
-      stage: 'mastered',
-      correctStreak: 3,
-      lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
-      nextReviewDue: new Date().toISOString(),
-    },
-    'l1-v2': {
-      wordId: 'l1-v2',
-      stage: 'learning',
-      correctStreak: 1,
-      lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
-      nextReviewDue: new Date().toISOString(),
-    },
-    'l2-v3': {
-      wordId: 'l2-v3',
-      stage: 'mastered',
-      correctStreak: 3,
-      lastReviewedAt: new Date(Date.now() - 86400000).toISOString(),
-      nextReviewDue: new Date().toISOString(),
-    },
-  },
+  savedWordIds: [],
+  masteredWordIds: [],
+  wordSRS: {},
   mistakeNotebook: [],
-  lectureNotes: {
-    'lecture-1-silent-consonants':
-      'Silent K before N (knight, knee, know) and silent B after M (plumber, comb, climb).',
-  },
+  lectureNotes: {},
   customLectures: [],
-  customWords: [
-    {
-      id: 'cw-sample-1',
-      word: 'Handkerchief',
-      ipa: '/ˈhæŋ.kə.tʃɪf/',
-      partOfSpeech: 'noun',
-      silentLettersSummary: 'Silent middle "d"',
-      nepaliMeaning: 'रुमाल',
-      englishExample: 'He kept a clean cotton handkerchief in his coat pocket.',
-      deckTag: 'Daily Essentials',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cw-sample-2',
-      word: 'Cupboard',
-      ipa: '/ˈkʌb.əd/',
-      partOfSpeech: 'noun',
-      silentLettersSummary: 'Silent "p" before "b"',
-      nepaliMeaning: 'दराज / भाँडा राख्ने अलमारी',
-      englishExample: 'The tea cups are stored neatly in the kitchen cupboard.',
-      deckTag: 'Home & Kitchen',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cw-sample-3',
-      word: 'Mortgage',
-      ipa: '/ˈmɔː.ɡɪdʒ/',
-      partOfSpeech: 'noun',
-      silentLettersSummary: 'Silent middle "t"',
-      nepaliMeaning: 'धितो / घरजग्गा कर्जा',
-      englishExample: 'The family paid off their bank mortgage ahead of schedule.',
-      deckTag: 'Finance & Banking',
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  preferredSpeechRate: 0.95,
+  customWords: [],
+  preferredSpeechRate: 0.75,
   darkMode: false,
-  languageMode: 'english-meanings',
+  languageMode: 'full-nepali',
   pendingSyncQueue: [],
   lastSyncedAt: null,
   lastDailyChallengeAt: null,
@@ -108,9 +53,7 @@ export const DEFAULT_USER_PROGRESS: UserProgressState = {
   detectiveSolvedIds: [],
   rolePlayCompletedIds: [],
   examHistory: [],
-  studyActivityByDate: {
-    [getTodayDateString()]: 2,
-  },
+  studyActivityByDate: {},
 };
 
 export function getUnifiedMasteredWordsCount(state: UserProgressState): number {
@@ -124,7 +67,9 @@ export function getUnifiedMasteredWordsCount(state: UserProgressState): number {
   const fromCompletedLectures = (state.completedUnitIds?.length || 0) * 10;
   return Math.max(
     explicitAndSrs,
-    explicitAndSrs + Math.min(state.savedWordIds?.length || 0, 15) + Math.floor(fromCompletedLectures / 2)
+    explicitAndSrs +
+      Math.min(state.savedWordIds?.length || 0, 15) +
+      Math.floor(fromCompletedLectures / 2)
   );
 }
 
@@ -165,33 +110,62 @@ export async function saveToIndexedDB(state: UserProgressState): Promise<void> {
   });
 }
 
+export async function clearOfflineIndexedDB(): Promise<void> {
+  const db = await openOfflineDB();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
 export function loadUserProgress(): UserProgressState {
-  if (typeof window === 'undefined') return DEFAULT_USER_PROGRESS;
+  if (typeof window === 'undefined') return { ...DEFAULT_USER_PROGRESS };
   try {
+    // Clean up legacy v1 seeded demo storage if present
+    if (window.localStorage.getItem(LEGACY_STORAGE_KEY)) {
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_USER_PROGRESS;
+    if (!raw) return { ...DEFAULT_USER_PROGRESS };
     const parsed = JSON.parse(raw) as Partial<UserProgressState>;
+    const resolvedLevel = parsed.selectedLevel || parsed.currentLevel || 'B1';
     return {
       ...DEFAULT_USER_PROGRESS,
       ...parsed,
+      selectedLevel: resolvedLevel,
+      currentLevel: resolvedLevel,
+      completedUnitIds: Array.isArray(parsed.completedUnitIds) ? parsed.completedUnitIds : [],
       completedStepsByLecture: parsed.completedStepsByLecture || {},
-      masteredWordIds: parsed.masteredWordIds || DEFAULT_USER_PROGRESS.masteredWordIds,
-      wordSRS: parsed.wordSRS || DEFAULT_USER_PROGRESS.wordSRS,
-      mistakeNotebook: parsed.mistakeNotebook || [],
-      lectureNotes: parsed.lectureNotes || DEFAULT_USER_PROGRESS.lectureNotes,
-      customWords: parsed.customWords || DEFAULT_USER_PROGRESS.customWords,
+      moduleScores: parsed.moduleScores || {},
+      savedWordIds: Array.isArray(parsed.savedWordIds) ? parsed.savedWordIds : [],
+      masteredWordIds: Array.isArray(parsed.masteredWordIds) ? parsed.masteredWordIds : [],
+      wordSRS: parsed.wordSRS || {},
+      mistakeNotebook: Array.isArray(parsed.mistakeNotebook) ? parsed.mistakeNotebook : [],
+      lectureNotes: parsed.lectureNotes || {},
+      customLectures: Array.isArray(parsed.customLectures) ? parsed.customLectures : [],
+      customWords: Array.isArray(parsed.customWords) ? parsed.customWords : [],
       streakFreezeShields:
         typeof parsed.streakFreezeShields === 'number'
           ? parsed.streakFreezeShields
           : DEFAULT_USER_PROGRESS.streakFreezeShields,
-      unlockedBadgeIds: parsed.unlockedBadgeIds || [],
-      detectiveSolvedIds: parsed.detectiveSolvedIds || [],
-      rolePlayCompletedIds: parsed.rolePlayCompletedIds || [],
-      examHistory: parsed.examHistory || [],
-      studyActivityByDate: parsed.studyActivityByDate || DEFAULT_USER_PROGRESS.studyActivityByDate,
+      unlockedBadgeIds: Array.isArray(parsed.unlockedBadgeIds) ? parsed.unlockedBadgeIds : [],
+      detectiveSolvedIds: Array.isArray(parsed.detectiveSolvedIds) ? parsed.detectiveSolvedIds : [],
+      rolePlayCompletedIds: Array.isArray(parsed.rolePlayCompletedIds)
+        ? parsed.rolePlayCompletedIds
+        : [],
+      examHistory: Array.isArray(parsed.examHistory) ? parsed.examHistory : [],
+      studyActivityByDate: parsed.studyActivityByDate || {},
     };
   } catch {
-    return DEFAULT_USER_PROGRESS;
+    return { ...DEFAULT_USER_PROGRESS };
   }
 }
 
@@ -203,6 +177,36 @@ export function saveUserProgress(state: UserProgressState): void {
   } catch (err) {
     console.error('Failed to save progress to localStorage:', err);
   }
+}
+
+export function resetAllUserProgress(preservePreferences?: {
+  userName?: string;
+  darkMode?: boolean;
+  languageMode?: UserProgressState['languageMode'];
+  selectedLevel?: CEFRLevel;
+  dailyGoalMinutes?: 5 | 10 | 15 | 30;
+}): UserProgressState {
+  const freshState: UserProgressState = {
+    ...DEFAULT_USER_PROGRESS,
+    userName: preservePreferences?.userName || DEFAULT_USER_PROGRESS.userName,
+    darkMode: preservePreferences?.darkMode ?? DEFAULT_USER_PROGRESS.darkMode,
+    languageMode: preservePreferences?.languageMode || DEFAULT_USER_PROGRESS.languageMode,
+    selectedLevel: preservePreferences?.selectedLevel || DEFAULT_USER_PROGRESS.selectedLevel,
+    currentLevel: preservePreferences?.selectedLevel || DEFAULT_USER_PROGRESS.selectedLevel,
+    dailyGoalMinutes:
+      preservePreferences?.dailyGoalMinutes || DEFAULT_USER_PROGRESS.dailyGoalMinutes,
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(freshState));
+      void clearOfflineIndexedDB().then(() => saveToIndexedDB(freshState));
+    } catch (err) {
+      console.error('Failed to reset local progress:', err);
+    }
+  }
+  return freshState;
 }
 
 export function calculateUpdatedStreak(state: UserProgressState): {

@@ -1,0 +1,114 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 3. Entity Validation Blueprint: UserProgressDocument
+    function isValidUserProgressDocument(data) {
+      return data.keys().hasAll([
+        'ownerId',
+        'displayName',
+        'selectedLevel',
+        'dailyGoalMinutes',
+        'currentStreakDays',
+        'streakFreezeShields',
+        'sprintHighScore',
+        'completedUnitIdsCount',
+        'masteredWordsCount',
+        'progressSnapshot',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'ownerId',
+        'displayName',
+        'selectedLevel',
+        'dailyGoalMinutes',
+        'currentStreakDays',
+        'streakFreezeShields',
+        'sprintHighScore',
+        'completedUnitIdsCount',
+        'masteredWordsCount',
+        'progressSnapshot',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.ownerId == request.auth.uid &&
+      data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+      data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+      data.selectedLevel is string && data.selectedLevel.size() <= 10 && (data.selectedLevel == 'B1' || data.selectedLevel == 'B2' || data.selectedLevel == 'C1') &&
+      data.dailyGoalMinutes is number && data.dailyGoalMinutes >= 1 && data.dailyGoalMinutes <= 120 &&
+      data.currentStreakDays is number && data.currentStreakDays >= 0 && data.currentStreakDays <= 10000 &&
+      data.streakFreezeShields is number && data.streakFreezeShields >= 0 && data.streakFreezeShields <= 100 &&
+      data.sprintHighScore is number && data.sprintHighScore >= 0 && data.sprintHighScore <= 100000 &&
+      data.completedUnitIdsCount is number && data.completedUnitIdsCount >= 0 && data.completedUnitIdsCount <= 500 &&
+      data.masteredWordsCount is number && data.masteredWordsCount >= 0 && data.masteredWordsCount <= 50000 &&
+      data.progressSnapshot is map && data.progressSnapshot.keys().size() <= 35 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules: /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProgressDocument(incoming()) &&
+        incoming().ownerId == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProgressDocument(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'selectedLevel',
+          'dailyGoalMinutes',
+          'currentStreakDays',
+          'streakFreezeShields',
+          'sprintHighScore',
+          'completedUnitIdsCount',
+          'masteredWordsCount',
+          'progressSnapshot',
+          'updatedAt'
+        ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+  }
+}
