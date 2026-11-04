@@ -16,6 +16,7 @@ export interface VocabularyItem {
   nepaliTransliteration?: string;
   englishExample: string;
   nepaliExampleTranslation: string;
+  nepaliExample?: string;
   usageTipNepali: string;
 }
 
@@ -180,6 +181,8 @@ export interface SRSRecord {
   wordId: string;
   stage: SRSStage;
   correctStreak: number;
+  intervalDays?: number;
+  repetitions?: number;
   lastReviewedAt: string;
   nextReviewDue: string;
 }
@@ -226,9 +229,14 @@ export interface ExamSimulationRecord {
   id: string;
   completedAt: string;
   overallBand: number;
+  overallScore?: number;
+  overallPercent?: number;
+  estimatedBand?: number | string;
   cefrEstimate: CEFRLevel;
+  cefrEquivalent?: CEFRLevel;
   pteScore: number;
   dictationScore: number;
+  listeningScore?: number;
   proofreadingScore: number;
   grammarScore: number;
   speakingScore: number;
@@ -239,9 +247,11 @@ export interface UserProgressState {
   userName?: string;
   dailyReminderEnabled?: boolean;
   selectedLevel: CEFRLevel;
+  currentLevel?: CEFRLevel;
   dailyGoalMinutes: number;
   onboardingComplete: boolean;
   currentStreakDays: number;
+  longestStreakDays?: number;
   lastStudyDate: string | null;
   completedUnitIds: string[];
   completedStepsByLecture: Record<string, number[]>;

@@ -6,18 +6,19 @@ export interface PronunciationResult {
   passed: boolean;
   feedbackEnglish: string;
   feedbackNepali: string;
+  feedback?: string;
   wordDiagnostics?: { word: string; matched: boolean }[];
 }
 
 export interface DialogueCalibrationSettings {
-  dialogueRate: 0.5 | 0.75 | 1.0;
+  dialogueRate: number;
   speakerAPitch: number;
   speakerBPitch: number;
   turnPauseMs: number;
 }
 
 const DEFAULT_DIALOGUE_CALIBRATION: DialogueCalibrationSettings = {
-  dialogueRate: 0.75,
+  dialogueRate: 0.85,
   speakerAPitch: 0.93,
   speakerBPitch: 1.09,
   turnPauseMs: 380,
@@ -48,10 +49,10 @@ class SpeechService {
       const raw = window.localStorage.getItem(DIALOGUE_CALIBRATION_STORAGE_KEY);
       if (!raw) return DEFAULT_DIALOGUE_CALIBRATION;
       const parsed = JSON.parse(raw) as Partial<DialogueCalibrationSettings>;
-      const validRate: 0.5 | 0.75 | 1.0 =
-        parsed.dialogueRate === 0.5 || parsed.dialogueRate === 0.75 || parsed.dialogueRate === 1.0
-          ? parsed.dialogueRate
-          : 0.75;
+      const validRate: number =
+        typeof parsed.dialogueRate === 'number' && !Number.isNaN(parsed.dialogueRate)
+          ? Math.max(0.5, Math.min(1.25, Number(parsed.dialogueRate.toFixed(2))))
+          : DEFAULT_DIALOGUE_CALIBRATION.dialogueRate;
       return {
         dialogueRate: validRate,
         speakerAPitch:
@@ -85,6 +86,18 @@ class SpeechService {
       }
     }
     return updated;
+  }
+
+  public saveDialogueCalibration(next: Partial<DialogueCalibrationSettings>): DialogueCalibrationSettings {
+    return this.setDialogueCalibration(next);
+  }
+
+  public speakWord(word: string, options?: number | { rate?: number; pitch?: number }): void {
+    this.speak(word, options);
+  }
+
+  public speakSentence(sentence: string, options?: number | { rate?: number; pitch?: number }): void {
+    this.speak(sentence, options);
   }
 
   private loadVoices() {
@@ -206,17 +219,20 @@ class SpeechService {
 
   public speak(
     text: string,
-    options?: {
-      rate?: number;
-      pitch?: number;
-      speakerIndex?: 0 | 1;
-      useDialogueCalibrationRate?: boolean;
-      onStart?: () => void;
-      onEnd?: () => void;
-    }
+    options?:
+      | number
+      | {
+          rate?: number;
+          pitch?: number;
+          speakerIndex?: 0 | 1;
+          useDialogueCalibrationRate?: boolean;
+          onStart?: () => void;
+          onEnd?: () => void;
+        }
   ): void {
+    const opts = typeof options === 'number' ? { rate: options } : options;
     if (!this.synth) {
-      options?.onEnd?.();
+      opts?.onEnd?.();
       return;
     }
 
@@ -224,35 +240,35 @@ class SpeechService {
 
     const calibration = this.getDialogueCalibration();
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = this.getBestEnglishVoice(options?.speakerIndex);
+    const voice = this.getBestEnglishVoice(opts?.speakerIndex);
     if (voice) {
       utterance.voice = voice;
     }
     utterance.lang = voice?.lang || 'en-US';
 
-    const baseRate = options?.useDialogueCalibrationRate
+    const baseRate = opts?.useDialogueCalibrationRate
       ? calibration.dialogueRate
-      : options?.rate ?? calibration.dialogueRate ?? 0.95;
+      : opts?.rate ?? calibration.dialogueRate ?? 0.95;
 
-    if (options?.speakerIndex === 0) {
+    if (opts?.speakerIndex === 0) {
       utterance.rate = Math.max(0.45, Math.min(1.3, baseRate));
-      utterance.pitch = options?.pitch ?? calibration.speakerAPitch;
-    } else if (options?.speakerIndex === 1) {
+      utterance.pitch = opts?.pitch ?? calibration.speakerAPitch;
+    } else if (opts?.speakerIndex === 1) {
       utterance.rate = Math.max(0.45, Math.min(1.3, baseRate));
-      utterance.pitch = options?.pitch ?? calibration.speakerBPitch;
+      utterance.pitch = opts?.pitch ?? calibration.speakerBPitch;
     } else {
       utterance.rate = Math.max(0.45, Math.min(1.3, baseRate));
-      utterance.pitch = options?.pitch ?? calibration.speakerAPitch ?? 1.0;
+      utterance.pitch = opts?.pitch ?? calibration.speakerAPitch ?? 1.0;
     }
 
     utterance.onstart = () => {
-      options?.onStart?.();
+      opts?.onStart?.();
     };
     utterance.onend = () => {
-      options?.onEnd?.();
+      opts?.onEnd?.();
     };
     utterance.onerror = () => {
-      options?.onEnd?.();
+      opts?.onEnd?.();
     };
 
     this.synth.speak(utterance);
@@ -423,6 +439,17 @@ class SpeechService {
         onListeningChange?.(false);
         reject(e);
       }
+    });
+  }
+
+  public listenAndEvaluate(
+    targetWord: string,
+    callback: (result: PronunciationResult) => void,
+    onListeningChange?: (listening: boolean) => void
+  ): Promise<PronunciationResult> {
+    return this.evaluatePronunciation(targetWord, onListeningChange).then((res) => {
+      callback(res);
+      return res;
     });
   }
 }

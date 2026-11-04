@@ -18,22 +18,49 @@ import {
   Headphones,
   Award,
   ArrowRight,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Mic,
   Radio,
   SkipForward,
   Check,
   Activity,
+  ScanSearch,
+  Blend,
+  Languages,
+  AudioLines,
+  Timer,
+  MessagesSquare,
+  Layers,
+  FileDown,
+  Shuffle,
 } from 'lucide-react';
 import {
   LectureUnit,
   LanguageMode,
+  CEFRLevel,
   CustomVocabItem,
   MistakeItem,
   ExamSimulationRecord,
 } from '../types/curriculum';
 import { speechService, PronunciationResult } from '../services/speech';
 import { getMassiveLexicon } from '../data/massiveLexicon';
+import {
+  shuffleWithSeed,
+  NAATI_TRANSLATION_BANK,
+  NaatiDomain,
+  EXTRA_DETECTIVE_PASSAGES,
+  EXTRA_CONFUSABLE_PAIRS,
+  EXTRA_SOV_SVO_DRILLS,
+  EXTRA_ARTICLE_DRILLS,
+  EXTRA_PREPOSITION_DRILLS,
+  EXTRA_INTERFERENCE_DRILLS,
+  EXTRA_CONNECTED_SPEECH_ITEMS,
+  EXTRA_SPRINT_ITEMS,
+  DAILY_CHALLENGE_POOL,
+} from '../data/arenaPracticeSets';
 import { AudioShadowingTrainer } from './AudioShadowingTrainer';
 import { MinimalPairLab } from './MinimalPairLab';
 import { WritingInterferenceLinter } from './WritingInterferenceLinter';
@@ -41,6 +68,7 @@ import { ArticulationGuideLab } from './ArticulationGuideLab';
 import { DictationPassageStudio } from './DictationPassageStudio';
 
 export type ArenaToolTab =
+  | 'naati-translation'
   | 'detective'
   | 'confusables'
   | 'interference'
@@ -51,6 +79,8 @@ export type ArenaToolTab =
   | 'shadowing'
   | 'custom-deck'
   | 'cheatsheets'
+  | 'srs-review'
+  | 'daily-challenge'
   | 'exam-simulator'
   | 'commuter-audio'
   | 'minimal-pairs'
@@ -68,7 +98,8 @@ interface PracticeArenaViewProps {
   rolePlayCompletedIds: string[];
   preferredSpeechRate: number;
   languageMode: LanguageMode;
-  initialToolTab?: ArenaToolTab;
+  initialToolTab?: ArenaToolTab | null;
+  onSelectTool?: (tool: ArenaToolTab | null) => void;
   onAddCustomWord: (item: Omit<CustomVocabItem, 'id' | 'createdAt'>) => void;
   onRemoveCustomWord: (wordId: string) => void;
   onRecordSprintScore: (score: number) => void;
@@ -1226,7 +1257,7 @@ interface RolePlayTurn {
   nepaliTranslation: string;
   choices: {
     text: string;
-    quality: 'best' | 'trap' | 'awkward';
+    quality: 'best' | 'trap' | 'awkward' | 'acceptable' | 'blunt';
     feedback: string;
   }[];
 }
@@ -1376,7 +1407,8 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   rolePlayCompletedIds,
   preferredSpeechRate,
   languageMode,
-  initialToolTab = 'detective',
+  initialToolTab = null,
+  onSelectTool,
   onAddCustomWord,
   onRemoveCustomWord,
   onRecordSprintScore,
@@ -1387,13 +1419,54 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   onOpenLecture,
   onOpenDailyChallenge,
 }) => {
-  const [activeTool, setActiveTool] = useState<ArenaToolTab>(initialToolTab);
+  const [activeTool, setActiveTool] = useState<ArenaToolTab | null>(initialToolTab ?? null);
+  const [arenaCategoryFilter, setArenaCategoryFilter] = useState<
+    'all' | 'speaking' | 'vocabulary' | 'grammar'
+  >('all');
+  const [showMoreStudios, setShowMoreStudios] = useState(false);
 
-  // Sync if initialToolTab prop changes
+  // Seed that changes every time user opens an activity or clicks "Shuffle & New Set"
+  const [arenaShuffleSeed, setArenaShuffleSeed] = useState<number>(() =>
+    Math.floor(Math.random() * 1000000)
+  );
+
+  // Dedicated Spaced Repetition Review Page State (Activity #11)
+  const [srsPageIdx, setSrsPageIdx] = useState(0);
+  const [srsPageRevealed, setSrsPageRevealed] = useState(false);
+  const [srsPageQuizPicked, setSrsPageQuizPicked] = useState<string | null>(null);
+  const [srsPageRatedMap, setSrsPageRatedMap] = useState<
+    Record<string, 'again' | 'good' | 'easy'>
+  >({});
+
+  // Dedicated Daily Challenge Page State (Activity #12)
+  const [dailyPageIdx, setDailyPageIdx] = useState(0);
+  const [dailyPageAnswers, setDailyPageAnswers] = useState<Record<number, string>>({});
+  const [dailyTimerRunning, setDailyTimerRunning] = useState(false);
+  const [dailySecondsLeft, setDailySecondsLeft] = useState(60);
+
+  // NAATI English <-> Nepali Translation Practice & 60s Timed Challenge State
+  const [naatiDomain, setNaatiDomain] = useState<NaatiDomain>('ALL');
+  const [naatiDirection, setNaatiDirection] = useState<'en-to-ne' | 'ne-to-en' | 'mixed'>(
+    'en-to-ne'
+  );
+  const [naatiTimerDuration, setNaatiTimerDuration] = useState<60 | 90 | 30 | 0>(60);
+  const [naatiRunning, setNaatiRunning] = useState(false);
+  const [naatiFinished, setNaatiFinished] = useState(false);
+  const [naatiSecondsLeft, setNaatiSecondsLeft] = useState(60);
+  const [naatiIdx, setNaatiIdx] = useState(0);
+  const [naatiPicked, setNaatiPicked] = useState<string | null>(null);
+  const [naatiStats, setNaatiStats] = useState({
+    correct: 0,
+    total: 0,
+    streak: 0,
+    bestStreak: 0,
+    bestTimedScore: 0,
+  });
+
+  // Sync if initialToolTab prop changes from parent navigation
   useEffect(() => {
-    if (initialToolTab) {
-      setActiveTool(initialToolTab);
-    }
+    setActiveTool(initialToolTab ?? null);
+    setArenaShuffleSeed(Math.floor(Math.random() * 1000000) + Date.now() % 100000);
   }, [initialToolTab]);
 
   // --- Feature #2 State: Silent-Letter Detective ---
@@ -1445,7 +1518,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   const [rolePlayMicError, setRolePlayMicError] = useState<string | null>(null);
   const [rolePlayRapportScore, setRolePlayRapportScore] = useState<number>(80);
   const [rolePlayPolitenessHistory, setRolePlayPolitenessHistory] = useState<
-    ('best' | 'acceptable' | 'blunt')[]
+    ('best' | 'acceptable' | 'blunt' | 'awkward' | 'trap' | string)[]
   >([]);
 
   // --- Feature #9 State: Custom Study Deck Builder ---
@@ -1495,12 +1568,231 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
   const isFullNepali = languageMode === 'full-nepali';
 
+  const handleReshuffleCurrentArenaTool = () => {
+    const nextSeed = Math.floor(Math.random() * 1000000) + (Date.now() % 100000);
+    setArenaShuffleSeed(nextSeed);
+    setDetectivePassageIdx(0);
+    setFoundSilentTokenIndices([]);
+    setWrongTokenIndices([]);
+    setSelectedTokenDetail(null);
+    setConfusableAnswers({});
+    setSovPlacedChunks({});
+    setArticleAnswers({});
+    setPrepositionAnswers({});
+    setContinuousAnswers({});
+    setInterferenceAnswers({});
+    setConnectedAnswers({});
+    setSrsPageIdx(0);
+    setSrsPageRevealed(false);
+    setSrsPageQuizPicked(null);
+    setSrsPageRatedMap({});
+    setDailyPageIdx(0);
+    setDailyPageAnswers({});
+    setDailyTimerRunning(false);
+    setDailySecondsLeft(60);
+    setNaatiIdx(0);
+    setNaatiPicked(null);
+    setNaatiFinished(false);
+    if (naatiTimerDuration > 0) {
+      setNaatiSecondsLeft(naatiTimerDuration);
+    }
+  };
+
+  const handleSelectArenaTool = (tool: ArenaToolTab | null) => {
+    speechService.stop();
+    setShadowPhase('idle');
+    setCommuterPlaying(false);
+    setNaatiRunning(false);
+    setDailyTimerRunning(false);
+    handleReshuffleCurrentArenaTool();
+    setActiveTool(tool);
+    if (onSelectTool) {
+      onSelectTool(tool);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Core + Curated vocabulary list for the Master Vocabulary Sheet
   const curatedVocabularyList = useMemo(() => {
     const all = getMassiveLexicon(lectures);
     // Filter to core + curated root seeds (first ~320 high-value entries)
     return all.filter((w) => w.isCoreLessonWord || w.id.startsWith('lex-root-'));
   }, [lectures]);
+
+  // =========================================================================
+  // SHUFFLED & EXPANDED PRACTICE SETS (Re-shuffled every time user opens tool)
+  // =========================================================================
+  const shuffledDetectivePassages = useMemo(() => {
+    const combined = [...DETECTIVE_PASSAGES, ...EXTRA_DETECTIVE_PASSAGES];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 11);
+  }, [arenaShuffleSeed]);
+
+  const shuffledConfusablePairs = useMemo(() => {
+    const combined = [...CONFUSABLE_PAIRS, ...EXTRA_CONFUSABLE_PAIRS];
+    const allWordsPool = combined.flatMap((p) => [p.wordA, p.wordB]);
+    return shuffleWithSeed(combined, arenaShuffleSeed + 23).map((pair, idx) => {
+      // Build 4 shuffled options (wordA, wordB, + 2 extra distractors)
+      const distractors = shuffleWithSeed(
+        allWordsPool.filter((w) => w !== pair.wordA && w !== pair.wordB),
+        arenaShuffleSeed + idx * 17
+      ).slice(0, 2);
+      const options = shuffleWithSeed(
+        [pair.wordA, pair.wordB, ...distractors],
+        arenaShuffleSeed + idx * 31
+      );
+      return { ...pair, options };
+    });
+  }, [arenaShuffleSeed]);
+
+  const shuffledSovDrills = useMemo(() => {
+    const combined = [...SOV_SVO_REORDER_DRILLS, ...EXTRA_SOV_SVO_DRILLS];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 37).map((drill, idx) => ({
+      ...drill,
+      scrambledChunks: shuffleWithSeed(drill.correctOrder, arenaShuffleSeed + 101 + idx * 19),
+    }));
+  }, [arenaShuffleSeed]);
+
+  const shuffledArticleDrills = useMemo(() => {
+    const combined = [...ARTICLE_MASTERY_DRILLS, ...EXTRA_ARTICLE_DRILLS];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 43).map((drill, idx) => ({
+      ...drill,
+      options: shuffleWithSeed(drill.options, arenaShuffleSeed + 201 + idx * 13),
+    }));
+  }, [arenaShuffleSeed]);
+
+  const shuffledPrepositionDrills = useMemo(() => {
+    const combined = [...PREPOSITION_TRAP_DRILLS, ...EXTRA_PREPOSITION_DRILLS];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 53).map((drill, idx) => ({
+      ...drill,
+      options: shuffleWithSeed(drill.options, arenaShuffleSeed + 301 + idx * 17),
+    }));
+  }, [arenaShuffleSeed]);
+
+  const shuffledContinuousDrills = useMemo(() => {
+    return shuffleWithSeed(CONTINUOUS_OVERUSE_DRILLS, arenaShuffleSeed + 61).map((drill, idx) => ({
+      ...drill,
+      options: shuffleWithSeed(drill.options, arenaShuffleSeed + 401 + idx * 19),
+    }));
+  }, [arenaShuffleSeed]);
+
+  const shuffledInterferenceDrills = useMemo(() => {
+    const combined = [...INTERFERENCE_DRILLS, ...EXTRA_INTERFERENCE_DRILLS];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 71).map((drill, idx) => ({
+      ...drill,
+      options: shuffleWithSeed(drill.options, arenaShuffleSeed + 501 + idx * 23),
+    }));
+  }, [arenaShuffleSeed]);
+
+  const shuffledConnectedSpeechItems = useMemo(() => {
+    const combined = [...CONNECTED_SPEECH_ITEMS, ...EXTRA_CONNECTED_SPEECH_ITEMS];
+    return shuffleWithSeed(combined, arenaShuffleSeed + 83).map((item, idx) => ({
+      ...item,
+      options: shuffleWithSeed(item.options, arenaShuffleSeed + 601 + idx * 29),
+    }));
+  }, [arenaShuffleSeed]);
+
+  // NAATI English <-> Nepali Shuffled Questions + Shuffled 4 Options
+  const naatiQuestionDeck = useMemo(() => {
+    const filteredDomain =
+      naatiDomain === 'ALL'
+        ? NAATI_TRANSLATION_BANK
+        : NAATI_TRANSLATION_BANK.filter((item) => item.domain === naatiDomain);
+
+    // Also include core curriculum words when 'ALL' is selected for an even larger pool
+    const extraCurriculumItems =
+      naatiDomain === 'ALL'
+        ? curatedVocabularyList.slice(0, 60).map((w) => ({
+            id: `naati-lex-${w.id}`,
+            english: w.word,
+            ipa: w.ipa,
+            nepali: w.nepaliMeaning,
+            domain: 'workplace' as const,
+            domainLabel: `Curriculum L${String(w.lectureNumber).padStart(2, '0')} · ${w.level}`,
+            contextSentence: w.englishExample,
+            nepaliSentence: w.nepaliExampleTranslation || w.nepaliMeaning,
+          }))
+        : [];
+
+    const fullPool = [...filteredDomain, ...extraCurriculumItems];
+    const shuffledItems = shuffleWithSeed(fullPool, arenaShuffleSeed + 777);
+
+    return shuffledItems.map((target, idx) => {
+      const mode: 'en-to-ne' | 'ne-to-en' =
+        naatiDirection === 'mixed'
+          ? idx % 2 === 0
+            ? 'en-to-ne'
+            : 'ne-to-en'
+          : naatiDirection;
+
+      const distractorPool = shuffleWithSeed(
+        fullPool.filter((other) => other.id !== target.id),
+        arenaShuffleSeed + idx * 41 + 19
+      ).slice(0, 3);
+
+      if (mode === 'en-to-ne') {
+        const correctAnswer = target.nepali;
+        const rawOptions = [
+          correctAnswer,
+          ...distractorPool.map((d) => d.nepali),
+        ];
+        return {
+          id: `${target.id}-${idx}`,
+          target,
+          mode,
+          promptWord: target.english,
+          promptSub: target.ipa,
+          correctAnswer,
+          options: shuffleWithSeed(rawOptions, arenaShuffleSeed + idx * 59),
+        };
+      } else {
+        const correctAnswer = target.english;
+        const rawOptions = [
+          correctAnswer,
+          ...distractorPool.map((d) => d.english),
+        ];
+        return {
+          id: `${target.id}-${idx}`,
+          target,
+          mode,
+          promptWord: target.nepali,
+          promptSub: target.domainLabel,
+          correctAnswer,
+          options: shuffleWithSeed(rawOptions, arenaShuffleSeed + idx * 67),
+        };
+      }
+    });
+  }, [naatiDomain, naatiDirection, curatedVocabularyList, arenaShuffleSeed]);
+
+  // NAATI 60s Countdown Timer Effect
+  useEffect(() => {
+    if (!naatiRunning || naatiTimerDuration === 0) return;
+    if (naatiSecondsLeft <= 0) {
+      setNaatiRunning(false);
+      setNaatiFinished(true);
+      setNaatiStats((prev) => ({
+        ...prev,
+        bestTimedScore: Math.max(prev.bestTimedScore, prev.correct),
+      }));
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setNaatiSecondsLeft((s) => s - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [naatiRunning, naatiSecondsLeft, naatiTimerDuration]);
+
+  // Daily Challenge 60s Timer Effect
+  useEffect(() => {
+    if (!dailyTimerRunning) return;
+    if (dailySecondsLeft <= 0) {
+      setDailyTimerRunning(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setDailySecondsLeft((s) => s - 1);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [dailyTimerRunning, dailySecondsLeft]);
 
   const filteredVocabSheet = useMemo(() => {
     const q = vocabTableSearch.toLowerCase().trim();
@@ -1585,7 +1877,9 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     };
   }, [shadowPhase, shadowCountdown, currentShadowLine, shadowLineIdx, shadowLines.length]);
 
-  const currentPassage = DETECTIVE_PASSAGES[detectivePassageIdx] || DETECTIVE_PASSAGES[0];
+  const currentPassage =
+    shuffledDetectivePassages[detectivePassageIdx % shuffledDetectivePassages.length] ||
+    shuffledDetectivePassages[0];
   const totalSilentInPassage = currentPassage.tokens.filter((t) => t.isSilentTarget).length;
 
   const handleTapDetectiveToken = (idx: number) => {
@@ -1614,23 +1908,28 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     }
   };
 
-  // Active Sprint Pool filtered by CEFR Tier or Mistake Notebook
+  // Active Sprint Pool filtered by CEFR Tier or Mistake Notebook + Shuffled Questions & Options
   const activeSprintPool = useMemo(() => {
+    const combinedPool = [...SPRINT_CHALLENGE_POOL, ...EXTRA_SPRINT_ITEMS];
+    let base = combinedPool;
     if (sprintTier === 'MISTAKES' && mistakeNotebook.length > 0) {
       const mistakeSet = new Set(mistakeNotebook.map((m) => m.correctAnswer.trim().toLowerCase()));
-      const matched = SPRINT_CHALLENGE_POOL.filter((item) =>
+      const matched = combinedPool.filter((item) =>
         mistakeSet.has(item.word.toLowerCase())
       );
-      if (matched.length > 0) return matched;
+      if (matched.length > 0) base = matched;
+    } else if (sprintTier === 'B1' || sprintTier === 'B2' || sprintTier === 'C1') {
+      const filtered = combinedPool.filter((item) => item.level === sprintTier);
+      if (filtered.length > 0) base = filtered;
     }
-    if (sprintTier === 'B1' || sprintTier === 'B2' || sprintTier === 'C1') {
-      const filtered = SPRINT_CHALLENGE_POOL.filter((item) => item.level === sprintTier);
-      return filtered.length > 0 ? filtered : SPRINT_CHALLENGE_POOL;
-    }
-    return SPRINT_CHALLENGE_POOL;
-  }, [sprintTier, mistakeNotebook]);
+    return shuffleWithSeed(base, arenaShuffleSeed + 911).map((item, idx) => ({
+      ...item,
+      options: shuffleWithSeed(item.options, arenaShuffleSeed + 911 + idx * 23),
+    }));
+  }, [sprintTier, mistakeNotebook, arenaShuffleSeed]);
 
   const handleStartSprint = () => {
+    setArenaShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
     setSprintScore(0);
     setSprintCombo(0);
     setSprintSecondsLeft(60);
@@ -1719,14 +2018,35 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         ? 'B2 · IELTS Band 6.5–7.0'
         : 'B1 · IELTS Band 5.5–6.0';
 
+    const numericBand =
+      overallScore >= 85
+        ? 7.5
+        : overallScore >= 65
+        ? 6.5
+        : 5.5;
+
+    const cefrEst: CEFRLevel =
+      overallScore >= 85
+        ? 'C1'
+        : overallScore >= 65
+        ? 'B2'
+        : 'B1';
+
     if (onRecordExamResult) {
       onRecordExamResult({
+        overallBand: numericBand,
         overallScore,
+        overallPercent: overallScore,
         estimatedBand,
+        cefrEstimate: cefrEst,
+        cefrEquivalent: cefrEst,
+        pteScore: Math.round(overallScore * 0.9),
+        dictationScore: Math.round((listeningScore / 2) * 100),
         listeningScore: Math.round((listeningScore / 2) * 100),
         proofreadingScore: Math.round((proofreadingScore / 2) * 100),
         grammarScore: Math.round((grammarScore / 2) * 100),
         speakingScore: Math.round((speakingScore / 2) * 100),
+        weakestSkill: 'grammar',
       });
     }
   };
@@ -1852,138 +2172,897 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-6">
-      {/* Page Header + Quick Daily Challenge Launch Button */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-        <div>
-          <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
-            Interactive Fluency, Translation & Exam Readiness Hub · 12 Specialized Studios
+  const arenaCoreActivities: {
+    id: ArenaToolTab;
+    title: string;
+    description: string;
+    category: 'speaking' | 'vocabulary' | 'grammar';
+    icon: React.ReactNode;
+    quickRound: {
+      question: string;
+      passage?: string;
+      options: string[];
+      correctAnswer: string;
+    };
+  }[] = [
+    {
+      id: 'naati-translation',
+      title: 'NAATI English ↔ Nepali translation',
+      description: '60-second timed English-to-Nepali & Nepali-to-English vocabulary challenge.',
+      category: 'vocabulary',
+      icon: <Languages className="w-4 h-4" />,
+      quickRound: {
+        question: 'What is the Nepali meaning of “Affidavit” (/ˌæf.ɪˈdeɪ.vɪt/)?',
+        options: ['शपथपत्र / लिखित बयान', 'घरभाडा सम्झौतापत्र', 'औषधि पुर्जा'],
+        correctAnswer: 'शपथपत्र / लिखित बयान',
+      },
+    },
+    {
+      id: 'detective',
+      title: 'Silent-letter detective',
+      description: 'Find the quiet letters hiding in a real-world passage.',
+      category: 'vocabulary',
+      icon: <ScanSearch className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which words contain a silent letter?',
+        passage: 'The knight wrote a note beside the receipt.',
+        options: ['knight, wrote, receipt', 'beside, note', 'The, beside, the'],
+        correctAnswer: 'knight, wrote, receipt',
+      },
+    },
+    {
+      id: 'confusables',
+      title: 'Confusables & homophones',
+      description: 'Choose the right word: principle or principal?',
+      category: 'vocabulary',
+      icon: <Blend className="w-4 h-4" />,
+      quickRound: {
+        question: 'Choose the right word: “The school ___ spoke at assembly.”',
+        options: ['principal', 'principle', 'principel'],
+        correctAnswer: 'principal',
+      },
+    },
+    {
+      id: 'interference',
+      title: 'Nepali interference fixer',
+      description: 'Build natural English from familiar Nepali patterns.',
+      category: 'grammar',
+      icon: <Languages className="w-4 h-4" />,
+      quickRound: {
+        question: 'Choose the natural English sentence.',
+        options: [
+          'We discussed the plan.',
+          'We discussed about the plan.',
+          'We discuss about plan.',
+        ],
+        correctAnswer: 'We discussed the plan.',
+      },
+    },
+    {
+      id: 'connected-speech',
+      title: 'Connected speech decoder',
+      description: 'Hear how words flow together in everyday speech.',
+      category: 'speaking',
+      icon: <AudioLines className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which phrase sounds like “couldja”?',
+        options: ['Could you help?', 'Could I help?', 'Can you help?'],
+        correctAnswer: 'Could you help?',
+      },
+    },
+    {
+      id: 'sprint',
+      title: '60-second spelling sprint',
+      description: 'Spot spelling patterns against the clock.',
+      category: 'vocabulary',
+      icon: <Timer className="w-4 h-4" />,
+      quickRound: {
+        question: 'Complete the spelling: whis__e',
+        options: ['tle', 'tel', 'tll'],
+        correctAnswer: 'tle',
+      },
+    },
+    {
+      id: 'word-trees',
+      title: 'Word family explorer',
+      description: 'See how silent letters change across related words.',
+      category: 'vocabulary',
+      icon: <GitBranch className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which word is related to “sign” where the silent g wakes up?',
+        options: ['signature', 'signing', 'assigned'],
+        correctAnswer: 'signature',
+      },
+    },
+    {
+      id: 'roleplay',
+      title: 'Real-world role-play',
+      description: 'Practise a job interview or a Kathmandu bank visit.',
+      category: 'speaking',
+      icon: <MessagesSquare className="w-4 h-4" />,
+      quickRound: {
+        question: 'A bank officer asks for your reference number. Choose a polite reply.',
+        options: [
+          'I have it here. Could you check, please?',
+          'Check it now.',
+          'I am having reference.',
+        ],
+        correctAnswer: 'I have it here. Could you check, please?',
+      },
+    },
+    {
+      id: 'shadowing',
+      title: 'Hands-free shadowing',
+      description: 'Listen carefully, speak aloud, and compare naturally.',
+      category: 'speaking',
+      icon: <Mic className="w-4 h-4" />,
+      quickRound: {
+        question: 'Choose the most natural polite phrase to listen and shadow aloud.',
+        options: ['Could you check that, please?', 'Check that.', 'You could.'],
+        correctAnswer: 'Could you check that, please?',
+      },
+    },
+    {
+      id: 'custom-deck',
+      title: 'Custom flashcard deck',
+      description: 'Make a deck from words that matter to you.',
+      category: 'vocabulary',
+      icon: <Layers className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which study set should you create?',
+        options: ['My own words', 'Quiet letters', 'Workplace phrases'],
+        correctAnswer: 'My own words',
+      },
+    },
+    {
+      id: 'cheatsheets',
+      title: 'Printable study sheets',
+      description: 'Take spelling rules and your mistake notes offline.',
+      category: 'grammar',
+      icon: <FileDown className="w-4 h-4" />,
+      quickRound: {
+        question: 'What would you like to take offline?',
+        options: ['Silent-letter rules', 'SVO / SOV guide', 'My mistake notebook'],
+        correctAnswer: 'Silent-letter rules',
+      },
+    },
+    {
+      id: 'srs-review',
+      title: 'Spaced repetition review',
+      description: 'Eight words are ready for a quick revisit.',
+      category: 'vocabulary',
+      icon: <RotateCcw className="w-4 h-4" />,
+      quickRound: {
+        question: 'What does “subtle” (/ˈsʌt.əl/) mean?',
+        options: ['small but important', 'very loud', 'extremely easy'],
+        correctAnswer: 'small but important',
+      },
+    },
+    {
+      id: 'daily-challenge',
+      title: 'Daily challenge',
+      description: 'Three quick questions from your own learning.',
+      category: 'grammar',
+      icon: <Sparkles className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which spelling is correct?',
+        options: ['receipt', 'reciept', 'reseipt'],
+        correctAnswer: 'receipt',
+      },
+    },
+  ];
+
+  const arenaExtraStudios: {
+    id: ArenaToolTab;
+    title: string;
+    description: string;
+    category: 'speaking' | 'vocabulary' | 'grammar';
+    icon: React.ReactNode;
+    quickRound: {
+      question: string;
+      passage?: string;
+      options: string[];
+      correctAnswer: string;
+    };
+  }[] = [
+    {
+      id: 'exam-simulator',
+      title: '10-minute exam simulator',
+      description: 'Timed IELTS, PTE & interview diagnostic mock test.',
+      category: 'grammar',
+      icon: <Award className="w-4 h-4" />,
+      quickRound: {
+        question: 'Choose the grammatically accurate IELTS/workplace sentence.',
+        options: [
+          'In my opinion, the schedule is realistic.',
+          'According to me, the schedule is realistic.',
+          'I am having opinion on this schedule.',
+        ],
+        correctAnswer: 'In my opinion, the schedule is realistic.',
+      },
+    },
+    {
+      id: 'commuter-audio',
+      title: 'Commuter audio player',
+      description: 'Hands-free vocabulary and sentence audio loop.',
+      category: 'speaking',
+      icon: <Radio className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which letter is silent in “Wednesday” (/ˈwenz.deɪ/)?',
+        options: ['The first d', 'The letter n', 'The letter s'],
+        correctAnswer: 'The first d',
+      },
+    },
+    {
+      id: 'minimal-pairs',
+      title: 'Minimal pair ear lab',
+      description: 'Contrast /v/ vs /w/, /s/ vs /ʃ/, and /f/ vs /p/.',
+      category: 'speaking',
+      icon: <Headphones className="w-4 h-4" />,
+      quickRound: {
+        question: 'How do you pronounce the /v/ sound in “vest”?',
+        options: [
+          'Upper teeth gently touch lower lip',
+          'Round both lips like /w/',
+          'Press both lips tightly together',
+        ],
+        correctAnswer: 'Upper teeth gently touch lower lip',
+      },
+    },
+    {
+      id: 'writing-linter',
+      title: 'Writing & email linter',
+      description: 'Check workplace emails and paragraphs for natural flow.',
+      category: 'grammar',
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which email opening is the most natural and polite?',
+        options: [
+          'I have a quick question regarding the report.',
+          'I am having a doubt in the report.',
+          'Please revert back soon.',
+        ],
+        correctAnswer: 'I have a quick question regarding the report.',
+      },
+    },
+    {
+      id: 'articulation-guide',
+      title: 'IPA mouth & tongue guide',
+      description: 'Visual articulation guide for tricky English sounds.',
+      category: 'speaking',
+      icon: <Activity className="w-4 h-4" />,
+      quickRound: {
+        question: 'Which sound is the unstressed neutral vowel in “plumber” (/ˈplʌm.ər/)?',
+        options: ['Schwa /ə/', 'Long /iː/', 'Diphthong /aɪ/'],
+        correctAnswer: 'Schwa /ə/',
+      },
+    },
+    {
+      id: 'dictation-studio',
+      title: 'Dictation passage studio',
+      description: 'Listen and transcribe complete real-world passages.',
+      category: 'vocabulary',
+      icon: <Volume2 className="w-4 h-4" />,
+      quickRound: {
+        question: 'Choose the correct spelling of the silent-letter word for a bank loan:',
+        options: ['mortgage', 'morgage', 'mortage'],
+        correctAnswer: 'mortgage',
+      },
+    },
+  ];
+
+  const allArenaActivities = [...arenaCoreActivities, ...arenaExtraStudios];
+
+  const filteredCoreActivities = arenaCoreActivities.filter(
+    (act) => arenaCategoryFilter === 'all' || act.category === arenaCategoryFilter
+  );
+
+  const filteredExtraStudios = arenaExtraStudios.filter(
+    (act) => arenaCategoryFilter === 'all' || act.category === arenaCategoryFilter
+  );
+
+  // =========================================================================
+  // LANDING VIEW: PRACTICE ARENA GRID (WHEN NO INDIVIDUAL PRACTICE IS OPEN)
+  // =========================================================================
+  if (activeTool === null) {
+    return (
+      <div className="max-w-[1120px] mx-auto px-3.5 sm:px-6 md:px-10 py-5 sm:py-8 pb-24">
+        <section id="page-practice">
+          <div className="text-[10px] font-semibold uppercase tracking-[1px] text-[#B7332C] dark:text-[#F0A59B] mb-1.5">
+            Choose a way to practise
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            Practice Arena, L1 Translation Lab, 10-Min Exam Simulator & Commuter Audio
+          <h1 className="font-serif text-[25px] sm:text-[29px] font-medium leading-[1.2] tracking-[-0.5px] text-[#282522] dark:text-[#F1ECE4]">
+            Practice arena
           </h1>
-          <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-            Train with the Nepali-to-English Translation Lab, Timed 10-Min IELTS/PTE/Interview Simulator, Hands-Free Commuter Audio Podcast Player, Role-Play Voice Simulator, and 60s Phonics Sprint.
+          <p className="text-[11px] sm:text-xs text-[#79736D] dark:text-[#A69F96] mt-1.5">
+            Short, focused activities that turn knowledge into confident English.
           </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              speechService.stop();
-              setCommuterPlaying(false);
-              setActiveTool('shadowing');
-            }}
-            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            <Activity className="w-4 h-4 text-[#D97706]" />
-            <span>Audio Shadowing Trainer (Waveform)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenDailyChallenge}
-            className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Launch Daily 3-Question Challenge</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Enhancement #2: Cross-Linked Mistake Notebook "Fix My Weakest 5 Patterns" Banner */}
-      {mistakeNotebook.length > 0 && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#D97706]/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
-          <div className="space-y-1">
-            <div className="text-xs font-bold text-[#B91C1C] dark:text-amber-400">
-              Smart Remedial Cross-Link · {mistakeNotebook.length} Active Items in Mistake Notebook
+          {/* Toolbar: Filter Chips + Activity Count Badge */}
+          <div className="flex items-center justify-between gap-2 my-4 sm:my-[18px] flex-wrap">
+            <div className="flex items-center gap-[7px] overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+              {(
+                [
+                  { id: 'all', label: 'All activities' },
+                  { id: 'speaking', label: 'Speaking' },
+                  { id: 'vocabulary', label: 'Vocabulary' },
+                  { id: 'grammar', label: 'Grammar' },
+                ] as const
+              ).map((chip) => {
+                const isActive = arenaCategoryFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => setArenaCategoryFilter(chip.id)}
+                    className={`text-[10px] sm:text-[11px] px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B] font-semibold'
+                        : 'bg-[#F0ECE5] dark:bg-[#34312D] text-[#6C665E] dark:text-[#BDB6AB] hover:bg-[#E8E2D9] dark:hover:bg-[#3E3B36]'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
             </div>
-            <h2 className="text-sm sm:text-base font-bold text-[#1C1917] dark:text-[#F5F2EB]">
-              Fix Your Weakest 5 Patterns Across Specialized Practice Studios
-            </h2>
-            <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-              Top recent targets:{' '}
-              {mistakeNotebook
-                .slice(0, 5)
-                .map((m) => `“${m.correctAnswer}”`)
-                .join(' · ')}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setSprintTier('MISTAKES');
-                setActiveTool('sprint');
-              }}
-              className="px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              Drill Mistakes in 60s Sprint
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTool('writing-linter')}
-              className="px-3.5 py-2 rounded-xl bg-stone-900 dark:bg-stone-800 text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap"
-            >
-              Open Writing Linter
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCommuterSource('mistakes');
-                setActiveTool('commuter-audio');
-              }}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-bold text-[#1C1917] dark:text-[#F5F2EB] cursor-pointer whitespace-nowrap"
-            >
-              Loop Mistakes in Commuter Audio
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* 16-Tool Navigation Bar */}
-      <div className="p-2 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center gap-1.5 print:hidden">
-        {(
-          [
-            { id: 'detective', label: '1. Silent-Letter Detective' },
-            { id: 'confusables', label: '2. Confusables & Homophones' },
-            { id: 'interference', label: '3. Nepali-to-English Translation Lab' },
-            { id: 'connected-speech', label: '4. Connected Speech Decoder' },
-            { id: 'sprint', label: '5. 60s Phonics Sprint' },
-            { id: 'word-trees', label: '6. Word Family Root Trees' },
-            { id: 'roleplay', label: '7. Role-Play Simulator (Voice)' },
-            { id: 'shadowing', label: '8. Audio Shadowing Trainer (Waveform)' },
-            { id: 'custom-deck', label: `9. Custom Deck (${customWords.length})` },
-            { id: 'cheatsheets', label: '10. Master Vocab List & PDF Sheets' },
-            { id: 'exam-simulator', label: '11. 10-Min Exam Simulator (IELTS/PTE)' },
-            { id: 'commuter-audio', label: '12. Hands-Free Commuter Audio' },
-            { id: 'minimal-pairs', label: '13. Minimal Pair Ear & Voice Lab' },
-            { id: 'writing-linter', label: '14. Writing & Email Linter' },
-            { id: 'articulation-guide', label: '15. IPA Mouth & Tongue Guide' },
-            { id: 'dictation-studio', label: '16. Dictation Passage Studio' },
-          ] as { id: ArenaToolTab; label: string }[]
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              speechService.stop();
-              setShadowPhase('idle');
-              setCommuterPlaying(false);
-              setActiveTool(tab.id);
-            }}
-            className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-              activeTool === tab.id
-                ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] shadow-xs'
-                : 'bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+            <span className="text-[9px] sm:text-[10px] font-semibold px-2.5 py-1 rounded-full bg-[#F6EEDF] dark:bg-amber-950/50 text-[#946B31] dark:text-amber-300 whitespace-nowrap ml-auto">
+              {filteredCoreActivities.length + (showMoreStudios ? filteredExtraStudios.length : 0)}{' '}
+              {filteredCoreActivities.length + (showMoreStudios ? filteredExtraStudios.length : 0) === 1
+                ? 'activity'
+                : 'activities'}
+            </span>
+          </div>
+
+          {/* 12 Core Practice Arena Cards Grid (Matching practice-arena.html) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 mt-4">
+            {filteredCoreActivities.map((act, idx) => {
+              const colorType = idx % 3;
+              const iconTone =
+                colorType === 0
+                  ? 'bg-[#EAF0F4] text-[#55738A] dark:bg-sky-950/50 dark:text-sky-300'
+                  : colorType === 1
+                  ? 'bg-[#F6EEDF] text-[#A27635] dark:bg-amber-950/50 dark:text-amber-300'
+                  : 'bg-[#E8F1EB] text-[#3C705D] dark:bg-emerald-950/50 dark:text-emerald-300';
+
+              return (
+                <article
+                  key={act.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSelectArenaTool(act.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelectArenaTool(act.id);
+                    }
+                  }}
+                  className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-[13px] p-3 sm:p-[15px] min-h-[136px] sm:min-h-[140px] flex flex-col justify-between cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:border-[#CDBEB0] dark:hover:border-[#57524C] shadow-[0_1px_1px_rgba(44,33,21,0.03)] focus:outline-none focus:ring-2 focus:ring-[#B7332C]/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`w-[34px] h-[34px] rounded-[10px] flex items-center justify-center shrink-0 ${iconTone}`}
+                    >
+                      {act.icon}
+                    </span>
+                    <span className="text-xs text-[#A49C92] dark:text-[#8C857E]" aria-hidden="true">
+                      ↗
+                    </span>
+                  </div>
+
+                  <div className="mt-3">
+                    <h3 className="text-xs sm:text-[13px] font-semibold text-[#282522] dark:text-[#F1ECE4] leading-snug">
+                      {act.title}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] text-[#79736D] dark:text-[#A69F96] mt-1 leading-[1.45] max-w-[270px]">
+                      {act.description}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Optional Specialized Labs Drawer (Exam Simulator, Commuter Audio, Minimal Pairs, Writing Linter, IPA Guide, Dictation) */}
+          <div className="mt-5 pt-4 border-t border-[#E8E2D9]/70 dark:border-[#3B3834]/70">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setShowMoreStudios((prev) => !prev)}
+                className="text-[11px] sm:text-xs font-medium text-[#79736D] dark:text-[#A69F96] hover:text-[#282522] dark:hover:text-[#F1ECE4] inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>
+                  {showMoreStudios
+                    ? 'Hide specialized exam & pronunciation labs'
+                    : `Explore ${filteredExtraStudios.length} more specialized labs (IELTS/PTE exam, commuter audio, minimal pairs, writing linter)`}
+                </span>
+                <span aria-hidden="true">{showMoreStudios ? '↑' : '→'}</span>
+              </button>
+            </div>
+
+            {showMoreStudios && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 mt-3">
+                {filteredExtraStudios.map((act, idx) => {
+                  const colorType = idx % 3;
+                  const iconTone =
+                    colorType === 0
+                      ? 'bg-[#EAF0F4] text-[#55738A] dark:bg-sky-950/50 dark:text-sky-300'
+                      : colorType === 1
+                      ? 'bg-[#F6EEDF] text-[#A27635] dark:bg-amber-950/50 dark:text-amber-300'
+                      : 'bg-[#E8F1EB] text-[#3C705D] dark:bg-emerald-950/50 dark:text-emerald-300';
+
+                  return (
+                    <article
+                      key={act.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleSelectArenaTool(act.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectArenaTool(act.id);
+                        }
+                      }}
+                      className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-[13px] p-3 sm:p-[15px] min-h-[136px] sm:min-h-[140px] flex flex-col justify-between cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:border-[#CDBEB0] dark:hover:border-[#57524C] shadow-[0_1px_1px_rgba(44,33,21,0.03)] focus:outline-none focus:ring-2 focus:ring-[#B7332C]/40"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`w-[34px] h-[34px] rounded-[10px] flex items-center justify-center shrink-0 ${iconTone}`}
+                        >
+                          {act.icon}
+                        </span>
+                        <span
+                          className="text-xs text-[#A49C92] dark:text-[#8C857E]"
+                          aria-hidden="true"
+                        >
+                          ↗
+                        </span>
+                      </div>
+
+                      <div className="mt-3">
+                        <h3 className="text-xs sm:text-[13px] font-semibold text-[#282522] dark:text-[#F1ECE4] leading-snug">
+                          {act.title}
+                        </h3>
+                        <p className="text-[10px] sm:text-[11px] text-[#79736D] dark:text-[#A69F96] mt-1 leading-[1.45] max-w-[270px]">
+                          {act.description}
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
+    );
+  }
+
+  // =========================================================================
+  // INDIVIDUAL PRACTICE DEDICATED PAGE VIEW (WHEN AN ACTIVITY IS CLICKED)
+  // =========================================================================
+  const currentActivityIdx = allArenaActivities.findIndex((a) => a.id === activeTool);
+  const currentActivityMeta =
+    allArenaActivities[currentActivityIdx >= 0 ? currentActivityIdx : 0];
+
+  return (
+    <div className="max-w-[1120px] mx-auto px-3.5 sm:px-6 md:px-10 py-5 sm:py-7 pb-24 space-y-5">
+      {/* Clean Top Bar: ONLY Back to Practice Arena + Practice Title (No Prev / Next) */}
+      <div className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-4 sm:p-5 print:hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleSelectArenaTool(null)}
+              className="px-3.5 py-2 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[#B7332C] dark:text-[#F0A59B]" />
+              <span>Back to Practice arena</span>
+            </button>
+
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B] flex items-center justify-center shrink-0">
+                {currentActivityMeta.icon}
+              </div>
+              <div className="min-w-0">
+                <h1 className="font-serif text-lg sm:text-xl font-medium text-[#282522] dark:text-[#F1ECE4] leading-snug truncate">
+                  {currentActivityMeta.title}
+                </h1>
+                <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] truncate">
+                  {currentActivityMeta.description}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleReshuffleCurrentArenaTool}
+            className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-[11px] font-semibold text-[#6C665E] dark:text-[#BDB6AB] hover:text-[#282522] dark:hover:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-[#B7332C]" />
+            <span>Shuffle new practice set</span>
+          </button>
+        </div>
+      </div>
+
+      {/* =================================================================== */}
+      {/* NEW TOOL: NAATI ENGLISH ↔ NEPALI WORD TRANSLATION (60S TIMED SET)   */}
+      {/* =================================================================== */}
+      {activeTool === 'naati-translation' &&
+        (() => {
+          const currentQ =
+            naatiQuestionDeck[naatiIdx % Math.max(1, naatiQuestionDeck.length)];
+          const accuracy =
+            naatiStats.total > 0
+              ? Math.round((naatiStats.correct / naatiStats.total) * 100)
+              : 100;
+
+          const handleStartNaatiTimed = (durationSec: 0 | 30 | 60 | 90) => {
+            setArenaShuffleSeed(
+              Math.floor(Math.random() * 1000000) + (Date.now() % 100000)
+            );
+            setNaatiTimerDuration(durationSec);
+            setNaatiSecondsLeft(durationSec || 60);
+            setNaatiIdx(0);
+            setNaatiPicked(null);
+            setNaatiFinished(false);
+            setNaatiRunning(durationSec > 0);
+            setNaatiStats((prev) => ({
+              ...prev,
+              total: 0,
+              correct: 0,
+              streak: 0,
+            }));
+          };
+
+          const handlePickNaatiOption = (opt: string) => {
+            if (!currentQ || naatiPicked !== null || naatiFinished) return;
+            setNaatiPicked(opt);
+            const isCorrect = opt === currentQ.correctAnswer;
+
+            if (isCorrect) {
+              speechService.speak(currentQ.target.english, {
+                rate: preferredSpeechRate,
+              });
+            } else {
+              onRecordMistake({
+                lectureId: lectures[0]?.id || 'lecture-1-silent-consonants',
+                lectureNumber: 1,
+                sourceType: 'vocab-quiz',
+                prompt: `NAATI Translation (${currentQ.target.domainLabel}): "${currentQ.promptWord}"`,
+                nepaliHint: `${currentQ.target.english} (${currentQ.target.ipa}) = ${currentQ.target.nepali}`,
+                userWrongAnswer: opt,
+                correctAnswer: currentQ.correctAnswer,
+                explanation: `Example: "${currentQ.target.contextSentence}" (${currentQ.target.nepaliSentence})`,
+              });
+            }
+
+            setNaatiStats((prev) => {
+              const nextCorrect = isCorrect ? prev.correct + 1 : prev.correct;
+              const nextStreak = isCorrect ? prev.streak + 1 : 0;
+              return {
+                total: prev.total + 1,
+                correct: nextCorrect,
+                streak: nextStreak,
+                bestStreak: Math.max(prev.bestStreak, nextStreak),
+                bestTimedScore:
+                  naatiRunning && naatiTimerDuration > 0
+                    ? Math.max(prev.bestTimedScore, nextCorrect)
+                    : prev.bestTimedScore,
+              };
+            });
+
+            if (naatiRunning && naatiTimerDuration > 0) {
+              window.setTimeout(() => {
+                setNaatiIdx((i) => i + 1);
+                setNaatiPicked(null);
+              }, 550);
+            }
+          };
+
+          return (
+            <section className="max-w-4xl mx-auto bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-5 sm:p-7 space-y-5">
+              {/* Top Controls: Direction, Domain, and 60s Timer Challenge Bar */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-[#E8E2D9] dark:border-[#3B3834]">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      { id: 'en-to-ne', label: 'English → Nepali' },
+                      { id: 'ne-to-en', label: 'Nepali → English' },
+                      { id: 'mixed', label: 'Mixed Bidirectional' },
+                    ] as const
+                  ).map((dir) => (
+                    <button
+                      key={dir.id}
+                      type="button"
+                      onClick={() => {
+                        setNaatiDirection(dir.id);
+                        setNaatiIdx(0);
+                        setNaatiPicked(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                        naatiDirection === dir.id
+                          ? 'bg-[#B7332C] text-white border-[#B7332C]'
+                          : 'bg-[#F7F4EE] dark:bg-[#1E1D1B] border-[#E8E2D9] dark:border-[#3B3834] text-[#6C665E] dark:text-[#BDB6AB]'
+                      }`}
+                    >
+                      {dir.label}
+                    </button>
+                  ))}
+
+                  <select
+                    value={naatiDomain}
+                    onChange={(e) => {
+                      setNaatiDomain(e.target.value as 'ALL' | NaatiDomain);
+                      setNaatiIdx(0);
+                      setNaatiPicked(null);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4]"
+                  >
+                    <option value="ALL">All NAATI & Core Domains ({naatiQuestionDeck.length} words)</option>
+                    <option value="healthcare">Healthcare & Medical Interpreting</option>
+                    <option value="legal">Legal, Police & Court Interpreting</option>
+                    <option value="immigration">Immigration, Visa & Citizenship</option>
+                    <option value="finance">Banking, Tax & Centrelink</option>
+                    <option value="community">Housing, Tenancy & Social Services</option>
+                    <option value="workplace">Education & Workplace</option>
+                  </select>
+                </div>
+
+                {/* 60-Second Timing Challenge Controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      { sec: 60 as const, label: '⏱ 60s Challenge' },
+                      { sec: 30 as const, label: '⚡ 30s Blitz' },
+                      { sec: 90 as const, label: '🏃 90s Marathon' },
+                      { sec: 0 as const, label: 'Untimed Set' },
+                    ]
+                  ).map((mode) => {
+                    const isSelected =
+                      naatiTimerDuration === mode.sec &&
+                      (mode.sec === 0 ? !naatiRunning : naatiRunning);
+                    return (
+                      <button
+                        key={mode.sec}
+                        type="button"
+                        onClick={() => handleStartNaatiTimed(mode.sec)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#3C705D] text-white border-[#3C705D]'
+                            : 'bg-[#F7F4EE] dark:bg-[#1E1D1B] border-[#E8E2D9] dark:border-[#3B3834] text-[#282522] dark:text-[#F1ECE4] hover:border-[#B7332C]'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Live Score, Streak & Countdown Progress Strip */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-3 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] flex items-center justify-between">
+                    <span className="text-[#79736D] dark:text-[#A69F96]">Timer</span>
+                    <span
+                      className={`font-ipa font-bold text-sm ${
+                        naatiRunning && naatiSecondsLeft <= 10
+                          ? 'text-[#B7332C] animate-pulse'
+                          : 'text-[#282522] dark:text-[#F1ECE4]'
+                      }`}
+                    >
+                      {naatiTimerDuration > 0
+                        ? naatiRunning
+                          ? `${naatiSecondsLeft}s left`
+                          : `${naatiTimerDuration}s ready`
+                        : 'Untimed'}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] flex items-center justify-between">
+                    <span className="text-[#79736D] dark:text-[#A69F96]">Score</span>
+                    <span className="font-ipa font-bold text-sm text-[#3C705D] dark:text-emerald-400">
+                      {naatiStats.correct} / {naatiStats.total} ({accuracy}%)
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] flex items-center justify-between">
+                    <span className="text-[#79736D] dark:text-[#A69F96]">Streak</span>
+                    <span className="font-ipa font-bold text-sm text-[#A27635] dark:text-amber-300">
+                      {naatiStats.streak} 🔥 (Best {naatiStats.bestStreak})
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] flex items-center justify-between">
+                    <span className="text-[#79736D] dark:text-[#A69F96]">Question</span>
+                    <span className="font-ipa font-bold text-sm text-[#282522] dark:text-[#F1ECE4]">
+                      #{(naatiIdx % Math.max(1, naatiQuestionDeck.length)) + 1} of{' '}
+                      {naatiQuestionDeck.length}
+                    </span>
+                  </div>
+                </div>
+
+                {naatiRunning && naatiTimerDuration > 0 && (
+                  <div className="w-full h-2 rounded-full bg-[#E8E2D9] dark:bg-[#3B3834] overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        naatiSecondsLeft <= 10 ? 'bg-[#B7332C]' : 'bg-[#3C705D]'
+                      }`}
+                      style={{
+                        width: `${Math.max(
+                          0,
+                          Math.min(100, (naatiSecondsLeft / naatiTimerDuration) * 100)
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Timed Challenge Complete Summary */}
+              {naatiFinished ? (
+                <div className="p-8 rounded-2xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[#E8F1EB] text-[#3C705D] flex items-center justify-center mx-auto">
+                    <Award className="w-8 h-8" />
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#3C705D]">
+                    {naatiTimerDuration}-Second NAATI Translation Challenge Complete!
+                  </div>
+                  <h3 className="font-serif text-3xl font-medium text-[#282522] dark:text-[#F1ECE4]">
+                    {naatiStats.correct} Correct Translations ({accuracy}% Accuracy)
+                  </h3>
+                  <p className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                    Best Streak: <strong>{naatiStats.bestStreak} in a row</strong> · Questions
+                    Attempted: <strong>{naatiStats.total}</strong>
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartNaatiTimed(naatiTimerDuration || 60)}
+                      className="px-5 py-2.5 rounded-xl bg-[#B7332C] text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Start New Shuffled {naatiTimerDuration || 60}s Challenge</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartNaatiTimed(0)}
+                      className="px-4 py-2.5 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] cursor-pointer"
+                    >
+                      Switch to Untimed Practice
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                currentQ && (
+                  <div className="p-5 sm:p-7 rounded-2xl bg-[#F7F4EE] dark:bg-[#302E2B] border border-[#E8E2D9] dark:border-[#45413C] space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-[#F6EEDF] text-[#946B31]">
+                        {currentQ.target.domainLabel} ·{' '}
+                        {currentQ.mode === 'en-to-ne'
+                          ? 'TRANSLATE ENGLISH → NEPALI'
+                          : 'TRANSLATE NEPALI → ENGLISH'}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        {!naatiRunning && naatiTimerDuration > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartNaatiTimed(naatiTimerDuration)}
+                            className="px-3 py-1.5 rounded-xl bg-[#B7332C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Timer className="w-3.5 h-3.5" />
+                            <span>Start {naatiTimerDuration}s Timer Now</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            speechService.speak(currentQ.target.english, {
+                              rate: preferredSpeechRate,
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] text-xs font-semibold text-[#B7332C] dark:text-[#F0A59B] inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Hear English</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div
+                        className={`text-2xl sm:text-3xl font-semibold text-[#282522] dark:text-[#F1ECE4] ${
+                          currentQ.mode === 'ne-to-en' ? 'font-nepali' : 'font-serif'
+                        }`}
+                      >
+                        {currentQ.promptWord}
+                      </div>
+                      <div className="font-ipa text-xs text-[#79736D] dark:text-[#A69F96]">
+                        {currentQ.promptSub}
+                      </div>
+                      {currentQ.mode === 'en-to-ne' && (
+                        <p className="text-xs text-[#6C665E] dark:text-[#BDB6AB] italic pt-1">
+                          “{currentQ.target.contextSentence}”
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 4 Shuffled Options */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {currentQ.options.map((opt) => {
+                        const isPicked = naatiPicked === opt;
+                        const isRight = opt === currentQ.correctAnswer;
+                        let optStyle =
+                          'bg-[#FFFDF9] dark:bg-[#292725] border-[#E8E2D9] dark:border-[#48433E] text-[#282522] dark:text-[#F1ECE4] hover:border-[#B7332C]';
+                        if (naatiPicked !== null) {
+                          if (isRight) {
+                            optStyle =
+                              'bg-[#EAF2EB] dark:bg-emerald-950/60 border-[#3C705D] text-[#355B3C] dark:text-emerald-300 font-semibold ring-1 ring-[#3C705D]';
+                          } else if (isPicked) {
+                            optStyle =
+                              'bg-[#F8E9E5] dark:bg-red-950/50 border-[#B7332C] text-[#943E36] dark:text-red-300 line-through';
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            disabled={naatiPicked !== null}
+                            onClick={() => handlePickNaatiOption(opt)}
+                            className={`min-h-[48px] px-4 py-3 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                              currentQ.mode === 'en-to-ne' ? 'font-nepali' : ''
+                            } ${optStyle}`}
+                          >
+                            <span>{opt}</span>
+                            {naatiPicked !== null && isRight && (
+                              <CheckCircle2 className="w-4 h-4 text-[#3C705D] shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Instant Coaching & Next Button (in Untimed Mode) */}
+                    {naatiPicked !== null && (
+                      <div className="p-4 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1 text-xs">
+                          <div className="font-semibold text-[#282522] dark:text-[#F1ECE4]">
+                            {currentQ.target.english}{' '}
+                            <span className="font-ipa font-normal text-[#79736D]">
+                              {currentQ.target.ipa}
+                            </span>{' '}
+                            ={' '}
+                            <span className="font-nepali text-[#3C705D] dark:text-emerald-400">
+                              {currentQ.target.nepali}
+                            </span>
+                          </div>
+                          <div className="text-[#79736D] dark:text-[#A69F96]">
+                            “{currentQ.target.contextSentence}” ({currentQ.target.nepaliSentence})
+                          </div>
+                        </div>
+
+                        {!naatiRunning && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNaatiIdx((i) => i + 1);
+                              setNaatiPicked(null);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-[#B7332C] text-white text-xs font-semibold shrink-0 cursor-pointer"
+                          >
+                            Next word →
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+            </section>
+          );
+        })()}
 
       {/* =================================================================== */}
       {/* TOOL 1 (FEATURE #2): SILENT-LETTER DETECTIVE HIGHLIGHTER GAME       */}
@@ -1993,7 +3072,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
               <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                Feature #2 · Interactive Orthography Reading Game
+                Interactive Orthography Reading Game · {shuffledDetectivePassages.length} Shuffled Cases
               </div>
               <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
                 Silent-Letter Detective — Tap Every Word with a Hidden Silent Letter!
@@ -2004,7 +3083,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {DETECTIVE_PASSAGES.map((p, idx) => (
+              {shuffledDetectivePassages.map((p, idx) => (
                 <button
                   key={p.id}
                   type="button"
@@ -2014,13 +3093,13 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     setWrongTokenIndices([]);
                     setSelectedTokenDetail(null);
                   }}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                    detectivePassageIdx === idx
+                  className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    detectivePassageIdx % shuffledDetectivePassages.length === idx
                       ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
                   }`}
                 >
-                  Case 0{idx + 1} {detectiveSolvedIds.includes(p.id) ? '✓' : ''}
+                  Set 0{idx + 1} {detectiveSolvedIds.includes(p.id) ? '✓' : ''}
                 </button>
               ))}
             </div>
@@ -2055,7 +3134,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   key={idx}
                   type="button"
                   onClick={() => handleTapDetectiveToken(idx)}
-                  className={`px-3 py-1.5 rounded-xl border text-base sm:text-lg transition-all ${tokenClass}`}
+                  className={`px-3 py-1.5 rounded-xl border text-base sm:text-lg transition-all cursor-pointer ${tokenClass}`}
                 >
                   {tok.text}
                 </button>
@@ -2116,13 +3195,13 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const nextIdx = (detectivePassageIdx + 1) % DETECTIVE_PASSAGES.length;
+                  const nextIdx = (detectivePassageIdx + 1) % shuffledDetectivePassages.length;
                   setDetectivePassageIdx(nextIdx);
                   setFoundSilentTokenIndices([]);
                   setWrongTokenIndices([]);
                   setSelectedTokenDetail(null);
                 }}
-                className="px-3.5 py-1.5 rounded-lg bg-[#15803D] text-white text-xs font-semibold"
+                className="px-3.5 py-1.5 rounded-lg bg-[#15803D] text-white text-xs font-semibold cursor-pointer"
               >
                 Next Detective Case →
               </button>
@@ -2138,18 +3217,18 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="space-y-4">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
             <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-              Feature #3 · Homophones & Spelling Contrast Arena
+              Homophones & Spelling Contrast Arena · {shuffledConfusablePairs.length} Shuffled Sets
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
               Confusable Words & Silent-Letter Homophones Arena
             </h2>
             <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
-              These pairs sound identical (same IPA) because of silent letters or schwa vowels, but have completely different spellings and meanings. Compare them and solve the context check below each card:
+              These pairs sound identical (same IPA) because of silent letters or schwa vowels, but have completely different spellings and meanings. Compare them and solve the shuffled 4-option check below each card:
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {CONFUSABLE_PAIRS.map((pair) => {
+            {shuffledConfusablePairs.map((pair) => {
               const userAns = confusableAnswers[pair.id];
               return (
                 <div
@@ -2211,13 +3290,13 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Quick Context Quiz */}
+                  {/* Quick Context Quiz with 4 Shuffled Options */}
                   <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-2">
                     <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                       Fill the Blank: “{pair.quizSentence}”
                     </div>
-                    <div className="flex items-center gap-2">
-                      {[pair.wordA, pair.wordB].map((opt) => {
+                    <div className="grid grid-cols-2 gap-2">
+                      {pair.options.map((opt) => {
                         const isPicked = userAns === opt;
                         const isRight = opt === pair.correctChoice;
                         let style =
@@ -2238,7 +3317,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             onClick={() =>
                               setConfusableAnswers((prev) => ({ ...prev, [pair.id]: opt }))
                             }
-                            className={`flex-1 min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${style}`}
+                            className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${style}`}
                           >
                             {opt}
                           </button>
@@ -2261,7 +3340,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
             <div>
               <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                Nepali-to-English Translation & L1 Interference Lab
+                Nepali-to-English Translation & L1 Interference Lab · Shuffled Practice Sets
               </div>
               <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
                 Master SOV → SVO Word Order, Articles, Prepositions & Stative Verbs
@@ -2275,17 +3354,17 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {(
                 [
-                  { id: 'sov-svo', label: '1. SOV → SVO Word Order Reordering' },
-                  { id: 'articles', label: '2. Article Mastery (a / an / the / Ø)' },
-                  { id: 'prepositions', label: '3. Preposition Traps (in / on / at / by / with)' },
-                  { id: 'continuous-traps', label: '4. Continuous Overuse & Direct Translation Traps' },
+                  { id: 'sov-svo', label: `1. SOV → SVO Word Order (${shuffledSovDrills.length})` },
+                  { id: 'articles', label: `2. Article Mastery (${shuffledArticleDrills.length})` },
+                  { id: 'prepositions', label: `3. Preposition Traps (${shuffledPrepositionDrills.length})` },
+                  { id: 'continuous-traps', label: `4. Direct Translation Traps (${shuffledContinuousDrills.length + shuffledInterferenceDrills.length})` },
                 ] as const
               ).map((sub) => (
                 <button
                   key={sub.id}
                   type="button"
                   onClick={() => setInterferenceSubTab(sub.id)}
-                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     interferenceSubTab === sub.id
                       ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
@@ -2300,7 +3379,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           {/* SUB-TAB 1: SOV -> SVO WORD ORDER REORDERING */}
           {interferenceSubTab === 'sov-svo' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {SOV_SVO_REORDER_DRILLS.map((drill) => {
+              {shuffledSovDrills.map((drill) => {
                 const placed = sovPlacedChunks[drill.id] || [];
                 const isComplete = placed.length === drill.correctOrder.length;
                 const isExactMatch =
@@ -2351,7 +3430,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                                   }
                                 }
                               }}
-                              className={`min-h-[36px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                              className={`min-h-[36px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                                 isUsed
                                   ? 'bg-[#B91C1C]/10 border-[#B91C1C] text-[#B91C1C] line-through opacity-60'
                                   : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
@@ -2409,7 +3488,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           {/* SUB-TAB 2: ARTICLE MASTERY (A / AN / THE / ZERO ARTICLE) */}
           {interferenceSubTab === 'articles' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {ARTICLE_MASTERY_DRILLS.map((drill) => {
+              {shuffledArticleDrills.map((drill) => {
                 const picked = articleAnswers[drill.id];
                 return (
                   <div
@@ -2445,7 +3524,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                               onClick={() =>
                                 setArticleAnswers((prev) => ({ ...prev, [drill.id]: opt }))
                               }
-                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${btnClass}`}
+                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${btnClass}`}
                             >
                               {opt}
                             </button>
@@ -2470,7 +3549,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           {/* SUB-TAB 3: PREPOSITION TRAPS MAPPED TO NEPALI POSTPOSITIONS */}
           {interferenceSubTab === 'prepositions' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {PREPOSITION_TRAP_DRILLS.map((drill) => {
+              {shuffledPrepositionDrills.map((drill) => {
                 const picked = prepositionAnswers[drill.id];
                 return (
                   <div
@@ -2506,7 +3585,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                               onClick={() =>
                                 setPrepositionAnswers((prev) => ({ ...prev, [drill.id]: opt }))
                               }
-                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${btnClass}`}
+                              className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${btnClass}`}
                             >
                               {opt}
                             </button>
@@ -2531,7 +3610,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           {/* SUB-TAB 4: PRESENT CONTINUOUS OVERUSE & DIRECT TRANSLATION TRAPS */}
           {interferenceSubTab === 'continuous-traps' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {CONTINUOUS_OVERUSE_DRILLS.map((drill) => {
+              {shuffledContinuousDrills.map((drill) => {
                 const picked = continuousAnswers[drill.id];
                 return (
                   <div
@@ -2570,7 +3649,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                                   speechService.speak(opt, { rate: preferredSpeechRate });
                                 }
                               }}
-                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${style}`}
+                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-pointer ${style}`}
                             >
                               <span>{opt}</span>
                               {picked && isRight && (
@@ -2591,7 +3670,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 );
               })}
 
-              {INTERFERENCE_DRILLS.map((drill) => {
+              {shuffledInterferenceDrills.map((drill) => {
                 const selected = interferenceAnswers[drill.id];
                 return (
                   <div
@@ -2634,7 +3713,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                                   speechService.speak(opt, { rate: preferredSpeechRate });
                                 }
                               }}
-                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                              className={`w-full min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 cursor-pointer ${btnStyle}`}
                             >
                               <span>{opt}</span>
                               {selected && isCorrect && (
@@ -2667,7 +3746,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="space-y-4">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
             <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-              Feature #5 · Fast-Speech Linking & Ear Decoder
+              Fast-Speech Linking & Ear Decoder · {shuffledConnectedSpeechItems.length} Shuffled Sets
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
               Speed Listening & Connected Speech Decoder (1.0x vs 0.5x)
@@ -2678,7 +3757,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {CONNECTED_SPEECH_ITEMS.map((item) => {
+            {shuffledConnectedSpeechItems.map((item) => {
               const picked = connectedAnswers[item.id];
               return (
                 <div
@@ -2747,7 +3826,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             onClick={() =>
                               setConnectedAnswers((prev) => ({ ...prev, [item.id]: opt }))
                             }
-                            className={`w-full min-h-[38px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all ${style}`}
+                            className={`w-full min-h-[38px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all cursor-pointer ${style}`}
                           >
                             {opt}
                           </button>
@@ -4398,6 +5477,434 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           onRecordMistake={onRecordMistake}
         />
       )}
+
+      {/* =================================================================== */}
+      {/* ACTIVITY 11: SPACED REPETITION REVIEW (SHUFFLED 12-WORD + 4 OPTIONS) */}
+      {/* =================================================================== */}
+      {activeTool === 'srs-review' &&
+        (() => {
+          const srsDeck = shuffleWithSeed(curatedVocabularyList, arenaShuffleSeed + 512).slice(
+            0,
+            12
+          );
+          const currentSrsWord = srsDeck[srsPageIdx % Math.max(1, srsDeck.length)];
+          const ratedCount = Object.keys(srsPageRatedMap).length;
+
+          const srsQuizOptions = currentSrsWord
+            ? shuffleWithSeed(
+                [
+                  currentSrsWord.nepaliMeaning,
+                  ...shuffleWithSeed(
+                    curatedVocabularyList
+                      .filter((w) => w.id !== currentSrsWord.id)
+                      .map((w) => w.nepaliMeaning),
+                    arenaShuffleSeed + srsPageIdx * 37
+                  ).slice(0, 3),
+                ],
+                arenaShuffleSeed + srsPageIdx * 53
+              )
+            : [];
+
+          return (
+            <section className="max-w-3xl mx-auto bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-5 sm:p-8 space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E8E2D9] dark:border-[#3B3834]">
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-[#F6EEDF] text-[#946B31]">
+                    WORD {(srsPageIdx % srsDeck.length) + 1} OF {srsDeck.length} · SHUFFLED SET
+                  </span>
+                  <h2 className="font-serif text-xl sm:text-2xl font-medium text-[#282522] dark:text-[#F1ECE4] mt-2">
+                    12 Shuffled Words Ready for Spaced Repetition Recall
+                  </h2>
+                  <p className="text-xs text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                    Test your recall with the 4-option meaning check or flip the card directly, then rate your memory.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-[#79736D] dark:text-[#A69F96]">
+                  <span>
+                    Reviewed:{' '}
+                    <strong className="text-[#282522] dark:text-[#F1ECE4]">
+                      {ratedCount} / {srsDeck.length}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleReshuffleCurrentArenaTool}
+                    className="px-3 py-1.5 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-semibold text-[#B7332C] cursor-pointer"
+                  >
+                    New 12-word set ↻
+                  </button>
+                </div>
+              </div>
+
+              {currentSrsWord && (
+                <div className="p-6 sm:p-8 rounded-2xl bg-[#F7F4EE] dark:bg-[#302E2B] border border-[#E8E2D9] dark:border-[#45413C] space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-serif text-3xl sm:text-4xl font-medium text-[#282522] dark:text-[#F1ECE4]">
+                        {currentSrsWord.segments?.map((seg, i) =>
+                          seg.silent ? (
+                            <span
+                              key={i}
+                              className="text-[#B7332C] dark:text-[#F0A59B] underline decoration-dotted underline-offset-4"
+                            >
+                              {seg.text}
+                            </span>
+                          ) : (
+                            <span key={i}>{seg.text}</span>
+                          )
+                        )}
+                      </div>
+                      <div className="font-ipa text-xs sm:text-sm text-[#79736D] dark:text-[#A69F96] mt-1">
+                        {currentSrsWord.ipa} · {currentSrsWord.partOfSpeech}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          speechService.speak(currentSrsWord.word, { rate: preferredSpeechRate })
+                        }
+                        className="px-3.5 py-2 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] text-xs font-semibold text-[#B7332C] dark:text-[#F0A59B] inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>Hear word</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSrsPageRevealed((r) => !r)}
+                        className="px-3.5 py-2 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] cursor-pointer"
+                      >
+                        {srsPageRevealed ? 'Hide meaning' : 'Reveal meaning'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4-Option Shuffled Quick Meaning Check */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-[#79736D] dark:text-[#A69F96]">
+                      Select the accurate Nepali meaning (4 shuffled options):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {srsQuizOptions.map((opt) => {
+                        const isPicked = srsPageQuizPicked === opt;
+                        const isRight = opt === currentSrsWord.nepaliMeaning;
+                        let cls =
+                          'bg-[#FFFDF9] dark:bg-[#292725] border-[#E8E2D9] dark:border-[#45413C] text-[#282522] dark:text-[#F1ECE4] hover:border-[#B7332C]';
+                        if (srsPageQuizPicked !== null || srsPageRevealed) {
+                          if (isRight) {
+                            cls =
+                              'bg-[#EAF2EB] dark:bg-emerald-950/50 border-[#3C705D] text-[#355B3C] dark:text-emerald-300 font-semibold';
+                          } else if (isPicked) {
+                            cls =
+                              'bg-[#F8E9E5] dark:bg-red-950/50 border-[#B7332C] text-[#943E36] dark:text-red-300 line-through';
+                          }
+                        }
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => {
+                              setSrsPageQuizPicked(opt);
+                              setSrsPageRevealed(true);
+                              if (opt === currentSrsWord.nepaliMeaning) {
+                                speechService.speak(currentSrsWord.word, {
+                                  rate: preferredSpeechRate,
+                                });
+                              }
+                            }}
+                            className={`px-3.5 py-2.5 rounded-xl border text-left font-nepali text-xs sm:text-sm transition-all cursor-pointer ${cls}`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {srsPageRevealed && (
+                    <div className="pt-4 border-t border-[#E8E2D9] dark:border-[#45413C] space-y-3">
+                      <div className="font-nepali text-lg sm:text-xl font-semibold text-[#3C705D] dark:text-emerald-400">
+                        {currentSrsWord.nepaliMeaning}
+                      </div>
+                      <div className="text-xs text-[#B7332C] dark:text-[#F0A59B] font-medium">
+                        {currentSrsWord.silentLettersSummary}
+                      </div>
+                      <div className="text-xs sm:text-sm text-[#282522] dark:text-[#F1ECE4]">
+                        “{currentSrsWord.englishExample}”
+                      </div>
+
+                      <div className="pt-2 flex flex-wrap items-center gap-2">
+                        {(
+                          [
+                            { id: 'again', label: 'Again · 1h', tone: 'hover:border-[#B7332C]' },
+                            { id: 'good', label: 'Good · 1d', tone: 'hover:border-[#A27635]' },
+                            { id: 'easy', label: 'Easy · 3d', tone: 'hover:border-[#3C705D]' },
+                          ] as const
+                        ).map((btn) => (
+                          <button
+                            key={btn.id}
+                            type="button"
+                            onClick={() => {
+                              setSrsPageRatedMap((prev) => ({
+                                ...prev,
+                                [currentSrsWord.id]: btn.id,
+                              }));
+                              setSrsPageRevealed(false);
+                              setSrsPageQuizPicked(null);
+                              setSrsPageIdx((i) => (i + 1) % srsDeck.length);
+                            }}
+                            className={`px-4 py-2 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] ${btn.tone} text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] transition-colors cursor-pointer`}
+                          >
+                            {btn.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 12-Word Progress Pips */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {srsDeck.map((w, idx) => {
+                    const isRated = Boolean(srsPageRatedMap[w.id]);
+                    const isCurrent = idx === srsPageIdx % srsDeck.length;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => {
+                          setSrsPageIdx(idx);
+                          setSrsPageRevealed(false);
+                          setSrsPageQuizPicked(null);
+                        }}
+                        title={w.word}
+                        className={`h-2 rounded-full transition-all cursor-pointer ${
+                          isCurrent
+                            ? 'w-7 bg-[#B7332C]'
+                            : isRated
+                            ? 'w-4 bg-[#3C705D]'
+                            : 'w-4 bg-[#E6E0D7] dark:bg-[#3B3834]'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSrsPageRevealed(false);
+                      setSrsPageQuizPicked(null);
+                      setSrsPageIdx((i) => (i - 1 + srsDeck.length) % srsDeck.length);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-medium text-[#79736D] hover:text-[#282522] cursor-pointer"
+                  >
+                    ← Prev word
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSrsPageRevealed(false);
+                      setSrsPageQuizPicked(null);
+                      setSrsPageIdx((i) => (i + 1) % srsDeck.length);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-medium text-[#B7332C] cursor-pointer"
+                  >
+                    Next word →
+                  </button>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
+
+      {/* =================================================================== */}
+      {/* ACTIVITY 12: DAILY CHALLENGE (10 SHUFFLED QUESTIONS + 60S TIMER)    */}
+      {/* =================================================================== */}
+      {activeTool === 'daily-challenge' &&
+        (() => {
+          const dailyQuestions = shuffleWithSeed(
+            DAILY_CHALLENGE_POOL,
+            arenaShuffleSeed + 888
+          ).map((q, idx) => ({
+            ...q,
+            indexNum: idx,
+            options: shuffleWithSeed(q.options, arenaShuffleSeed + 888 + idx * 29),
+          }));
+
+          const currentQ = dailyQuestions[dailyPageIdx % dailyQuestions.length];
+          const picked = dailyPageAnswers[currentQ.indexNum];
+          const totalAnswered = Object.keys(dailyPageAnswers).length;
+          const totalRight = dailyQuestions.filter(
+            (q) => dailyPageAnswers[q.indexNum] === q.correctAnswer
+          ).length;
+
+          return (
+            <section className="max-w-3xl mx-auto bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-5 sm:p-8 space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E8E2D9] dark:border-[#3B3834]">
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-[#F6EEDF] text-[#946B31]">
+                    QUESTION {(dailyPageIdx % dailyQuestions.length) + 1} OF{' '}
+                    {dailyQuestions.length} · {currentQ.badge}
+                  </span>
+                  <h2 className="font-serif text-xl sm:text-2xl font-medium text-[#282522] dark:text-[#F1ECE4] mt-2">
+                    10 Shuffled Daily Challenge Questions
+                  </h2>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (dailyTimerRunning) {
+                        setDailyTimerRunning(false);
+                      } else {
+                        setArenaShuffleSeed(
+                          Math.floor(Math.random() * 1000000) + (Date.now() % 100000)
+                        );
+                        setDailyPageAnswers({});
+                        setDailyPageIdx(0);
+                        setDailySecondsLeft(60);
+                        setDailyTimerRunning(true);
+                      }
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer ${
+                      dailyTimerRunning
+                        ? 'bg-[#B7332C] text-white'
+                        : 'bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B]'
+                    }`}
+                  >
+                    <Timer className="w-3.5 h-3.5" />
+                    <span>
+                      {dailyTimerRunning
+                        ? `${dailySecondsLeft}s left (Stop)`
+                        : 'Start 60s Timed Set'}
+                    </span>
+                  </button>
+
+                  {onOpenDailyChallenge && (
+                    <button
+                      type="button"
+                      onClick={onOpenDailyChallenge}
+                      className="px-3 py-2 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-[#B7332C]" />
+                      <span>Daily Blitz Modal</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 rounded-2xl bg-[#F7F4EE] dark:bg-[#302E2B] border border-[#E8E2D9] dark:border-[#45413C] space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-serif text-lg sm:text-xl font-medium text-[#282522] dark:text-[#F1ECE4]">
+                    {currentQ.prompt}
+                  </h3>
+                  <p className="text-xs text-[#79736D] dark:text-[#A69F96]">{currentQ.context}</p>
+                </div>
+
+                <div className="space-y-2.5">
+                  {currentQ.options.map((opt) => {
+                    const isPicked = picked === opt;
+                    const isRight = opt === currentQ.correctAnswer;
+                    let cls =
+                      'bg-[#FFFDF9] dark:bg-[#292725] border-[#E8E2D9] dark:border-[#48433E] text-[#282522] dark:text-[#F1ECE4] hover:border-[#C68172]';
+                    if (picked) {
+                      if (isRight) {
+                        cls =
+                          'bg-[#EAF2EB] dark:bg-emerald-950/50 border-[#88AD8D] text-[#355B3C] dark:text-emerald-300 font-semibold';
+                      } else if (isPicked) {
+                        cls =
+                          'bg-[#F8E9E5] dark:bg-red-950/50 border-[#D39A8E] text-[#943E36] dark:text-red-300';
+                      }
+                    }
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        disabled={Boolean(picked)}
+                        onClick={() => {
+                          setDailyPageAnswers((prev) => ({
+                            ...prev,
+                            [currentQ.indexNum]: opt,
+                          }));
+                          if (opt === currentQ.correctAnswer) {
+                            speechService.speak(opt, { rate: preferredSpeechRate });
+                          }
+                        }}
+                        className={`w-full text-left px-4 py-3 rounded-xl border text-xs sm:text-sm transition-all cursor-pointer ${cls}`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {picked && (
+                  <div className="p-3.5 rounded-xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#45413C] text-xs text-[#3C705D] dark:text-emerald-400">
+                    <strong>
+                      {picked === currentQ.correctAnswer ? '✓ Well spotted! ' : 'Target rule: '}
+                    </strong>
+                    {currentQ.explanation}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                  Score:{' '}
+                  <strong className="text-[#282522] dark:text-[#F1ECE4]">
+                    {totalRight} of {dailyQuestions.length}
+                  </strong>{' '}
+                  correct
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {dailyQuestions.map((q) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => setDailyPageIdx(q.indexNum)}
+                      className={`w-7 h-7 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        dailyPageIdx % dailyQuestions.length === q.indexNum
+                          ? 'bg-[#B7332C] text-white border-[#B7332C]'
+                          : dailyPageAnswers[q.indexNum]
+                          ? 'bg-[#E8F1EB] text-[#3C705D] border-[#88AD8D]'
+                          : 'bg-[#F7F4EE] dark:bg-[#1E1D1B] border-[#E8E2D9] dark:border-[#3B3834]'
+                      }`}
+                    >
+                      {q.indexNum + 1}
+                    </button>
+                  ))}
+
+                  {totalAnswered === dailyQuestions.length ? (
+                    <button
+                      type="button"
+                      onClick={handleReshuffleCurrentArenaTool}
+                      className="px-3.5 py-2 rounded-xl bg-[#3C705D] text-white text-xs font-semibold cursor-pointer"
+                    >
+                      Shuffle & Play again ↻
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDailyPageIdx((i) => (i + 1) % dailyQuestions.length)}
+                      className="px-3.5 py-2 rounded-xl bg-[#B7332C] text-white text-xs font-semibold cursor-pointer"
+                    >
+                      Next question →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+          );
+        })()}
     </div>
   );
 };

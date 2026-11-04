@@ -363,9 +363,9 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                           </td>
                           <td className="py-2.5 px-2.5 text-[#1C1917] align-top">
                             <div>“{item.englishExample}”</div>
-                            {!selfTestBlankMode && item.nepaliExample && (
+                            {!selfTestBlankMode && (item.nepaliExampleTranslation || item.nepaliExample) && (
                               <div className="font-nepali text-[11px] text-[#57534E] mt-0.5">
-                                {item.nepaliExample}
+                                {item.nepaliExampleTranslation || item.nepaliExample}
                               </div>
                             )}
                           </td>

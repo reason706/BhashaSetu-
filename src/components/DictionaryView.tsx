@@ -30,6 +30,11 @@ import {
   Mic,
   Shuffle,
   Trophy,
+  Loader2,
+  ChevronDown,
+  X,
+  SlidersHorizontal,
+  Timer,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -39,6 +44,10 @@ import {
 } from '../types/curriculum';
 import { speechService, PronunciationResult } from '../services/speech';
 import { getMassiveLexicon, EnrichedLexiconItem } from '../data/massiveLexicon';
+import {
+  shuffleWithSeed,
+  NAATI_TRANSLATION_BANK,
+} from '../data/arenaPracticeSets';
 import {
   PrintableStudySheetModal,
   StudySheetFocusMode,
@@ -120,32 +129,59 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [selectedLectureNum, setSelectedLectureNum] = useState<number | null>(initialLectureFilter);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Shuffle seed that randomizes questions and options every time a practice mode opens or reshuffles
+  const [dictShuffleSeed, setDictShuffleSeed] = useState<number>(
+    () => Math.floor(Math.random() * 1000000) + 17
+  );
+
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [flashcardQuizPicked, setFlashcardQuizPicked] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
   const [flashcardAutoSpeak, setFlashcardAutoSpeak] = useState(false);
   const [flashcardSessionReviewed, setFlashcardSessionReviewed] = useState(0);
   const [flashcardMicListening, setFlashcardMicListening] = useState(false);
   const [flashcardMicResult, setFlashcardMicResult] = useState<PronunciationResult | null>(null);
 
-  // Interactive Silent-Letter Match Game state
+  // Interactive Silent-Letter Match Game state (+ 60s Timer Challenge)
   const [matchBoardRound, setMatchBoardRound] = useState(0);
   const [selectedMatchWordId, setSelectedMatchWordId] = useState<string | null>(null);
   const [selectedMatchMeaningId, setSelectedMatchMeaningId] = useState<string | null>(null);
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
   const [wrongMatchFlash, setWrongMatchFlash] = useState(false);
-  const [matchGameStats, setMatchGameStats] = useState({ score: 0, combo: 0, boardsCleared: 0 });
+  const [matchTimerRunning, setMatchTimerRunning] = useState(false);
+  const [matchSecondsLeft, setMatchSecondsLeft] = useState(60);
+  const [matchGameStats, setMatchGameStats] = useState({
+    score: 0,
+    combo: 0,
+    boardsCleared: 0,
+    roundsCompleted: 0,
+    pairsMatched: 0,
+    mistakes: 0,
+    streak: 0,
+  });
 
-  // Quick Vocab Speed Quiz state
+  // Quick Vocab Speed Quiz state (+ Question Mode & 60s Timer Challenge)
+  const [quizModeType, setQuizModeType] = useState<
+    'en-to-ne' | 'ne-to-en' | 'silent-rule' | 'naati-set'
+  >('en-to-ne');
   const [quizIndex, setQuizIndex] = useState(0);
   const [quizSelectedOption, setQuizSelectedOption] = useState<string | null>(null);
   const [quizScore, setQuizScore] = useState({ correct: 0, total: 0, streak: 0 });
+  const [quizTimerRunning, setQuizTimerRunning] = useState(false);
+  const [quizTimerDuration, setQuizTimerDuration] = useState<0 | 30 | 60>(0);
+  const [quizSecondsLeft, setQuizSecondsLeft] = useState(60);
+  const [quizTimerFinished, setQuizTimerFinished] = useState(false);
 
-  // Audio Dictation & Spelling Bee state
+  // Audio Dictation & Spelling Bee state (+ 4-Option Multiple Choice vs Typing + 60s Timer)
+  const [dictationMode, setDictationMode] = useState<'options' | 'type'>('options');
   const [dictationIndex, setDictationIndex] = useState(0);
   const [dictationInput, setDictationInput] = useState('');
   const [dictationSubmitted, setDictationSubmitted] = useState(false);
   const [dictationStats, setDictationStats] = useState({ correct: 0, total: 0, streak: 0 });
+  const [dictationTimerRunning, setDictationTimerRunning] = useState(false);
+  const [dictationSecondsLeft, setDictationSecondsLeft] = useState(60);
 
   // Mistake Notebook Drill state
   const [mistakeAnswers, setMistakeAnswers] = useState<Record<string, string>>({});
@@ -160,6 +196,50 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   // Printable PDF & CSV Study Sheet Modal state
   const [studySheetModalMode, setStudySheetModalMode] = useState<StudySheetFocusMode | null>(null);
+
+  // AI Silent-Letter & Pronunciation Explainer state per word ID
+  const [aiWordExplanations, setAiWordExplanations] = useState<
+    Record<
+      string,
+      {
+        silentReasonNepali: string;
+        mouthPositionNepali: string;
+        nepaliSoundComparison: string;
+        memoryTrickNepali: string;
+        extraExampleEnglish: string;
+        extraExampleNepali: string;
+      }
+    >
+  >({});
+  const [aiWordLoadingId, setAiWordLoadingId] = useState<string | null>(null);
+
+  const handleExplainDictionaryWord = async (item: EnrichedLexiconItem) => {
+    if (aiWordExplanations[item.id] || aiWordLoadingId === item.id) return;
+    setAiWordLoadingId(item.id);
+    try {
+      const res = await fetch('/api/ai/word-explainer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          word: item.word,
+          ipa: item.ipa,
+          silentLettersSummary: item.silentLettersSummary,
+          level: item.level,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.explanation) {
+        setAiWordExplanations((prev) => ({
+          ...prev,
+          [item.id]: data.explanation,
+        }));
+      }
+    } catch {
+      // Ignore transient errors
+    } finally {
+      setAiWordLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     if (initialLectureFilter !== undefined) {
@@ -353,6 +433,38 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     };
   }, [commuterPlaying, commuterIndex, currentCommuterWord, commuterPlaylist.length, preferredSpeechRate]);
 
+  // 60s Countdown Timers for Speed Quiz, Dictation, and Match Game
+  useEffect(() => {
+    if (!quizTimerRunning) return;
+    if (quizSecondsLeft <= 0) {
+      setQuizTimerRunning(false);
+      setQuizTimerFinished(true);
+      return;
+    }
+    const t = window.setTimeout(() => setQuizSecondsLeft((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [quizTimerRunning, quizSecondsLeft]);
+
+  useEffect(() => {
+    if (!dictationTimerRunning) return;
+    if (dictationSecondsLeft <= 0) {
+      setDictationTimerRunning(false);
+      return;
+    }
+    const t = window.setTimeout(() => setDictationSecondsLeft((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [dictationTimerRunning, dictationSecondsLeft]);
+
+  useEffect(() => {
+    if (!matchTimerRunning) return;
+    if (matchSecondsLeft <= 0) {
+      setMatchTimerRunning(false);
+      return;
+    }
+    const t = window.setTimeout(() => setMatchSecondsLeft((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [matchTimerRunning, matchSecondsLeft]);
+
   const totalPages = Math.max(1, Math.ceil(filteredWords.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedWords = useMemo(() => {
@@ -360,64 +472,281 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     return filteredWords.slice(start, start + PAGE_SIZE);
   }, [filteredWords, safePage]);
 
-  const currentFlashcard = filteredWords[cardIndex] || filteredWords[0] || null;
-  const currentDictationWord =
-    filteredWords[dictationIndex % Math.max(1, filteredWords.length)] || null;
+  // Shuffled pool of practice words for Flashcards, Dictation, Match, and Quiz
+  const shuffledPracticePool = useMemo(() => {
+    const base =
+      filteredWords.length > 0
+        ? filteredWords.slice(0, 240)
+        : allWords.filter((w) => w.isCoreLessonWord).slice(0, 120);
+    return shuffleWithSeed(base, dictShuffleSeed);
+  }, [filteredWords, allWords, dictShuffleSeed]);
 
-  // Build deterministic 4-option multiple choice question for Vocab Speed Quiz
-  const currentQuizQuestion = useMemo(() => {
-    if (filteredWords.length === 0) return null;
-    const target = filteredWords[quizIndex % filteredWords.length];
-    const distractors: string[] = [];
-    const step = Math.max(1, Math.floor(allWords.length / 7));
-    let ptr = (quizIndex * 13 + 5) % allWords.length;
-    while (distractors.length < 3 && distractors.length < allWords.length - 1) {
-      const candidate = allWords[ptr].nepaliMeaning;
-      if (candidate !== target.nepaliMeaning && !distractors.includes(candidate)) {
-        distractors.push(candidate);
+  const currentFlashcard =
+    shuffledPracticePool[cardIndex % Math.max(1, shuffledPracticePool.length)] || null;
+
+  const flashcardQuizOptions = useMemo(() => {
+    if (!currentFlashcard) return [];
+    const distractors = shuffleWithSeed(
+      shuffledPracticePool
+        .filter((w) => w.id !== currentFlashcard.id)
+        .map((w) => w.nepaliMeaning),
+      dictShuffleSeed + cardIndex * 31 + 7
+    ).slice(0, 3);
+    return shuffleWithSeed(
+      [currentFlashcard.nepaliMeaning, ...distractors],
+      dictShuffleSeed + cardIndex * 47 + 13
+    );
+  }, [currentFlashcard, shuffledPracticePool, dictShuffleSeed, cardIndex]);
+
+  const currentDictationWord =
+    shuffledPracticePool[dictationIndex % Math.max(1, shuffledPracticePool.length)] || null;
+
+  // Build 4 shuffled spelling options for Audio Dictation (1 exact + 3 realistic silent-letter distractors)
+  const dictationSpellingOptions = useMemo(() => {
+    if (!currentDictationWord) return [];
+    const w = currentDictationWord.word;
+    const lower = w.toLowerCase();
+    const candidates = new Set<string>();
+
+    // Generate plausible orthographic distractors by dropping/swapping silent segments
+    if (currentDictationWord.segments?.some((s) => s.silent)) {
+      const withoutSilent = currentDictationWord.segments
+        .filter((s) => !s.silent)
+        .map((s) => s.text)
+        .join('');
+      if (withoutSilent.toLowerCase() !== lower && withoutSilent.length >= 2) {
+        candidates.add(withoutSilent);
       }
-      ptr = (ptr + step) % allWords.length;
     }
-    const rawOptions = [target.nepaliMeaning, ...distractors];
-    const shift = quizIndex % rawOptions.length;
-    const options = [...rawOptions.slice(shift), ...rawOptions.slice(0, shift)];
+    if (lower.includes('ie')) candidates.add(w.replace(/ie/i, 'ei'));
+    if (lower.includes('ei')) candidates.add(w.replace(/ei/i, 'ie'));
+    if (lower.includes('gh')) candidates.add(w.replace(/gh/i, 'g'));
+    if (lower.endsWith('le')) candidates.add(w.slice(0, -2) + 'el');
+    if (lower.endsWith('ce')) candidates.add(w.slice(0, -2) + 'se');
+    candidates.add(w + 'e');
+    if (w.length > 3) {
+      candidates.add(w.slice(0, 2) + w[2] + w.slice(2));
+      candidates.add(w.slice(0, -1));
+    }
+
+    const validDistractors = Array.from(candidates)
+      .filter((c) => c.toLowerCase() !== lower)
+      .slice(0, 3);
+
+    while (validDistractors.length < 3 && shuffledPracticePool.length > 3) {
+      const other =
+        shuffledPracticePool[
+          (dictationIndex + validDistractors.length + 1) % shuffledPracticePool.length
+        ]?.word;
+      if (other && other.toLowerCase() !== lower && !validDistractors.includes(other)) {
+        validDistractors.push(other);
+      } else {
+        break;
+      }
+    }
+
+    return shuffleWithSeed(
+      [w, ...validDistractors.slice(0, 3)],
+      dictShuffleSeed + dictationIndex * 53 + 19
+    );
+  }, [currentDictationWord, shuffledPracticePool, dictShuffleSeed, dictationIndex]);
+
+  // Build Shuffled 4-Option Question for Speed Quiz (supports 4 quiz modes + NAATI set!)
+  const currentQuizQuestion = useMemo(() => {
+    if (quizModeType === 'naati-set') {
+      const shuffledNaati = shuffleWithSeed(NAATI_TRANSLATION_BANK, dictShuffleSeed + 303);
+      const item = shuffledNaati[quizIndex % shuffledNaati.length];
+      const distractors = shuffleWithSeed(
+        shuffledNaati.filter((n) => n.id !== item.id).map((n) => n.nepali),
+        dictShuffleSeed + quizIndex * 29
+      ).slice(0, 3);
+      const options = shuffleWithSeed(
+        [item.nepali, ...distractors],
+        dictShuffleSeed + quizIndex * 43
+      );
+      const syntheticTarget: EnrichedLexiconItem = {
+        id: item.id,
+        word: item.english,
+        ipa: item.ipa,
+        partOfSpeech: item.domainLabel,
+        nepaliMeaning: item.nepali,
+        englishExample: item.contextSentence,
+        nepaliExampleTranslation: item.nepaliSentence,
+        silentLettersSummary: `NAATI ${item.domainLabel}`,
+        segments: [{ text: item.english, silent: false }],
+        lectureId: lectures[0]?.id || 'lecture-1-silent-consonants',
+        lectureNumber: 1,
+        lectureTitle: item.domainLabel,
+        category: item.domainLabel,
+        level: 'B2',
+        isCoreLessonWord: true,
+        usageTipNepali: item.nepaliSentence,
+      };
+      return {
+        target: syntheticTarget,
+        promptTitle: 'Choose the accurate NAATI Nepali translation:',
+        promptMain: item.english,
+        promptSub: `${item.ipa} · ${item.domainLabel}`,
+        correctAnswer: item.nepali,
+        options,
+        isNepaliOption: true,
+      };
+    }
+
+    if (shuffledPracticePool.length === 0) return null;
+    const target = shuffledPracticePool[quizIndex % shuffledPracticePool.length];
+
+    if (quizModeType === 'ne-to-en') {
+      const distractors = shuffleWithSeed(
+        shuffledPracticePool.filter((w) => w.id !== target.id).map((w) => w.word),
+        dictShuffleSeed + quizIndex * 31
+      ).slice(0, 3);
+      const options = shuffleWithSeed(
+        [target.word, ...distractors],
+        dictShuffleSeed + quizIndex * 47
+      );
+      return {
+        target,
+        promptTitle: 'Choose the English word for this Nepali meaning:',
+        promptMain: target.nepaliMeaning,
+        promptSub: `${target.partOfSpeech} · L${String(target.lectureNumber).padStart(2, '0')} (${target.level})`,
+        correctAnswer: target.word,
+        options,
+        isNepaliOption: false,
+      };
+    }
+
+    if (quizModeType === 'silent-rule') {
+      const rulePool = [
+        target.silentLettersSummary,
+        'Silent k before n at the start of a word',
+        'Silent b after m at the end of a root word',
+        'Silent w before r at the start of a word',
+        'Silent l before m, k, or d',
+        'Silent t in -stle and -sten endings',
+        'Silent g before n in root words',
+        'Silent p before s or t',
+      ];
+      const distractors = shuffleWithSeed(
+        Array.from(new Set(rulePool)).filter((r) => r !== target.silentLettersSummary),
+        dictShuffleSeed + quizIndex * 37
+      ).slice(0, 3);
+      const options = shuffleWithSeed(
+        [target.silentLettersSummary, ...distractors],
+        dictShuffleSeed + quizIndex * 59
+      );
+      return {
+        target,
+        promptTitle: 'Identify the phonics / silent-letter rule for:',
+        promptMain: target.word,
+        promptSub: `${target.ipa} · ${target.nepaliMeaning}`,
+        correctAnswer: target.silentLettersSummary,
+        options,
+        isNepaliOption: false,
+      };
+    }
+
+    // Default: 'en-to-ne'
+    const distractors = shuffleWithSeed(
+      shuffledPracticePool
+        .filter((w) => w.id !== target.id && w.nepaliMeaning !== target.nepaliMeaning)
+        .map((w) => w.nepaliMeaning),
+      dictShuffleSeed + quizIndex * 23
+    ).slice(0, 3);
+    const options = shuffleWithSeed(
+      [target.nepaliMeaning, ...distractors],
+      dictShuffleSeed + quizIndex * 41
+    );
     return {
       target,
+      promptTitle: 'Choose the correct Nepali meaning:',
+      promptMain: target.word,
+      promptSub: `${target.ipa} · ${target.partOfSpeech}`,
+      correctAnswer: target.nepaliMeaning,
       options,
+      isNepaliOption: true,
     };
-  }, [filteredWords, allWords, quizIndex]);
+  }, [shuffledPracticePool, quizIndex, quizModeType, dictShuffleSeed, lectures]);
+
+  const handleReshuffleDictionaryPractice = () => {
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setCardIndex(0);
+    setIsFlipped(false);
+    setFlashcardQuizPicked(null);
+    setFlashcardMicResult(null);
+    setMatchedPairIds([]);
+    setSelectedMatchWordId(null);
+    setSelectedMatchMeaningId(null);
+    setDictationIndex(0);
+    setDictationInput('');
+    setDictationSubmitted(false);
+    setQuizIndex(0);
+    setQuizSelectedOption(null);
+    setQuizTimerFinished(false);
+  };
+
+  const handleStartQuizTimedChallenge = (durationSec: 30 | 60) => {
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setQuizIndex(0);
+    setQuizSelectedOption(null);
+    setQuizScore({ correct: 0, total: 0, streak: 0 });
+    setQuizTimerDuration(durationSec);
+    setQuizSecondsLeft(durationSec);
+    setQuizTimerFinished(false);
+    setQuizTimerRunning(true);
+  };
+
+  const handleStartDictationTimed = (durationSec: 60) => {
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setDictationIndex(0);
+    setDictationInput('');
+    setDictationSubmitted(false);
+    setDictationStats({ correct: 0, total: 0, streak: 0 });
+    setDictationSecondsLeft(durationSec);
+    setDictationTimerRunning(true);
+  };
+
+  const handleStartMatchTimed = (durationSec: 60) => {
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setMatchedPairIds([]);
+    setSelectedMatchWordId(null);
+    setSelectedMatchMeaningId(null);
+    setMatchSecondsLeft(durationSec);
+    setMatchTimerRunning(true);
+  };
 
   const handleNextCard = () => {
     setIsFlipped(false);
+    setFlashcardQuizPicked(null);
     setFlashcardMicResult(null);
-    const nextIdx = filteredWords.length ? (cardIndex + 1) % filteredWords.length : 0;
+    const nextIdx = shuffledPracticePool.length
+      ? (cardIndex + 1) % shuffledPracticePool.length
+      : 0;
     setCardIndex(nextIdx);
-    if (flashcardAutoSpeak && filteredWords[nextIdx]) {
-      speechService.speak(filteredWords[nextIdx].word, { rate: preferredSpeechRate });
+    if (flashcardAutoSpeak && shuffledPracticePool[nextIdx]) {
+      speechService.speak(shuffledPracticePool[nextIdx].word, { rate: preferredSpeechRate });
     }
   };
 
   const handlePrevCard = () => {
     setIsFlipped(false);
+    setFlashcardQuizPicked(null);
     setFlashcardMicResult(null);
-    const prevIdx = filteredWords.length
-      ? (cardIndex - 1 + filteredWords.length) % filteredWords.length
+    const prevIdx = shuffledPracticePool.length
+      ? (cardIndex - 1 + shuffledPracticePool.length) % shuffledPracticePool.length
       : 0;
     setCardIndex(prevIdx);
-    if (flashcardAutoSpeak && filteredWords[prevIdx]) {
-      speechService.speak(filteredWords[prevIdx].word, { rate: preferredSpeechRate });
+    if (flashcardAutoSpeak && shuffledPracticePool[prevIdx]) {
+      speechService.speak(shuffledPracticePool[prevIdx].word, { rate: preferredSpeechRate });
     }
   };
 
   const handleShuffleFlashcard = () => {
-    if (!filteredWords.length) return;
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
     setIsFlipped(false);
+    setFlashcardQuizPicked(null);
     setFlashcardMicResult(null);
-    const randomIdx = Math.floor(Math.random() * filteredWords.length);
-    setCardIndex(randomIdx);
-    if (flashcardAutoSpeak && filteredWords[randomIdx]) {
-      speechService.speak(filteredWords[randomIdx].word, { rate: preferredSpeechRate });
-    }
+    setCardIndex(0);
   };
 
   const handleRateFlashcardSRS = (wasCorrect: boolean) => {
@@ -444,15 +773,23 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     );
   };
 
-  // Interactive 6-Pair Silent-Letter Match Game Board
+  // Interactive 6-Pair Silent-Letter Match Game Board (Shuffled every round)
   const matchBoardData = useMemo(() => {
-    const pool = filteredWords.length >= 6 ? filteredWords : allWords.slice(0, 60);
+    const pool =
+      shuffledPracticePool.length >= 6
+        ? shuffledPracticePool
+        : shuffleWithSeed(allWords.slice(0, 80), dictShuffleSeed + matchBoardRound * 19);
     const startIdx = (matchBoardRound * 6) % Math.max(1, pool.length - 6);
-    const pairs = pool.slice(startIdx, startIdx + 6);
-    const shift = (matchBoardRound * 2 + 3) % Math.max(1, pairs.length);
-    const shuffledMeanings = [...pairs.slice(shift), ...pairs.slice(0, shift)];
+    const pairs = shuffleWithSeed(
+      pool.slice(startIdx, startIdx + 6),
+      dictShuffleSeed + matchBoardRound * 37
+    );
+    const shuffledMeanings = shuffleWithSeed(
+      pairs,
+      dictShuffleSeed + matchBoardRound * 73 + 11
+    );
     return { pairs, shuffledMeanings };
-  }, [filteredWords, allWords, matchBoardRound]);
+  }, [shuffledPracticePool, allWords, matchBoardRound, dictShuffleSeed]);
 
   const handleSelectMatchWord = (wordId: string) => {
     if (matchedPairIds.includes(wordId)) return;
@@ -469,6 +806,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         setSelectedMatchMeaningId(null);
         if (onUpdateWordSRS) onUpdateWordSRS(wordId, true);
         setMatchGameStats((prev) => ({
+          ...prev,
           roundsCompleted:
             nextMatched.length === matchBoardData.pairs.length
               ? prev.roundsCompleted + 1
@@ -504,6 +842,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         setSelectedMatchMeaningId(null);
         if (onUpdateWordSRS) onUpdateWordSRS(wordId, true);
         setMatchGameStats((prev) => ({
+          ...prev,
           roundsCompleted:
             nextMatched.length === matchBoardData.pairs.length
               ? prev.roundsCompleted + 1
@@ -529,6 +868,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   };
 
   const handleNextMatchRound = () => {
+    setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
     setMatchedPairIds([]);
     setSelectedMatchWordId(null);
     setSelectedMatchMeaningId(null);
@@ -538,7 +878,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const handleAnswerQuiz = (option: string) => {
     if (quizSelectedOption || !currentQuizQuestion) return;
     setQuizSelectedOption(option);
-    const isCorrect = option === currentQuizQuestion.target.nepaliMeaning;
+    const isCorrect = option === currentQuizQuestion.correctAnswer;
+    if (isCorrect) {
+      speechService.speak(currentQuizQuestion.target.word, { rate: preferredSpeechRate });
+    }
     setQuizScore((prev) => ({
       correct: prev.correct + (isCorrect ? 1 : 0),
       total: prev.total + 1,
@@ -552,13 +895,19 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         lectureId: currentQuizQuestion.target.lectureId,
         lectureNumber: currentQuizQuestion.target.lectureNumber,
         sourceType: 'vocab-quiz',
-        prompt: `What is the Nepali meaning of "${currentQuizQuestion.target.word}" (${currentQuizQuestion.target.ipa})?`,
+        prompt: `${currentQuizQuestion.promptTitle} "${currentQuizQuestion.promptMain}"`,
         nepaliHint: currentQuizQuestion.target.englishExample,
         userWrongAnswer: option,
-        correctAnswer: currentQuizQuestion.target.nepaliMeaning,
+        correctAnswer: currentQuizQuestion.correctAnswer,
         options: currentQuizQuestion.options,
         explanation: `"${currentQuizQuestion.target.word}" means "${currentQuizQuestion.target.nepaliMeaning}". Phonics: ${currentQuizQuestion.target.silentLettersSummary}.`,
       });
+    }
+    if (quizTimerRunning) {
+      window.setTimeout(() => {
+        setQuizSelectedOption(null);
+        setQuizIndex((prev) => prev + 1);
+      }, 480);
     }
   };
 
@@ -567,13 +916,17 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setQuizIndex((prev) => prev + 1);
   };
 
-  const handleCheckDictation = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentDictationWord || dictationSubmitted || !dictationInput.trim()) return;
+  const handleSubmitDictationAnswer = (answerText: string) => {
+    if (!currentDictationWord || dictationSubmitted || !answerText.trim()) return;
+    setDictationInput(answerText);
     setDictationSubmitted(true);
-    const cleanUser = dictationInput.trim().toLowerCase();
+    const cleanUser = answerText.trim().toLowerCase();
     const cleanTarget = currentDictationWord.word.trim().toLowerCase();
     const isExact = cleanUser === cleanTarget;
+
+    if (isExact) {
+      speechService.speak(currentDictationWord.word, { rate: preferredSpeechRate });
+    }
 
     setDictationStats((prev) => ({
       correct: prev.correct + (isExact ? 1 : 0),
@@ -592,11 +945,24 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         sourceType: 'dictation',
         prompt: `Spell the English word meaning "${currentDictationWord.nepaliMeaning}" (${currentDictationWord.ipa}):`,
         nepaliHint: currentDictationWord.englishExample,
-        userWrongAnswer: dictationInput.trim(),
+        userWrongAnswer: answerText.trim(),
         correctAnswer: currentDictationWord.word,
         explanation: `Correct spelling: "${currentDictationWord.word}". Silent-letter rule: ${currentDictationWord.silentLettersSummary}.`,
       });
     }
+
+    if (dictationTimerRunning) {
+      window.setTimeout(() => {
+        setDictationSubmitted(false);
+        setDictationInput('');
+        setDictationIndex((prev) => prev + 1);
+      }, 520);
+    }
+  };
+
+  const handleCheckDictation = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSubmitDictationAnswer(dictationInput);
   };
 
   const handleNextDictationWord = () => {
@@ -609,6 +975,60 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     const matched = allWords.filter((w) => savedWordIds.includes(w.id));
     return matched.length > 0 ? matched : allWords.filter((w) => w.isCoreLessonWord).slice(0, 20);
   }, [allWords, savedWordIds]);
+
+  // Dropdown states for clean, non-congested toolbar
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
+  const [moreFiltersDropdownOpen, setMoreFiltersDropdownOpen] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+
+  const sectionDropdownRef = useRef<HTMLDivElement | null>(null);
+  const moreFiltersDropdownRef = useRef<HTMLDivElement | null>(null);
+  const exportDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (sectionDropdownRef.current && !sectionDropdownRef.current.contains(target)) {
+        setSectionDropdownOpen(false);
+      }
+      if (moreFiltersDropdownRef.current && !moreFiltersDropdownRef.current.contains(target)) {
+        setMoreFiltersDropdownOpen(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(target)) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const selectedLectureObj = useMemo(
+    () =>
+      selectedLectureNum !== null
+        ? lectures.find((l) => l.lectureNumber === selectedLectureNum) || null
+        : null,
+    [lectures, selectedLectureNum]
+  );
+
+  const isSecondaryFilterActive =
+    filterMode === 'mastered' ||
+    filterMode === 'B1' ||
+    filterMode === 'B2' ||
+    filterMode === 'C1' ||
+    silentPatternFilter !== 'ALL';
+
+  const activeSecondaryFilterLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (filterMode === 'mastered') parts.push(`Mastered (${masteredWordIds.length})`);
+    if (filterMode === 'B1' || filterMode === 'B2' || filterMode === 'C1') {
+      parts.push(`Level ${filterMode}`);
+    }
+    if (silentPatternFilter !== 'ALL') {
+      const found = SILENT_PATTERN_PILLS.find((p) => p.id === silentPatternFilter);
+      if (found) parts.push(found.label);
+    }
+    return parts.length > 0 ? parts.join(' · ') : 'More Filters';
+  }, [filterMode, masteredWordIds.length, silentPatternFilter]);
 
   if (studySheetModalMode) {
     return (
@@ -625,194 +1045,203 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-      {/* Header & Mode Switcher */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 pb-6 border-b border-[#E7E0D6] dark:border-[#2E2924] mb-6">
+    <div className="max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24">
+      {/* ===================================================================== */}
+      {/* 1. CLEAN EDITORIAL HEADER + COMPACT UTILITY ACTIONS                   */}
+      {/* ===================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-[#E8E0D2] dark:border-[#2C2621] mb-5">
         <div>
-          <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-1">
-            <span>Offline Vocabulary Lexicon</span>
-            <span className="mx-2" aria-hidden="true">·</span>
-            <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {allWords.length.toLocaleString()}+ Total Words
-            </span>
-            <span className="mx-2" aria-hidden="true">·</span>
-            <span>{coreWordsCount} Core Lesson Words</span>
-            <span className="mx-2" aria-hidden="true">·</span>
-            <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-              {savedWordIds.length} Saved · {srsTrackedCount} in SRS
-            </span>
+          <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#9E2A2B] dark:text-[#F87171] mb-1.5">
+            YOUR VOCABULARY · {allWords.length.toLocaleString()} WORDS
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            10,000+ Word Lexicon, Audio Dictation & SRS Drill Hub
+          <h1 className="font-serif text-2xl sm:text-4xl font-normal tracking-tight text-[#1E1B18] dark:text-[#F5F2EB] leading-tight">
+            Dictionary &amp; lexicon
           </h1>
-          <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-            Explore {allWords.length.toLocaleString()} vocabulary entries, practice Spaced Repetition flashcards, test your spelling in Audio Dictation Bee, or review your Mistake Notebook.
+          <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] mt-1">
+            Explore pronunciation, Nepali meanings, silent-letter rules, and interactive word drills.
           </p>
         </div>
 
-        {/* 6-Mode Switcher: Lexicon Cards | Vocab List Table | SRS Flashcards | Audio Dictation | Speed Quiz | Mistake Notebook */}
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#F2ECE1] dark:bg-[#1F1C18] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] self-start">
+        {/* Compact Utility Bar: Audio Loop & Export Dropdown */}
+        <div className="flex items-center gap-2 self-start sm:self-end shrink-0">
           <button
-            onClick={() => setViewMode('list')}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'list'
-                ? 'bg-white dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
+            type="button"
+            onClick={() => setCommuterOpen((prev) => !prev)}
+            className={`min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all border ${
+              commuterOpen || commuterPlaying
+                ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] shadow-xs'
+                : 'bg-white dark:bg-[#191715] border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB] hover:border-[#9E2A2B]/50'
             }`}
           >
-            <List className="w-3.5 h-3.5" />
-            <span>Lexicon Cards ({filteredWords.length.toLocaleString()})</span>
+            <Radio
+              className={`w-3.5 h-3.5 ${
+                commuterPlaying
+                  ? 'animate-pulse text-white'
+                  : commuterOpen
+                  ? 'text-white'
+                  : 'text-[#9E2A2B]'
+              }`}
+            />
+            <span>{commuterPlaying ? 'Audio Playing' : 'Audio Loop'}</span>
           </button>
 
-          <button
-            onClick={() => setViewMode('table')}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <List className="w-3.5 h-3.5 text-[#B91C1C]" />
-            <span>Vocab List Table</span>
-          </button>
+          {/* Export / Study Sheet Dropdown */}
+          <div ref={exportDropdownRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setExportDropdownOpen((prev) => !prev)}
+              className="min-h-[38px] px-3.5 py-1.5 rounded-full bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]/50 text-xs font-medium text-[#1E1B18] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-all"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#5E5850]" />
+              <span>Export</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-[#8E877E] transition-transform ${
+                  exportDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
 
-          <button
-            onClick={() => {
-              setViewMode('flashcards');
-              setCardIndex(0);
-              setIsFlipped(false);
-            }}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'flashcards'
-                ? 'bg-[#A82020] text-white shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>SRS Flashcards</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setViewMode('match');
-              setMatchedPairIds([]);
-              setSelectedMatchWordId(null);
-              setSelectedMatchMeaningId(null);
-            }}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'match'
-                ? 'bg-[#A82020] text-white shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <Trophy className="w-3.5 h-3.5" />
-            <span>Match Game</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setViewMode('dictation');
-              setDictationSubmitted(false);
-              setDictationInput('');
-            }}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'dictation'
-                ? 'bg-[#B91C1C] text-white shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <Headphones className="w-3.5 h-3.5" />
-            <span>Audio Dictation Bee</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setViewMode('quiz');
-              setQuizSelectedOption(null);
-            }}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'quiz'
-                ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5 text-[#D97706]" />
-            <span>Speed Quiz</span>
-          </button>
-
-          <button
-            onClick={() => setViewMode('mistakes')}
-            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-              viewMode === 'mistakes'
-                ? 'bg-[#B91C1C] text-white shadow-xs'
-                : 'text-[#57534E] dark:text-[#A8A29E]'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Mistake Notebook ({mistakeNotebook.length})</span>
-          </button>
+            {exportDropdownOpen && (
+              <div className="absolute right-0 z-40 mt-2 w-60 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] shadow-xl p-1.5 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportDropdownOpen(false);
+                    setStudySheetModalMode(filterMode === 'saved' ? 'saved' : 'combined');
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-medium text-[#1E1B18] dark:text-[#F5F2EB] hover:bg-[#F3EFE6] dark:hover:bg-[#141210] flex items-center gap-2.5 transition-colors"
+                >
+                  <Printer className="w-4 h-4 text-[#9E2A2B] shrink-0" />
+                  <div>
+                    <div className="font-semibold">Print / PDF Study Sheet</div>
+                    <div className="text-[11px] text-[#8E877E]">Formatted vocabulary handout</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportDropdownOpen(false);
+                    exportSavedWordsToCSV(savedWordsObjects, masteredWordIds, wordSRS);
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl text-left text-xs font-medium text-[#1E1B18] dark:text-[#F5F2EB] hover:bg-[#F3EFE6] dark:hover:bg-[#141210] flex items-center gap-2.5 transition-colors"
+                >
+                  <FileDown className="w-4 h-4 text-[#2D6A4F] shrink-0" />
+                  <div>
+                    <div className="font-semibold">Download Saved Words (.CSV)</div>
+                    <div className="text-[11px] text-[#8E877E]">{savedWordIds.length} bookmarked words</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Section-by-Section Distribution Filter Bar (Hidden when in Mistake Notebook view) */}
-      {viewMode !== 'mistakes' && (
-        <>
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 mb-5">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                <Filter className="w-3.5 h-3.5 text-[#B91C1C]" />
-                <span>Filter by Curriculum Section (12 Managed Lecture Banks):</span>
-              </div>
-              {selectedLectureNum !== null && (
-                <button
-                  onClick={() => {
-                    setSelectedLectureNum(null);
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline"
+      {/* ===================================================================== */}
+      {/* 2. MODE SWITCHER TABS (Scrollable on Mobile, Clean Pills on Desktop)  */}
+      {/* ===================================================================== */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+        {(
+          [
+            {
+              id: 'list',
+              label: 'Lexicon Cards',
+              badge: filteredWords.length.toLocaleString(),
+              icon: List,
+            },
+            {
+              id: 'table',
+              label: 'Vocab Table',
+              icon: List,
+            },
+            {
+              id: 'flashcards',
+              label: 'SRS Flashcards',
+              icon: Layers,
+            },
+            {
+              id: 'match',
+              label: 'Match Game',
+              icon: Trophy,
+            },
+            {
+              id: 'dictation',
+              label: 'Audio Dictation',
+              icon: Headphones,
+            },
+            {
+              id: 'quiz',
+              label: 'Speed Quiz',
+              icon: Zap,
+            },
+            {
+              id: 'mistakes',
+              label: 'Mistakes',
+              badge: mistakeNotebook.length > 0 ? String(mistakeNotebook.length) : undefined,
+              icon: AlertTriangle,
+            },
+          ] as {
+            id: ViewMode;
+            label: string;
+            badge?: string;
+            icon: React.ComponentType<{ className?: string }>;
+          }[]
+        ).map((tab) => {
+          const IconComponent = tab.icon;
+          const active = viewMode === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setViewMode(tab.id);
+                if (
+                  tab.id === 'flashcards' ||
+                  tab.id === 'match' ||
+                  tab.id === 'dictation' ||
+                  tab.id === 'quiz'
+                ) {
+                  handleReshuffleDictionaryPractice();
+                }
+              }}
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
+                active
+                  ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-[#FAF8F5] dark:text-[#1E1B18] border-[#1E1B18] dark:border-[#F5F2EB] font-semibold shadow-xs'
+                  : 'bg-white dark:bg-[#191715] text-[#5E5850] dark:text-[#A8A29E] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#8E877E]/50 hover:text-[#1E1B18] dark:hover:text-[#F5F2EB]'
+              }`}
+            >
+              <IconComponent
+                className={`w-3.5 h-3.5 ${
+                  active ? 'text-current' : 'text-[#9E2A2B] dark:text-[#F87171]'
+                }`}
+              />
+              <span>{tab.label}</span>
+              {tab.badge && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-semibold ${
+                    active
+                      ? 'bg-white/20 dark:bg-black/15 text-current'
+                      : 'bg-[#F3EFE6] dark:bg-[#141210] text-[#5E5850] dark:text-[#A8A29E]'
+                  }`}
                 >
-                  Show All 12 Sections ({allWords.length.toLocaleString()} words)
-                </button>
+                  {tab.badge}
+                </span>
               )}
-            </div>
+            </button>
+          );
+        })}
+      </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-              {lectures.slice(0, 12).map((lec) => {
-                const count = lectureWordCounts[lec.lectureNumber] || 0;
-                const isSelected = selectedLectureNum === lec.lectureNumber;
-                return (
-                  <button
-                    key={lec.id}
-                    onClick={() => {
-                      setSelectedLectureNum(isSelected ? null : lec.lectureNumber);
-                      setCurrentPage(1);
-                      setCardIndex(0);
-                    }}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      isSelected
-                        ? 'border-[#B91C1C] bg-[#B91C1C]/10 dark:bg-[#B91C1C]/20 ring-1 ring-[#B91C1C]'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C]/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[11px] font-ipa">
-                      <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                        L{String(lec.lectureNumber).padStart(2, '0')} · {lec.level}
-                      </span>
-                      <span className="text-[#57534E] dark:text-[#A8A29E]">{count}w</span>
-                    </div>
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate mt-0.5">
-                      {lec.category}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Search & Category Filter Controls */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-[#57534E] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+      {/* ===================================================================== */}
+      {/* 3. STREAMLINED SEARCH & FILTER BAR (Hidden in Mistake Notebook)       */}
+      {/* ===================================================================== */}
+      {viewMode !== 'mistakes' && (
+        <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-3 sm:p-4 mb-6 space-y-3 shadow-2xs">
+          {/* ROW 1: Search Bar + Curriculum Section Dropdown (12 Managed Lecture Banks) in Same Line */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-[#8E877E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -821,119 +1250,171 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   setCurrentPage(1);
                   setCardIndex(0);
                 }}
-                placeholder="Search 10,400+ English words, Nepali meanings, IPA, or topics (e.g. knight, plumber, sovereign)..."
-                className="w-full min-h-[46px] pl-11 pr-4 py-2.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#57534E]/70 focus:outline-none focus:border-[#B91C1C]"
+                placeholder="Search words, Nepali meanings, or IPA (e.g. knight, doubt)..."
+                className="w-full min-h-[42px] pl-10 pr-9 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] placeholder:text-[#8E877E] focus:outline-none focus:border-[#9E2A2B] transition-colors"
               />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F2ECE1] dark:bg-[#1F1C18] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-              {(
-                [
-                  { id: 'all', label: `All (${allWords.length.toLocaleString()})` },
-                  { id: 'core', label: `Core Lesson (${coreWordsCount})` },
-                  { id: 'srs', label: `SRS Deck (${Math.max(coreWordsCount, srsTrackedCount)})` },
-                  { id: 'silent', label: 'Silent Letters' },
-                  { id: 'saved', label: `Saved (${savedWordIds.length})` },
-                  { id: 'mastered', label: `Mastered (${masteredWordIds.length})` },
-                  { id: 'B1', label: 'B1' },
-                  { id: 'B2', label: 'B2' },
-                  { id: 'C1', label: 'C1' },
-                ] as { id: FilterMode; label: string }[]
-              ).map((tab) => (
+              {searchQuery && (
                 <button
-                  key={tab.id}
+                  type="button"
                   onClick={() => {
-                    setFilterMode(tab.id);
+                    setSearchQuery('');
                     setCurrentPage(1);
                     setCardIndex(0);
-                    setIsFlipped(false);
                   }}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                    filterMode === tab.id
-                      ? 'bg-white dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] font-semibold shadow-xs'
-                      : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
-                  }`}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#8E877E] hover:text-[#1E1B18] dark:hover:text-[#F5F2EB]"
                 >
-                  {tab.label}
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              ))}
+              )}
+            </div>
+
+            {/* Curriculum Section Dropdown (12 Managed Lecture Banks) — Right After Search Bar */}
+            <div ref={sectionDropdownRef} className="relative w-full md:w-[310px] shrink-0">
+              <button
+                type="button"
+                onClick={() => setSectionDropdownOpen((prev) => !prev)}
+                className={`w-full min-h-[42px] px-3.5 py-2 rounded-xl border text-left flex items-center justify-between gap-2 transition-all ${
+                  selectedLectureNum !== null
+                    ? 'bg-[#F9E6E6]/60 dark:bg-[#9E2A2B]/20 border-[#9E2A2B]/40 text-[#9E2A2B] dark:text-[#F87171]'
+                    : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB] hover:border-[#9E2A2B]/50'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Filter className="w-3.5 h-3.5 text-[#9E2A2B] shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    {selectedLectureObj
+                      ? `L${String(selectedLectureObj.lectureNumber).padStart(2, '0')} · ${selectedLectureObj.category}`
+                      : 'All 12 Curriculum Sections'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-ipa px-1.5 py-0.5 rounded-md bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]">
+                    {selectedLectureNum !== null
+                      ? `${lectureWordCounts[selectedLectureNum] || 0}w`
+                      : '12 banks'}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-[#8E877E] transition-transform duration-200 ${
+                      sectionDropdownOpen ? 'rotate-180 text-[#9E2A2B]' : ''
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {sectionDropdownOpen && (
+                <div className="absolute right-0 left-0 md:left-auto md:w-[360px] z-40 mt-2 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] shadow-xl p-1.5 max-h-[340px] overflow-y-auto space-y-1">
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8E877E]">
+                    Filter by Curriculum Section (12 Lecture Banks)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLectureNum(null);
+                      setCurrentPage(1);
+                      setCardIndex(0);
+                      setSectionDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between gap-2 transition-colors ${
+                      selectedLectureNum === null
+                        ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 text-[#9E2A2B] dark:text-[#F87171] font-semibold'
+                        : 'hover:bg-[#F3EFE6] dark:hover:bg-[#141210] text-[#1E1B18] dark:text-[#F5F2EB]'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-xs font-semibold">All 12 Curriculum Sections</div>
+                      <div className="text-[11px] text-[#8E877E]">
+                        Complete lexicon ({allWords.length.toLocaleString()} words)
+                      </div>
+                    </div>
+                    {selectedLectureNum === null && <Check className="w-4 h-4 text-[#9E2A2B]" />}
+                  </button>
+
+                  {lectures.slice(0, 12).map((lec) => {
+                    const count = lectureWordCounts[lec.lectureNumber] || 0;
+                    const isSelected = selectedLectureNum === lec.lectureNumber;
+                    return (
+                      <button
+                        key={lec.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedLectureNum(isSelected ? null : lec.lectureNumber);
+                          setCurrentPage(1);
+                          setCardIndex(0);
+                          setSectionDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition-colors ${
+                          isSelected
+                            ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 text-[#9E2A2B] dark:text-[#F87171]'
+                            : 'hover:bg-[#F3EFE6] dark:hover:bg-[#141210] text-[#1E1B18] dark:text-[#F5F2EB]'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold truncate">
+                            <span className="font-ipa text-[#9E2A2B] dark:text-[#F87171]">
+                              L{String(lec.lectureNumber).padStart(2, '0')}
+                            </span>
+                            <span>·</span>
+                            <span className="truncate">{lec.category}</span>
+                          </div>
+                          <div className="text-[11px] text-[#8E877E] truncate">{lec.title}</div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] font-ipa px-1.5 py-0.5 rounded bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]">
+                            {lec.level} · {count}w
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#9E2A2B]" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Silent-Letter Family Filter Pills + Commuter Audio Mode Toggle Bar */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                <Sparkles className="w-3.5 h-3.5 text-[#B91C1C]" />
-                <span>Silent-Letter Orthographic Family Filter Pills:</span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setStudySheetModalMode(filterMode === 'saved' ? 'saved' : 'combined')
-                  }
-                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Export / Print Study Sheet (PDF / CSV)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => exportSavedWordsToCSV(savedWordsObjects, masteredWordIds, wordSRS)}
-                  className="min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
-                  <span>Saved Words (.CSV)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCommuterOpen((prev) => !prev)}
-                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
-                    commuterOpen || commuterPlaying
-                      ? 'bg-[#B91C1C] text-white'
-                      : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
-                  }`}
-                >
-                  <Radio className={`w-3.5 h-3.5 ${commuterPlaying ? 'animate-pulse' : 'text-[#B91C1C]'}`} />
-                  <span>
-                    {commuterPlaying
-                      ? 'Commuter Audio Playing'
-                      : 'Commuter Audio Mode'}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              {SILENT_PATTERN_PILLS.map((pill) => {
-                const isSelected = silentPatternFilter === pill.id;
+          {/* ROW 2: Primary Useful Filters Outside + Secondary/Pattern Filters in Dropdown */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            {/* Primary Quick Filters (Outside — Mobile Scrollable) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-0.5">
+              {(
+                [
+                  { id: 'all', label: 'All Words', count: allWords.length.toLocaleString() },
+                  { id: 'core', label: 'Core Lesson', count: String(coreWordsCount) },
+                  {
+                    id: 'srs',
+                    label: 'SRS Deck',
+                    count: String(Math.max(coreWordsCount, srsTrackedCount)),
+                  },
+                  { id: 'saved', label: 'Saved', count: String(savedWordIds.length) },
+                  { id: 'silent', label: 'Silent Letters' },
+                ] as { id: FilterMode; label: string; count?: string }[]
+              ).map((pill) => {
+                const active = filterMode === pill.id;
                 return (
                   <button
                     key={pill.id}
                     type="button"
                     onClick={() => {
-                      setSilentPatternFilter(pill.id);
+                      setFilterMode(pill.id);
                       setCurrentPage(1);
                       setCardIndex(0);
+                      setIsFlipped(false);
                     }}
-                    className={`min-h-[36px] px-3 py-1 rounded-xl border text-xs font-medium transition-all inline-flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'border-[#B91C1C] bg-[#B91C1C] text-white font-semibold shadow-xs'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B91C1C]/50'
+                    className={`min-h-[34px] px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
+                      active
+                        ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] font-semibold'
+                        : 'bg-[#FAF8F5] dark:bg-[#141210] text-[#5E5850] dark:text-[#A8A29E] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]/40 hover:text-[#1E1B18] dark:hover:text-[#F5F2EB]'
                     }`}
                   >
                     <span>{pill.label}</span>
-                    {pill.id !== 'ALL' && (
+                    {pill.count !== undefined && (
                       <span
-                        className={`font-ipa text-[10px] ${
-                          isSelected ? 'text-white/80' : 'text-[#B91C1C] dark:text-[#F87171]'
+                        className={`text-[10px] font-ipa ${
+                          active ? 'text-white/85' : 'text-[#8E877E]'
                         }`}
                       >
-                        ({pill.example})
+                        {pill.count}
                       </span>
                     )}
                   </button>
@@ -941,188 +1422,315 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               })}
             </div>
 
-            {/* Hands-Free Commuter Audio Mode (Podcast Player) Drawer */}
-            {commuterOpen && (
-              <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] rounded-xl p-4 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                      <Headphones className="w-4 h-4" />
-                      <span>Hands-Free Commuter Audio Mode (Podcast Loop)</span>
-                    </div>
-                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                      Loops automatically: <strong>1.0x Word</strong> → <strong>2s Mental Recall Pause</strong> → <strong>0.75x Slow Phoneme</strong> → <strong>Example Sentence</strong>.
-                    </p>
-                  </div>
+            {/* Secondary Filters Dropdown (Mastered, CEFR Levels B1/B2/C1, Silent-Letter Families) */}
+            <div className="flex items-center gap-2 ml-auto">
+              {(selectedLectureNum !== null ||
+                filterMode !== 'all' ||
+                silentPatternFilter !== 'ALL' ||
+                searchQuery.trim() !== '') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterMode('all');
+                    setSelectedLectureNum(null);
+                    setSilentPatternFilter('ALL');
+                    setCurrentPage(1);
+                    setCardIndex(0);
+                  }}
+                  className="min-h-[34px] px-2.5 py-1 rounded-full text-[11px] font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#F9E6E6]/50 transition-colors"
+                >
+                  Reset
+                </button>
+              )}
 
-                  {/* Playlist Source Selector */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {(
-                      [
-                        { id: 'filtered', label: `Current Filter (${Math.min(100, filteredWords.length)})` },
-                        { id: 'saved', label: `Saved Words (${savedWordIds.length})` },
-                        { id: 'mistakes', label: `Mistake Notebook (${mistakeNotebook.length})` },
-                      ] as const
-                    ).map((src) => (
-                      <button
-                        key={src.id}
-                        type="button"
-                        onClick={() => {
-                          setCommuterPlaylistSource(src.id);
-                          setCommuterIndex(0);
-                        }}
-                        className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-                          commuterPlaylistSource === src.id
-                            ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] border-transparent'
-                            : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
-                        }`}
-                      >
-                        {src.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div ref={moreFiltersDropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMoreFiltersDropdownOpen((prev) => !prev)}
+                  className={`min-h-[34px] px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1.5 border transition-all ${
+                    isSecondaryFilterActive
+                      ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 border-[#9E2A2B]/40 text-[#9E2A2B] dark:text-[#F87171] font-semibold'
+                      : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E] hover:border-[#9E2A2B]/40'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                  <span className="max-w-[170px] truncate">{activeSecondaryFilterLabel}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${
+                      moreFiltersDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
 
-                {currentCommuterWord ? (
-                  <div className="p-4 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
-                          Track {(commuterIndex % Math.max(1, commuterPlaylist.length)) + 1} / {commuterPlaylist.length}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171] font-ipa text-[11px] font-semibold">
-                          {commuterPhase === 'word-1x' && '1/4 · Speaking Word (1.0x)...'}
-                          {commuterPhase === 'pause-2s' && '2/4 · 2s Mental Recall Pause...'}
-                          {commuterPhase === 'word-075x' && '3/4 · Slow Articulation (0.75x)...'}
-                          {commuterPhase === 'sentence' && '4/4 · Reading Example Sentence...'}
-                          {commuterPhase === 'idle' && 'Ready to Play'}
-                        </span>
+                {moreFiltersDropdownOpen && (
+                  <div className="absolute right-0 z-40 mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] shadow-xl p-3 space-y-3 max-h-[380px] overflow-y-auto">
+                    {/* Mastery & CEFR Level Section */}
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#8E877E] mb-1.5 px-1">
+                        Level &amp; Mastery Status
                       </div>
-
-                      <div className="flex flex-wrap items-baseline gap-2.5">
-                        <span className="text-xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
-                          {currentCommuterWord.word}
-                        </span>
-                        <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
-                          {currentCommuterWord.ipa}
-                        </span>
-                        <span className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
-                          {currentCommuterWord.nepaliMeaning}
-                        </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(
+                          [
+                            { id: 'mastered', label: `Mastered (${masteredWordIds.length})` },
+                            { id: 'B1', label: 'Level B1 · Foundation' },
+                            { id: 'B2', label: 'Level B2 · Workplace' },
+                            { id: 'C1', label: 'Level C1 · Advanced' },
+                          ] as { id: FilterMode; label: string }[]
+                        ).map((opt) => {
+                          const active = filterMode === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                setFilterMode(active ? 'all' : opt.id);
+                                setCurrentPage(1);
+                                setCardIndex(0);
+                              }}
+                              className={`px-2.5 py-2 rounded-xl text-left text-xs font-medium border flex items-center justify-between transition-colors ${
+                                active
+                                  ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 border-[#9E2A2B]/40 text-[#9E2A2B] dark:text-[#F87171] font-semibold'
+                                  : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB] hover:border-[#9E2A2B]/40'
+                              }`}
+                            >
+                              <span className="truncate">{opt.label}</span>
+                              {active && <Check className="w-3.5 h-3.5 shrink-0 text-[#9E2A2B]" />}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        “{currentCommuterWord.englishExample}”
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (commuterPlaying) {
-                            setCommuterPlaying(false);
-                            speechService.stop();
-                          } else {
-                            setCommuterPlaying(true);
-                          }
-                        }}
-                        className={`min-h-[42px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 ${
-                          commuterPlaying
-                            ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917]'
-                            : 'bg-[#B91C1C] text-white'
-                        }`}
-                      >
-                        {commuterPlaying ? (
-                          <>
-                            <Square className="w-3.5 h-3.5" />
-                            <span>Stop Loop</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3.5 h-3.5" />
-                            <span>Start Loop</span>
-                          </>
+                    {/* Silent-Letter Pattern Filter inside Dropdown */}
+                    <div className="pt-2 border-t border-[#E8E0D2] dark:border-[#2C2621]">
+                      <div className="flex items-center justify-between mb-1.5 px-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#8E877E]">
+                          Silent-Letter Pattern Family
+                        </span>
+                        {silentPatternFilter !== 'ALL' && (
+                          <button
+                            type="button"
+                            onClick={() => setSilentPatternFilter('ALL')}
+                            className="text-[10px] font-semibold text-[#9E2A2B] hover:underline"
+                          >
+                            Clear pattern
+                          </button>
                         )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCommuterIndex((prev) => (prev + 1) % Math.max(1, commuterPlaylist.length))
-                        }
-                        className="min-h-[42px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold inline-flex items-center gap-1"
-                      >
-                        <SkipForward className="w-3.5 h-3.5" />
-                        <span>Next</span>
-                      </button>
+                      </div>
+                      <div className="space-y-1">
+                        {SILENT_PATTERN_PILLS.map((pill) => {
+                          const isSelected = silentPatternFilter === pill.id;
+                          return (
+                            <button
+                              key={pill.id}
+                              type="button"
+                              onClick={() => {
+                                setSilentPatternFilter(pill.id);
+                                setCurrentPage(1);
+                                setCardIndex(0);
+                                setMoreFiltersDropdownOpen(false);
+                              }}
+                              className={`w-full px-2.5 py-2 rounded-xl text-left text-xs flex items-center justify-between transition-colors ${
+                                isSelected
+                                  ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 text-[#9E2A2B] dark:text-[#F87171] font-semibold'
+                                  : 'hover:bg-[#F3EFE6] dark:hover:bg-[#141210] text-[#1E1B18] dark:text-[#F5F2EB]'
+                              }`}
+                            >
+                              <span>{pill.label}</span>
+                              <div className="flex items-center gap-2">
+                                {pill.id !== 'ALL' && (
+                                  <span className="font-ipa text-[11px] text-[#8E877E]">
+                                    {pill.example}
+                                  </span>
+                                )}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-[#9E2A2B]" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                    No words in the selected playlist source. Try switching to Current Filter.
-                  </p>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </>
+
+          {/* Hands-Free Commuter Audio Mode Drawer (Only shown when toggled open) */}
+          {commuterOpen && (
+            <div className="pt-3 border-t border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] rounded-xl p-3.5 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
+                    <Headphones className="w-3.5 h-3.5" />
+                    <span>Hands-Free Commuter Audio Loop</span>
+                  </div>
+                  <p className="text-[11px] text-[#5E5850] dark:text-[#A8A29E]">
+                    Plays 1.0x Word → 2s recall pause → 0.75x slow phoneme → example sentence.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1">
+                  {(
+                    [
+                      { id: 'filtered', label: `Current (${Math.min(100, filteredWords.length)})` },
+                      { id: 'saved', label: `Saved (${savedWordIds.length})` },
+                      { id: 'mistakes', label: `Mistakes (${mistakeNotebook.length})` },
+                    ] as const
+                  ).map((src) => (
+                    <button
+                      key={src.id}
+                      type="button"
+                      onClick={() => {
+                        setCommuterPlaylistSource(src.id);
+                        setCommuterIndex(0);
+                      }}
+                      className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+                        commuterPlaylistSource === src.id
+                          ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18] border-transparent'
+                          : 'bg-white dark:bg-[#1F1C18] border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]'
+                      }`}
+                    >
+                      {src.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {currentCommuterWord ? (
+                <div className="p-3 rounded-xl bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <span className="font-ipa text-[#8E877E]">
+                        Track {(commuterIndex % Math.max(1, commuterPlaylist.length)) + 1}/
+                        {commuterPlaylist.length}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-[#F9E6E6] dark:bg-[#9E2A2B]/20 text-[#9E2A2B] dark:text-[#F87171] font-semibold">
+                        {commuterPhase === 'word-1x' && 'Speaking 1.0x...'}
+                        {commuterPhase === 'pause-2s' && '2s Recall Pause...'}
+                        {commuterPhase === 'word-075x' && 'Slow 0.75x...'}
+                        {commuterPhase === 'sentence' && 'Reading Sentence...'}
+                        {commuterPhase === 'idle' && 'Ready'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-base font-bold text-[#1E1B18] dark:text-[#F5F2EB]">
+                        {currentCommuterWord.word}
+                      </span>
+                      <span className="font-ipa text-xs text-[#8E877E]">
+                        {currentCommuterWord.ipa}
+                      </span>
+                      <span className="font-nepali text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
+                        {currentCommuterWord.nepaliMeaning}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (commuterPlaying) {
+                          setCommuterPlaying(false);
+                          speechService.stop();
+                        } else {
+                          setCommuterPlaying(true);
+                        }
+                      }}
+                      className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 ${
+                        commuterPlaying
+                          ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18]'
+                          : 'bg-[#9E2A2B] text-white'
+                      }`}
+                    >
+                      {commuterPlaying ? (
+                        <>
+                          <Square className="w-3 h-3" />
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3 h-3" />
+                          <span>Play</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCommuterIndex(
+                          (prev) => (prev + 1) % Math.max(1, commuterPlaylist.length)
+                        )
+                      }
+                      className="min-h-[36px] px-2.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1"
+                    >
+                      <SkipForward className="w-3.5 h-3.5" />
+                      <span>Next</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[#8E877E]">No words in the selected playlist source.</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ===================================================================== */}
-      {/* MISTAKE NOTEBOOK (WEAK-WORDS & MISSED QUIZ VAULT)                     */}
+      {/* 4. MISTAKE NOTEBOOK VIEW                                              */}
       {/* ===================================================================== */}
       {viewMode === 'mistakes' && (
-        <div className="space-y-5">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                  Personal Weak-Words & Missed Quiz Vault
-                </div>
-                <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                  Mistake Notebook ({mistakeNotebook.length} Active Review Items)
-                </h2>
-                <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
-                  Every time you miss a Spelling Quiz, Grammar Capstone, Speed Quiz, or Audio Dictation item, it is saved here. Answer an item accurately <strong>twice in a row (2/2)</strong> to graduate it out of your notebook!
-                </p>
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#9E2A2B] dark:text-[#F87171]">
+                Targeted Weak-Word Review
               </div>
+              <h2 className="font-serif text-xl sm:text-2xl text-[#1E1B18] dark:text-[#F5F2EB] mt-0.5">
+                Mistake notebook ({mistakeNotebook.length})
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] mt-1">
+                Answer any missed item accurately <strong>twice in a row (2/2)</strong> to graduate it out of your notebook.
+              </p>
+            </div>
 
-              {/* Export & Print Mistake Notebook Controls */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setStudySheetModalMode('mistakes')}
-                  className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print / Save PDF Study Sheet</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exportMistakeNotebookToCSV(mistakeNotebook)}
-                  className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 transition-colors"
-                >
-                  <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
-                  <span>Export Mistakes (.CSV)</span>
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setStudySheetModalMode('mistakes')}
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Sheet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => exportMistakeNotebookToCSV(mistakeNotebook)}
+                className="min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-xs font-semibold text-[#1E1B18] dark:text-[#F5F2EB] inline-flex items-center gap-1.5"
+              >
+                <FileDown className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                <span>CSV</span>
+              </button>
             </div>
           </div>
 
           {mistakeNotebook.length === 0 ? (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-10 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#15803D]/10 text-[#15803D] flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6" />
+            <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-8 sm:p-10 text-center space-y-2.5">
+              <div className="w-11 h-11 rounded-2xl bg-[#E3EFE8] text-[#2D6A4F] flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Your Mistake Notebook is Clear!
+              <h3 className="font-serif text-lg text-[#1E1B18] dark:text-[#F5F2EB]">
+                Your mistake notebook is clear
               </h3>
-              <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
-                You have no pending missed items. Practice Audio Dictation Bee, Speed Quiz, or Lecture Quizzes—any tricky words you miss will automatically appear here for targeted review.
+              <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] max-w-md mx-auto">
+                Any tricky words you miss during Audio Dictation or Speed Quiz will automatically appear here for review.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-3.5">
               {mistakeNotebook.map((item) => {
                 const selectedAns = mistakeAnswers[item.id];
                 const isCorrect =
@@ -1131,65 +1739,64 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-4"
+                    className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-4 sm:p-5 space-y-3.5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171] uppercase">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md bg-[#F9E6E6] dark:bg-[#9E2A2B]/20 text-[#9E2A2B] dark:text-[#F87171] font-semibold uppercase text-[10px]">
                           {item.sourceType}
                         </span>
-                        <span>·</span>
                         <button
                           onClick={() => onOpenLecture(item.lectureId)}
-                          className="font-semibold hover:underline text-[#1C1917] dark:text-[#F5F2EB]"
+                          className="font-semibold hover:underline text-[#1E1B18] dark:text-[#F5F2EB]"
                         >
-                          Lecture {String(item.lectureNumber).padStart(2, '0')}
+                          L{String(item.lectureNumber).padStart(2, '0')}
                         </button>
-                        <span>·</span>
-                        <span className="text-[#57534E] dark:text-[#A8A29E]">
-                          Previous mistake: <del className="text-[#B91C1C]">{item.userWrongAnswer}</del>
+                        <span className="text-[#8E877E]">·</span>
+                        <span className="text-[#5E5850] dark:text-[#A8A29E]">
+                          Missed: <del className="text-[#9E2A2B]">{item.userWrongAnswer}</del>
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className="font-ipa text-xs text-[#15803D] dark:text-emerald-400 font-semibold">
-                          Mastery Streak: {item.consecutiveCorrect} / 2
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-ipa text-[11px] text-[#2D6A4F] dark:text-emerald-400 font-semibold">
+                          Streak {item.consecutiveCorrect}/2
                         </span>
                         {onRemoveMistake && (
                           <button
                             onClick={() => onRemoveMistake(item.id)}
-                            className="p-1.5 rounded-lg text-[#57534E] hover:text-[#B91C1C]"
+                            className="p-1 rounded-lg text-[#8E877E] hover:text-[#9E2A2B]"
                             title="Remove from notebook"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
 
-                    <p className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                    <p className="text-sm sm:text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
                       {item.prompt}
                     </p>
                     {item.nepaliHint && (
-                      <p className="font-nepali text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
-                        Hint / Context: “{item.nepaliHint}”
+                      <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                        Hint: “{item.nepaliHint}”
                       </p>
                     )}
 
                     {item.options && item.options.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {item.options.map((opt) => {
                           const isThisSelected = selectedAns === opt;
                           const isThisRight = opt === item.correctAnswer;
                           let style =
-                            'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
+                            'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621]';
                           if (selectedAns) {
                             if (isThisRight) {
                               style =
-                                'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] font-semibold';
+                                'bg-[#E3EFE8] dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] font-semibold';
                             } else if (isThisSelected) {
                               style =
-                                'bg-red-50 dark:bg-red-950/40 border-[#B91C1C] text-[#B91C1C] line-through';
+                                'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] text-[#9E2A2B] line-through';
                             }
                           }
                           return (
@@ -1201,7 +1808,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                                   onPracticeMistake(item.id, opt === item.correctAnswer);
                                 }
                               }}
-                              className={`min-h-[42px] px-4 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${style}`}
+                              className={`min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${style}`}
                             >
                               <span>{opt}</span>
                               {selectedAns && isThisRight && <Check className="w-4 h-4" />}
@@ -1210,15 +1817,14 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         })}
                       </div>
                     ) : (
-                      /* Free-text re-drill for Dictation items */
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <button
                           onClick={() =>
                             speechService.speak(item.correctAnswer, { rate: preferredSpeechRate })
                           }
-                          className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold inline-flex items-center gap-1.5"
+                          className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-xs font-semibold inline-flex items-center justify-center gap-1.5"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                          <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                           <span>Hear Word</span>
                         </button>
                         <input
@@ -1227,8 +1833,8 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           onChange={(e) =>
                             setMistakeAnswers((prev) => ({ ...prev, [item.id]: e.target.value }))
                           }
-                          placeholder="Type the exact spelling..."
-                          className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-sm font-ipa"
+                          placeholder="Type exact spelling..."
+                          className="flex-1 min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-sm font-ipa"
                         />
                         <button
                           onClick={() => {
@@ -1236,17 +1842,17 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               onPracticeMistake(item.id, isCorrect);
                             }
                           }}
-                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
+                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold"
                         >
-                          Verify Spelling
+                          Verify
                         </button>
                       </div>
                     )}
 
                     {selectedAns && (
-                      <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
-                          Target Answer: “{item.correctAnswer}” —{' '}
+                      <div className="p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                        <strong className="text-[#1E1B18] dark:text-[#F5F2EB]">
+                          Answer: “{item.correctAnswer}” —{' '}
                         </strong>
                         {item.explanation}
                       </div>
@@ -1260,55 +1866,125 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       )}
 
       {/* ===================================================================== */}
-      {/* AUDIO DICTATION & SPELLING BEE TYPING MODE                            */}
+      {/* 5. AUDIO DICTATION BEE MODE                                           */}
       {/* ===================================================================== */}
       {viewMode === 'dictation' && currentDictationWord && (
-        <div className="max-w-2xl mx-auto py-2">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs">
-              <div className="flex items-center gap-2">
-                <Headphones className="w-4 h-4 text-[#B91C1C]" />
-                <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                  Audio Dictation & Silent-Letter Spelling Bee
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-5 sm:p-7 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-[#E8E0D2] dark:border-[#2C2621] text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <Headphones className="w-4 h-4 text-[#9E2A2B]" />
+                <span className="font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                  Audio Dictation
                 </span>
-                <span>·</span>
-                <span>
-                  Lecture {String(currentDictationWord.lectureNumber).padStart(2, '0')} (
+                <span className="text-[#8E877E]">·</span>
+                <span className="text-[#5E5850] dark:text-[#A8A29E]">
+                  Set Item #{(dictationIndex % Math.max(1, shuffledPracticePool.length)) + 1} · L
+                  {String(currentDictationWord.lectureNumber).padStart(2, '0')} (
                   {currentDictationWord.level})
                 </span>
               </div>
-              <div className="font-ipa flex items-center gap-3">
+              <div className="font-ipa flex flex-wrap items-center gap-2.5 text-xs">
+                {dictationTimerRunning ? (
+                  <span
+                    className={`px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
+                      dictationSecondsLeft <= 10
+                        ? 'bg-[#F9E6E6] text-[#9E2A2B] animate-pulse'
+                        : 'bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB]'
+                    }`}
+                  >
+                    <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                    <span>{dictationSecondsLeft}s</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleStartDictationTimed(60)}
+                    className="px-2.5 py-1 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] font-semibold inline-flex items-center gap-1 text-[#1E1B18] dark:text-[#F5F2EB]"
+                  >
+                    <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                    <span>60s Challenge</span>
+                  </button>
+                )}
                 <span>
                   Score: <strong>{dictationStats.correct}</strong>/{dictationStats.total}
                 </span>
-                <span className="text-[#D97706]">Streak: {dictationStats.streak}</span>
+                <span className="text-[#B8863B] font-semibold">
+                  Streak {dictationStats.streak}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleReshuffleDictionaryPractice}
+                  className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] font-semibold inline-flex items-center gap-1"
+                  title="Shuffle questions and options"
+                >
+                  <Shuffle className="w-3 h-3 text-[#9E2A2B]" />
+                  <span>Shuffle</span>
+                </button>
               </div>
             </div>
 
-            <div className="text-center space-y-4 py-2">
-              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                Listen carefully to the word and type its exact English spelling (including silent letters!):
+            {/* Dictation Mode Toggle: 4-Option Spelling Check vs Type Exact Spelling */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex rounded-xl p-1 bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDictationMode('options');
+                    setDictationSubmitted(false);
+                    setDictationInput('');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    dictationMode === 'options'
+                      ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18]'
+                      : 'text-[#5E5850] dark:text-[#A8A29E]'
+                  }`}
+                >
+                  4-Option Spelling Check
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDictationMode('type');
+                    setDictationSubmitted(false);
+                    setDictationInput('');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    dictationMode === 'type'
+                      ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18]'
+                      : 'text-[#5E5850] dark:text-[#A8A29E]'
+                  }`}
+                >
+                  Type Exact Spelling
+                </button>
               </div>
+              {dictationSecondsLeft === 0 && !dictationTimerRunning && dictationStats.total > 0 && (
+                <span className="text-xs font-semibold text-[#9E2A2B]">
+                  Time&apos;s up! Final 60s Score: {dictationStats.correct}/{dictationStats.total}
+                </span>
+              )}
+            </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="text-center space-y-4">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={() =>
                     speechService.speak(currentDictationWord.word, { rate: preferredSpeechRate })
                   }
-                  className="min-h-[48px] px-5 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#991B1B]"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2 hover:bg-[#822021]"
                 >
                   <Volume2 className="w-4 h-4" />
-                  <span>Play Word (1.0x)</span>
+                  <span>Play Word</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => speechService.speak(currentDictationWord.word, { rate: 0.6 })}
-                  className="min-h-[48px] px-4 py-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm font-semibold inline-flex items-center gap-2"
+                  className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1.5"
                 >
-                  <Turtle className="w-4 h-4 text-[#D97706]" />
-                  <span>Slow Audio (0.65x)</span>
+                  <Turtle className="w-4 h-4 text-[#B8863B]" />
+                  <span>Slow (0.6x)</span>
                 </button>
 
                 <button
@@ -1318,87 +1994,142 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                       rate: preferredSpeechRate,
                     })
                   }
-                  className="min-h-[48px] px-4 py-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-2"
+                  className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-medium inline-flex items-center gap-1.5"
                 >
-                  <Volume2 className="w-4 h-4 text-[#57534E]" />
-                  <span>Hear in Sentence</span>
+                  <Volume2 className="w-3.5 h-3.5 text-[#5E5850]" />
+                  <span>Sentence</span>
                 </button>
               </div>
 
-              {/* Meaning & Phonics Hint Card */}
-              <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] max-w-lg mx-auto space-y-1">
-                <div className="font-nepali text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Meaning: {currentDictationWord.nepaliMeaning}
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] max-w-lg mx-auto space-y-1">
+                <div className="font-nepali text-sm sm:text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                  {currentDictationWord.nepaliMeaning}
                 </div>
-                <div className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  IPA: {currentDictationWord.ipa} · {currentDictationWord.partOfSpeech} · Hint:{' '}
-                  <strong className="text-[#B91C1C] dark:text-[#F87171]">
+                <div className="font-ipa text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                  {currentDictationWord.ipa} · {currentDictationWord.partOfSpeech} ·{' '}
+                  <strong className="text-[#9E2A2B] dark:text-[#F87171]">
                     {currentDictationWord.silentLettersSummary}
                   </strong>
                 </div>
               </div>
             </div>
 
-            <form onSubmit={handleCheckDictation} className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <input
-                  type="text"
-                  value={dictationInput}
-                  onChange={(e) => setDictationInput(e.target.value)}
-                  disabled={dictationSubmitted}
-                  placeholder="Type the English word here..."
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] font-ipa text-base text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#B91C1C]"
-                />
-                {!dictationSubmitted ? (
-                  <button
-                    type="submit"
-                    disabled={!dictationInput.trim()}
-                    className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs sm:text-sm font-semibold disabled:opacity-40"
-                  >
-                    Check Spelling
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleNextDictationWord}
-                    className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5"
-                  >
-                    <span>Next Word</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+            {dictationMode === 'options' ? (
+              <div className="space-y-3">
+                <div className="text-xs text-center text-[#5E5850] dark:text-[#A8A29E]">
+                  Select the correct silent-letter English spelling:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {dictationSpellingOptions.map((opt, idx) => {
+                    const isSelected = dictationInput === opt;
+                    const isCorrect =
+                      opt.trim().toLowerCase() === currentDictationWord.word.trim().toLowerCase();
+                    let optClass =
+                      'border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] hover:border-[#9E2A2B]';
+                    if (dictationSubmitted) {
+                      if (isCorrect) {
+                        optClass =
+                          'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold';
+                      } else if (isSelected) {
+                        optClass =
+                          'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300';
+                      }
+                    }
+                    return (
+                      <button
+                        key={`${opt}-${idx}`}
+                        type="button"
+                        disabled={dictationSubmitted}
+                        onClick={() => {
+                          handleSubmitDictationAnswer(opt);
+                        }}
+                        className={`min-h-[46px] px-4 py-2.5 rounded-xl border font-ipa text-sm sm:text-base flex items-center justify-between gap-2 transition-all ${optClass}`}
+                      >
+                        <span>{opt}</span>
+                        {dictationSubmitted && isCorrect && (
+                          <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
+                        )}
+                        {dictationSubmitted && isSelected && !isCorrect && (
+                          <XCircle className="w-4 h-4 text-[#9E2A2B] shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {dictationSubmitted && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleNextDictationWord}
+                      className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5"
+                    >
+                      <span>Next Word</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleCheckDictation} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={dictationInput}
+                    onChange={(e) => setDictationInput(e.target.value)}
+                    disabled={dictationSubmitted}
+                    placeholder="Type the English spelling..."
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] font-ipa text-sm sm:text-base text-[#1E1B18] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
+                  />
+                  {!dictationSubmitted ? (
+                    <button
+                      type="submit"
+                      disabled={!dictationInput.trim()}
+                      className="min-h-[44px] px-5 py-2 rounded-xl bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18] text-xs sm:text-sm font-semibold disabled:opacity-40"
+                    >
+                      Check
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleNextDictationWord}
+                      className="min-h-[44px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5"
+                    >
+                      <span>Next Word</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
 
             {dictationSubmitted && (
-              <div className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
+              <div className="p-4 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] space-y-2">
                 {dictationInput.trim().toLowerCase() ===
                 currentDictationWord.word.trim().toLowerCase() ? (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Exact Spelling Match!</span>
+                    <span>Exact spelling match!</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     <XCircle className="w-4 h-4" />
                     <span>
-                      Not quite — You typed “{dictationInput.trim()}” (Saved to Mistake Notebook)
+                      You answered “{dictationInput.trim()}” (Added to Mistake Notebook)
                     </span>
                   </div>
                 )}
 
-                {/* Visual Silent-Letter Breakdown of Target Word */}
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <span className="text-xs text-[#57534E]">Correct Orthography:</span>
-                  <span className="text-2xl font-bold font-ipa text-[#1C1917] dark:text-[#F5F2EB]">
+                <div className="flex flex-wrap items-baseline gap-2.5">
+                  <span className="text-xs text-[#8E877E]">Spelling:</span>
+                  <span className="text-xl font-bold font-ipa text-[#1E1B18] dark:text-[#F5F2EB]">
                     {currentDictationWord.segments?.map((seg, idx) =>
                       seg.silent ? (
                         <span
                           key={idx}
-                          className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/12 underline decoration-dotted px-0.5 rounded"
+                          className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted px-0.5 rounded"
                         >
                           {seg.text}
                         </span>
@@ -1408,9 +2139,8 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     )}
                   </span>
                 </div>
-
-                <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  Example: “{currentDictationWord.englishExample}”
+                <p className="text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                  “{currentDictationWord.englishExample}”
                 </p>
               </div>
             )}
@@ -1418,116 +2148,200 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         </div>
       )}
 
-      {/* Empty State */}
+      {/* ===================================================================== */}
+      {/* 6. EMPTY STATE                                                        */}
+      {/* ===================================================================== */}
       {viewMode !== 'mistakes' && filteredWords.length === 0 && (
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-10 text-center">
-          <p className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-1">
-            No matching vocabulary words found
+        <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-8 sm:p-10 text-center">
+          <p className="font-serif text-lg text-[#1E1B18] dark:text-[#F5F2EB] mb-1">
+            No matching words found
           </p>
-          <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mb-4">
-            Try searching for another word or resetting your active section filter.
+          <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] mb-4">
+            Try clearing your search or switching your active curriculum section filter.
           </p>
           <button
             onClick={() => {
               setSearchQuery('');
               setFilterMode('all');
               setSelectedLectureNum(null);
+              setSilentPatternFilter('ALL');
               setCurrentPage(1);
             }}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
+            className="min-h-[40px] px-4 py-2 rounded-full bg-[#9E2A2B] text-white text-xs font-semibold"
           >
-            Reset All Filters
+            Reset all filters
           </button>
         </div>
       )}
 
-      {/* SPEED QUIZ DRILL MODE */}
+      {/* ===================================================================== */}
+      {/* 7. SPEED QUIZ DRILL MODE                                              */}
+      {/* ===================================================================== */}
       {viewMode === 'quiz' && currentQuizQuestion && (
-        <div className="max-w-2xl mx-auto py-2">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs">
-              <div>
-                <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                  Vocabulary Speed Quiz
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-5 sm:p-7 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-[#E8E0D2] dark:border-[#2C2621] text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
+                  Speed Quiz
                 </span>
-                <span className="mx-2">·</span>
-                <span>
-                  Lecture {String(currentQuizQuestion.target.lectureNumber).padStart(2, '0')} (
+                <span className="text-[#8E877E]">·</span>
+                <span className="text-[#5E5850] dark:text-[#A8A29E]">
+                  Q#{quizIndex + 1} · L
+                  {String(currentQuizQuestion.target.lectureNumber).padStart(2, '0')} (
                   {currentQuizQuestion.target.level})
                 </span>
               </div>
-              <div className="font-ipa flex items-center gap-3">
+              <div className="font-ipa flex flex-wrap items-center gap-2.5">
+                {quizTimerRunning ? (
+                  <span
+                    className={`px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
+                      quizSecondsLeft <= 10
+                        ? 'bg-[#F9E6E6] text-[#9E2A2B] animate-pulse'
+                        : 'bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB]'
+                    }`}
+                  >
+                    <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                    <span>{quizSecondsLeft}s</span>
+                  </span>
+                ) : (
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleStartQuizTimedChallenge(60)}
+                      className="px-2.5 py-1 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] font-semibold inline-flex items-center gap-1 text-[#1E1B18] dark:text-[#F5F2EB]"
+                    >
+                      <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                      <span>60s Challenge</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartQuizTimedChallenge(30)}
+                      className="px-2 py-1 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#B8863B] font-semibold text-[11px] text-[#5E5850] dark:text-[#A8A29E]"
+                    >
+                      30s Blitz
+                    </button>
+                  </div>
+                )}
                 <span>
                   Score: <strong>{quizScore.correct}</strong>/{quizScore.total}
                 </span>
-                <span className="text-[#D97706]">Streak: {quizScore.streak}</span>
+                <span className="text-[#B8863B] font-semibold">Streak {quizScore.streak}</span>
+                <button
+                  type="button"
+                  onClick={handleReshuffleDictionaryPractice}
+                  className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] font-semibold inline-flex items-center gap-1"
+                  title="Shuffle questions and options"
+                >
+                  <Shuffle className="w-3 h-3 text-[#9E2A2B]" />
+                  <span>Shuffle</span>
+                </button>
               </div>
             </div>
 
-            <div className="text-center space-y-3 py-2">
-              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                Select the accurate Nepali meaning for:
+            {/* Question Set Mode Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { id: 'en-to-ne', label: 'English → Nepali' },
+                    { id: 'ne-to-en', label: 'Nepali → English' },
+                    { id: 'silent-rule', label: 'Silent-Letter Rule' },
+                    { id: 'naati-set', label: 'NAATI Vocab Set' },
+                  ] as const
+                ).map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => {
+                      setQuizModeType(mode.id);
+                      setQuizSelectedOption(null);
+                      setDictShuffleSeed((s) => s + 1);
+                      setQuizIndex(0);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      quizModeType === mode.id
+                        ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18] border-[#1E1B18] dark:border-[#F5F2EB]'
+                        : 'bg-[#FAF8F5] dark:bg-[#141210] text-[#5E5850] dark:text-[#A8A29E] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
               </div>
-              <div className="text-3xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                {currentQuizQuestion.target.segments?.map((seg, i) =>
-                  seg.silent ? (
-                    <span
-                      key={i}
-                      className="text-[#B91C1C] dark:text-[#F87171] underline decoration-dotted"
-                    >
-                      {seg.text}
-                    </span>
-                  ) : (
-                    <span key={i}>{seg.text}</span>
-                  )
-                )}
+              {quizSecondsLeft === 0 && !quizTimerRunning && quizScore.total > 0 && (
+                <span className="text-xs font-semibold text-[#9E2A2B]">
+                  Time&apos;s up! Timed Score: {quizScore.correct}/{quizScore.total}
+                </span>
+              )}
+            </div>
+
+            <div className="text-center space-y-2.5">
+              <div className="text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                {currentQuizQuestion.promptTitle}
               </div>
-              <div className="font-ipa text-sm text-[#57534E] dark:text-[#A8A29E]">
-                {currentQuizQuestion.target.ipa} · {currentQuizQuestion.target.partOfSpeech}
+              <div className="font-serif text-2xl sm:text-4xl text-[#1E1B18] dark:text-[#F5F2EB]">
+                {quizModeType === 'en-to-ne' || quizModeType === 'silent-rule'
+                  ? currentQuizQuestion.target.segments?.map((seg, i) =>
+                      seg.silent && quizModeType === 'en-to-ne' ? (
+                        <span
+                          key={i}
+                          className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted"
+                        >
+                          {seg.text}
+                        </span>
+                      ) : (
+                        <span key={i}>{seg.text}</span>
+                      )
+                    )
+                  : currentQuizQuestion.promptMain}
               </div>
-              <div className="flex justify-center gap-2 pt-1">
+              <div className="font-ipa text-xs sm:text-sm text-[#8E877E]">
+                {currentQuizQuestion.promptSub}
+              </div>
+              <div className="pt-1">
                 <button
                   onClick={() =>
                     speechService.speak(currentQuizQuestion.target.word, {
                       rate: preferredSpeechRate,
                     })
                   }
-                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
+                  className="min-h-[36px] px-3.5 py-1.5 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1.5"
                 >
-                  <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                  <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                   <span>Listen</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {currentQuizQuestion.options.map((opt, idx) => {
                 const isSelected = quizSelectedOption === opt;
-                const isAnswer = opt === currentQuizQuestion.target.nepaliMeaning;
+                const isAnswer = opt === currentQuizQuestion.correctAnswer;
                 let btnStyle =
-                  'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C]';
+                  'border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] hover:border-[#9E2A2B]';
                 if (quizSelectedOption) {
                   if (isAnswer) {
                     btnStyle =
-                      'border-[#15803D] bg-emerald-50/80 dark:bg-emerald-950/40 text-[#15803D] dark:text-emerald-300 font-semibold';
+                      'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold';
                   } else if (isSelected) {
                     btnStyle =
-                      'border-[#B91C1C] bg-red-50/80 dark:bg-red-950/40 text-[#B91C1C] dark:text-red-300';
+                      'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300';
                   }
                 }
                 return (
                   <button
-                    key={idx}
+                    key={`${opt}-${idx}`}
                     onClick={() => handleAnswerQuiz(opt)}
                     disabled={Boolean(quizSelectedOption)}
-                    className={`min-h-[48px] p-3.5 rounded-xl border text-left font-nepali text-sm sm:text-base flex items-center justify-between gap-3 transition-all ${btnStyle}`}
+                    className={`min-h-[46px] px-4 py-2.5 rounded-xl border text-left font-nepali text-sm sm:text-base flex items-center justify-between gap-3 transition-all ${btnStyle}`}
                   >
                     <span>{opt}</span>
                     {quizSelectedOption && isAnswer && (
-                      <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                     )}
                     {quizSelectedOption && isSelected && !isAnswer && (
-                      <XCircle className="w-4 h-4 text-[#B91C1C] shrink-0" />
+                      <XCircle className="w-4 h-4 text-[#9E2A2B] shrink-0" />
                     )}
                   </button>
                 );
@@ -1535,21 +2349,22 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
             </div>
 
             {quizSelectedOption && (
-              <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="text-xs space-y-1">
-                  <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    Example: “{currentQuizQuestion.target.englishExample}”
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs space-y-0.5">
+                  <div className="font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                    “{currentQuizQuestion.target.englishExample}”
                   </div>
-                  <div className="text-[#57534E] dark:text-[#A8A29E]">
-                    Phonics: {currentQuizQuestion.target.silentLettersSummary}
+                  <div className="text-[#8E877E]">
+                    {currentQuizQuestion.target.word} ({currentQuizQuestion.target.nepaliMeaning}) ·{' '}
+                    {currentQuizQuestion.target.silentLettersSummary}
                   </div>
                 </div>
                 <button
                   onClick={handleNextQuizQuestion}
-                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                  className="min-h-[40px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shrink-0"
                 >
                   <span>Next Question</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
@@ -1557,96 +2372,91 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         </div>
       )}
 
-      {/* FLASHCARD + SRS DRILL MODE */}
+      {/* ===================================================================== */}
+      {/* 8. SRS FLASHCARDS MODE                                                */}
+      {/* ===================================================================== */}
       {viewMode === 'flashcards' && currentFlashcard && (
-        <div className="max-w-2xl mx-auto py-4">
-          {/* Interactive Session Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-3 bg-[#F4F0E8] dark:bg-[#1A1714] px-4 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924]">
-            <div className="flex items-center gap-3">
-              <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Card {(cardIndex + 1).toLocaleString()} of {filteredWords.length.toLocaleString()}
+        <div className="max-w-2xl mx-auto">
+          {/* Compact Session Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5E5850] dark:text-[#A8A29E] mb-3 bg-white dark:bg-[#191715] px-4 py-2.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621]">
+            <div className="flex items-center gap-2.5">
+              <span className="font-ipa font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                {(cardIndex + 1).toLocaleString()} / {shuffledPracticePool.length.toLocaleString()}
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-medium text-[#15803D] dark:text-emerald-400">
-                Session Reviewed: {flashcardSessionReviewed}
+              <span className="px-2 py-0.5 rounded-full bg-[#E3EFE8] dark:bg-emerald-950/40 text-[11px] font-semibold text-[#2D6A4F] dark:text-emerald-300">
+                Reviewed: {flashcardSessionReviewed}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setFlashcardAutoSpeak((prev) => !prev)}
                 className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold inline-flex items-center gap-1 transition-colors ${
                   flashcardAutoSpeak
-                    ? 'bg-[#A82020] text-white border-[#A82020]'
-                    : 'bg-white dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                    ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
+                    : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]'
                 }`}
               >
                 <Volume2 className="w-3 h-3" />
-                <span>Auto-Speak {flashcardAutoSpeak ? 'ON' : 'OFF'}</span>
+                <span>Auto {flashcardAutoSpeak ? 'ON' : 'OFF'}</span>
               </button>
               <button
                 onClick={handleShuffleFlashcard}
-                className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1 hover:border-[#A82020]"
+                className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[11px] font-semibold text-[#1E1B18] dark:text-[#F5F2EB] inline-flex items-center gap-1 hover:border-[#9E2A2B]"
               >
-                <Shuffle className="w-3 h-3 text-[#A82020]" />
-                <span>Shuffle Card</span>
+                <Shuffle className="w-3 h-3 text-[#9E2A2B]" />
+                <span>Shuffle Deck &amp; Options</span>
               </button>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-10 min-h-[380px] flex flex-col justify-between shadow-xs transition-all">
+          <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-5 sm:p-8 min-h-[340px] flex flex-col justify-between">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#F4F0E8] dark:bg-[#141210] text-[11px] font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Lecture {String(currentFlashcard.lectureNumber).padStart(2, '0')} · {currentFlashcard.level}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[11px] font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                  L{String(currentFlashcard.lectureNumber).padStart(2, '0')} · {currentFlashcard.level}
                 </span>
-                <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                <span className="text-xs text-[#8E877E]">
                   {currentFlashcard.partOfSpeech} · {currentFlashcard.silentLettersSummary}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                {onToggleMasterWord && (
+              <div className="flex items-center gap-1.5">
+                {onToggleMasteredWord && (
                   <button
-                    onClick={() => onToggleMasterWord(currentFlashcard.id)}
-                    className={`min-h-[36px] px-3 rounded-lg border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                    onClick={() => onToggleMasteredWord(currentFlashcard.id)}
+                    className={`min-h-[34px] px-2.5 rounded-lg border text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
                       masteredWordIds.includes(currentFlashcard.id)
-                        ? 'bg-[#E2EFE7] border-[#2E6F4E]/30 text-[#1F5C3D] dark:bg-emerald-950/50 dark:text-emerald-300'
-                        : 'border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
+                        ? 'bg-[#E3EFE8] border-[#2D6A4F]/30 text-[#2D6A4F]'
+                        : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]'
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{masteredWordIds.includes(currentFlashcard.id) ? 'Mastered ✓' : 'Mark Mastered'}</span>
+                    <span>{masteredWordIds.includes(currentFlashcard.id) ? 'Mastered' : 'Master'}</span>
                   </button>
                 )}
                 <button
                   onClick={() => onToggleSaveWord(currentFlashcard.id)}
-                  className="min-h-[36px] px-3 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1.5"
+                  className="min-h-[34px] px-2.5 rounded-lg border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-medium inline-flex items-center gap-1"
                 >
                   {savedWordIds.includes(currentFlashcard.id) ? (
-                    <>
-                      <BookmarkCheck className="w-4 h-4 text-[#A82020]" />
-                      <span>Saved</span>
-                    </>
+                    <BookmarkCheck className="w-4 h-4 text-[#9E2A2B]" />
                   ) : (
-                    <>
-                      <Bookmark className="w-4 h-4" />
-                      <span>Save</span>
-                    </>
+                    <Bookmark className="w-4 h-4 text-[#8E877E]" />
                   )}
                 </button>
               </div>
             </div>
 
-            <div className="my-8 text-center">
+            <div className="my-5 text-center">
               <div
                 onClick={() => setIsFlipped((prev) => !prev)}
-                className="cursor-pointer select-none group inline-block px-6 py-3 rounded-2xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
-                title="Click card to flip"
+                className="cursor-pointer select-none inline-block px-5 py-2.5 rounded-2xl hover:bg-[#FAF8F5] dark:hover:bg-[#141210] transition-colors"
               >
-                <div className="text-3xl sm:text-5xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
+                <div className="font-serif text-3xl sm:text-5xl text-[#1E1B18] dark:text-[#F5F2EB] mb-1.5">
                   {currentFlashcard.segments?.map((seg, i) =>
                     seg.silent ? (
                       <span
                         key={i}
-                        className="text-[#A82020] dark:text-[#F87171] bg-[#A82020]/10 underline decoration-dotted decoration-2 underline-offset-6 px-0.5 rounded"
+                        className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted decoration-2 underline-offset-6 px-0.5 rounded"
                       >
                         {seg.text}
                       </span>
@@ -1655,188 +2465,261 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     )
                   )}
                 </div>
-                <div className="font-ipa text-lg text-[#57534E] dark:text-[#A8A29E]">
+                <div className="font-ipa text-sm sm:text-base text-[#8E877E]">
                   {currentFlashcard.ipa}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-2.5 my-5">
+              <div className="flex flex-wrap items-center justify-center gap-2 my-3">
                 <button
                   onClick={() =>
                     speechService.speak(currentFlashcard.word, { rate: preferredSpeechRate })
                   }
-                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-2 hover:border-[#A82020]"
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1.5 hover:border-[#9E2A2B]"
                 >
-                  <Volume2 className="w-4 h-4 text-[#A82020]" />
-                  <span>Listen ({preferredSpeechRate}x)</span>
+                  <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                  <span>Listen</span>
                 </button>
                 <button
                   onClick={() => speechService.speak(currentFlashcard.word, { rate: 0.6 })}
-                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-2 hover:border-[#D97706]"
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#B8863B]"
                 >
-                  <Turtle className="w-4 h-4 text-[#D97706]" />
-                  <span>Slow (0.6x)</span>
+                  <Turtle className="w-3.5 h-3.5 text-[#B8863B]" />
+                  <span>Slow</span>
                 </button>
                 <button
                   onClick={handleFlashcardMicTest}
                   disabled={flashcardMicListening}
-                  className={`min-h-[42px] px-4 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                     flashcardMicListening
-                      ? 'bg-[#A82020] text-white border-[#A82020] animate-pulse'
-                      : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020]/30 text-[#A82020] dark:text-red-300 hover:bg-[#A82020] hover:text-white'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] animate-pulse'
+                      : 'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B]/30 text-[#9E2A2B] dark:text-red-300'
                   }`}
                 >
-                  <Mic className="w-4 h-4" />
-                  <span>{flashcardMicListening ? 'Listening... Speak now' : 'Speak & Score'}</span>
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>{flashcardMicListening ? 'Listening...' : 'Speak'}</span>
                 </button>
               </div>
 
               {flashcardMicResult && (
-                <div className="max-w-md mx-auto mb-5 p-3 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs">
-                  <div className="flex items-center justify-between font-semibold mb-1">
-                    <span className="text-[#1C1917] dark:text-[#F5F2EB]">
-                      Heard: “{flashcardMicResult.transcript || '—'}”
-                    </span>
+                <div className="max-w-md mx-auto mb-4 p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs">
+                  <div className="flex items-center justify-between font-semibold mb-0.5">
+                    <span>Heard: “{flashcardMicResult.transcript || '—'}”</span>
                     <span
                       className={
-                        flashcardMicResult.score >= 80
-                          ? 'text-[#1F5C3D] dark:text-emerald-400'
-                          : 'text-[#D97706]'
+                        flashcardMicResult.score >= 80 ? 'text-[#2D6A4F]' : 'text-[#B8863B]'
                       }
                     >
-                      {flashcardMicResult.score}% Match
+                      {flashcardMicResult.score}%
                     </span>
                   </div>
-                  <p className="text-[#57534E] dark:text-[#A8A29E]">{flashcardMicResult.feedback}</p>
+                  <p className="text-[#5E5850] dark:text-[#A8A29E]">
+                    {flashcardMicResult.feedback || flashcardMicResult.feedbackEnglish}
+                  </p>
+                </div>
+              )}
+
+              {/* 4-Option Shuffled Quick Meaning Check before flipping */}
+              {!isFlipped && flashcardQuizOptions.length > 1 && (
+                <div className="max-w-lg mx-auto my-3 space-y-2">
+                  <div className="text-[11px] font-medium text-[#8E877E]">
+                    Test your recall (4 shuffled options) or flip directly:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {flashcardQuizOptions.map((opt, idx) => {
+                      const isChosen = flashcardQuizPicked === opt;
+                      const isRight = opt === currentFlashcard.nepaliMeaning;
+                      return (
+                        <button
+                          key={`${opt}-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setFlashcardQuizPicked(opt);
+                            setIsFlipped(true);
+                          }}
+                          className={`min-h-[40px] px-3 py-2 rounded-xl border text-left font-nepali text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${
+                            isChosen
+                              ? isRight
+                                ? 'border-[#2D6A4F] bg-[#E3EFE8] text-[#2D6A4F] font-semibold'
+                                : 'border-[#9E2A2B] bg-[#F9E6E6] text-[#9E2A2B]'
+                              : 'border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] hover:border-[#9E2A2B]'
+                          }`}
+                        >
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
               {isFlipped ? (
-                <div className="pt-5 border-t border-[#E6E0D4] dark:border-[#2E2924] space-y-3 text-center">
-                  <div className="font-nepali text-2xl font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                <div className="pt-4 border-t border-[#E8E0D2] dark:border-[#2C2621] space-y-2.5 text-center">
+                  {flashcardQuizPicked && (
+                    <div
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                        flashcardQuizPicked === currentFlashcard.nepaliMeaning
+                          ? 'bg-[#E3EFE8] text-[#2D6A4F]'
+                          : 'bg-[#F9E6E6] text-[#9E2A2B]'
+                      }`}
+                    >
+                      {flashcardQuizPicked === currentFlashcard.nepaliMeaning ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Correct recall!</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>You picked “{flashcardQuizPicked}”</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <div className="font-nepali text-xl sm:text-2xl font-semibold text-[#2D6A4F] dark:text-emerald-400">
                     {currentFlashcard.nepaliMeaning}
                   </div>
-                  <p className="text-sm text-[#1C1917] dark:text-[#F5F2EB]">
+                  <p className="text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB]">
                     “{currentFlashcard.englishExample}”
                   </p>
                   {isFullNepali && (
-                    <p className="font-nepali text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
+                    <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E]">
                       {currentFlashcard.nepaliExampleTranslation}
                     </p>
                   )}
 
-                  {/* SRS Self-Rating Buttons */}
-                  <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
                     <button
                       onClick={() => handleRateFlashcardSRS(false)}
-                      className="min-h-[42px] px-4 py-2 rounded-xl border border-amber-400 bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-xs font-semibold"
+                      className="min-h-[38px] px-4 py-1.5 rounded-xl border border-[#B8863B]/40 bg-[#FBF3E4] dark:bg-amber-950/40 text-[#8A5A19] dark:text-amber-200 text-xs font-semibold"
                     >
-                      Needs Practice (Repeat Soon)
+                      Needs Practice
                     </button>
                     <button
                       onClick={() => handleRateFlashcardSRS(true)}
-                      className="min-h-[42px] px-5 py-2 rounded-xl bg-[#2E6F4E] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Got It! (Advance SRS Stage)</span>
+                      <span>Got It (Advance SRS)</span>
                     </button>
                   </div>
                 </div>
               ) : (
                 <button
                   onClick={() => setIsFlipped(true)}
-                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold inline-flex items-center gap-2"
+                  className="mt-2 min-h-[40px] px-5 py-2 rounded-full bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18] text-xs font-semibold inline-flex items-center gap-2"
                 >
-                  <RotateCw className="w-4 h-4" />
-                  <span>Flip Card to Reveal Nepali Meaning</span>
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>Flip to reveal Nepali meaning</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-[#E6E0D4] dark:border-[#2E2924]">
+            <div className="flex items-center justify-between pt-3.5 border-t border-[#E8E0D2] dark:border-[#2C2621]">
               <button
                 onClick={handlePrevCard}
-                className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1.5"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Previous</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
               </button>
-              <span className="text-[11px] text-[#78716C] hidden sm:inline">
-                SRS Stage:{' '}
-                <strong className="uppercase text-[#A82020] dark:text-[#F87171]">
+              <span className="text-[11px] text-[#8E877E]">
+                SRS:{' '}
+                <strong className="uppercase text-[#9E2A2B] dark:text-[#F87171]">
                   {wordSRS[currentFlashcard.id]?.stage || 'new'}
                 </strong>
               </span>
               <button
                 onClick={handleNextCard}
-                className="min-h-[42px] px-5 py-2 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
               >
-                <span>Skip / Next</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Next</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* INTERACTIVE SILENT-LETTER MATCH GAME MODE */}
+      {/* ===================================================================== */}
+      {/* 9. SILENT-LETTER MATCH GAME MODE                                      */}
+      {/* ===================================================================== */}
       {viewMode === 'match' && (
-        <div className="max-w-4xl mx-auto py-4">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[#E6E0D4] dark:border-[#2E2924] mb-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-4 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E8E0D2] dark:border-[#2C2621] mb-5">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#A82020] mb-1">
-                  Interactive Word Pairing Game · Round #{matchBoardRound + 1}
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#9E2A2B] mb-0.5">
+                  Word Pairing · Shuffled Set #{matchBoardRound + 1}
                 </div>
-                <h2 className="text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Match Silent-Letter Words with Their Nepali Meanings
+                <h2 className="font-serif text-lg sm:text-xl text-[#1E1B18] dark:text-[#F5F2EB]">
+                  Match silent-letter words with Nepali meanings
                 </h2>
-                <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                  Click an English word on the left (hears pronunciation) and match it with its Nepali translation on the right.
-                </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="px-3 py-1.5 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Matched: <span className="text-[#1F5C3D]">{matchedPairIds.length}/6</span>
-                </div>
-                <div className="px-3 py-1.5 rounded-xl bg-[#F4F0E8] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Streak: <span className="text-[#A82020]">{matchGameStats.streak} 🔥</span>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {matchTimerRunning ? (
+                  <span
+                    className={`px-2.5 py-1 rounded-lg font-ipa text-xs font-bold inline-flex items-center gap-1 ${
+                      matchSecondsLeft <= 10
+                        ? 'bg-[#F9E6E6] text-[#9E2A2B] animate-pulse'
+                        : 'bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621]'
+                    }`}
+                  >
+                    <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                    <span>{matchSecondsLeft}s</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleStartMatchTimed(60)}
+                    className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] text-xs font-semibold inline-flex items-center gap-1"
+                  >
+                    <Timer className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                    <span>60s Challenge</span>
+                  </button>
+                )}
+                <span className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold">
+                  Matched: <strong className="text-[#2D6A4F]">{matchedPairIds.length}/6</strong>
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold">
+                  Streak: <strong className="text-[#9E2A2B]">{matchGameStats.streak}</strong>
+                </span>
                 <button
                   onClick={handleNextMatchRound}
-                  className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                  className="min-h-[34px] px-3 py-1 rounded-lg bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                 >
                   <Shuffle className="w-3.5 h-3.5" />
-                  <span>New Board</span>
+                  <span>Shuffle New Set</span>
                 </button>
               </div>
             </div>
 
-            {matchedPairIds.length === matchBoardData.pairs.length && matchBoardData.pairs.length > 0 ? (
-              <div className="text-center py-10 space-y-4 bg-[#FAF8F4] dark:bg-[#141210] rounded-2xl border border-[#E6E0D4] dark:border-[#2E2924]">
-                <div className="w-12 h-12 rounded-full bg-[#E2EFE7] text-[#1F5C3D] flex items-center justify-center mx-auto">
-                  <Trophy className="w-6 h-6" />
+            {matchedPairIds.length === matchBoardData.pairs.length &&
+            matchBoardData.pairs.length > 0 ? (
+              <div className="text-center py-8 space-y-3 bg-[#FAF8F5] dark:bg-[#141210] rounded-2xl border border-[#E8E0D2] dark:border-[#2C2621]">
+                <div className="w-11 h-11 rounded-full bg-[#E3EFE8] text-[#2D6A4F] flex items-center justify-center mx-auto">
+                  <Trophy className="w-5 h-5" />
                 </div>
-                <h3 className="text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  Board Cleared! All 6 Silent-Letter Pairs Matched
+                <h3 className="font-serif text-xl text-[#1E1B18] dark:text-[#F5F2EB]">
+                  All 6 pairs matched!
                 </h3>
-                <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">
-                  All 6 words have been advanced in your Spaced Repetition (SRS) deck.
+                <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E]">
+                  These words have been advanced in your Spaced Repetition deck.
                 </p>
                 <button
                   onClick={handleNextMatchRound}
-                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold inline-flex items-center gap-2"
+                  className="min-h-[40px] px-5 py-2 rounded-full bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                 >
-                  <span>Play Next Round (6 New Words)</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Play Next Shuffled Round</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Column: English Words with Silent Letters Highlighted */}
-                <div className="space-y-2.5">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-2">
-                    1. Select English Word (Plays Audio)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {/* Left Column: English Words */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#8E877E] mb-1">
+                    1. Tap English Word
                   </div>
                   {matchBoardData.pairs.map((item) => {
                     const isMatched = matchedPairIds.includes(item.id);
@@ -1846,23 +2729,23 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         key={`word-${item.id}`}
                         disabled={isMatched}
                         onClick={() => handleSelectMatchWord(item.id)}
-                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
                           isMatched
-                            ? 'bg-[#E2EFE7]/60 dark:bg-emerald-950/20 border-[#2E6F4E]/30 opacity-60 cursor-default'
+                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default'
                             : isSelected
                             ? wrongMatchFlash
                               ? 'bg-red-100 border-red-500 text-red-900'
-                              : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020] ring-2 ring-[#A82020]/20'
-                            : 'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]'
+                              : 'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] ring-1 ring-[#9E2A2B]/30'
+                            : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]'
                         }`}
                       >
                         <div>
-                          <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                          <div className="text-sm sm:text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
                             {item.segments?.map((seg, idx) =>
                               seg.silent ? (
                                 <span
                                   key={idx}
-                                  className="text-[#A82020] underline decoration-dotted underline-offset-4"
+                                  className="text-[#9E2A2B] underline decoration-dotted underline-offset-4"
                                 >
                                   {seg.text}
                                 </span>
@@ -1871,26 +2754,24 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               )
                             )}
                           </div>
-                          <div className="text-xs font-ipa text-[#78716C]">
+                          <div className="text-[11px] font-ipa text-[#8E877E]">
                             {item.ipa} · {item.silentLettersSummary}
                           </div>
                         </div>
                         {isMatched ? (
-                          <span className="text-xs font-semibold text-[#1F5C3D] inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4" /> Matched
-                          </span>
+                          <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                         ) : (
-                          <Volume2 className="w-4 h-4 text-[#A82020]" />
+                          <Volume2 className="w-4 h-4 text-[#9E2A2B] shrink-0" />
                         )}
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Right Column: Shuffled Nepali Meanings */}
-                <div className="space-y-2.5">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-2">
-                    2. Match Nepali Meaning (नेपाली अर्थ)
+                {/* Right Column: Nepali Meanings */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#8E877E] mb-1">
+                    2. Match Nepali Meaning
                   </div>
                   {matchBoardData.shuffledMeanings.map((item) => {
                     const isMatched = matchedPairIds.includes(item.id);
@@ -1900,27 +2781,25 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         key={`meaning-${item.id}`}
                         disabled={isMatched}
                         onClick={() => handleSelectMatchMeaning(item.id)}
-                        className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between min-h-[66px] ${
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between min-h-[60px] ${
                           isMatched
-                            ? 'bg-[#E2EFE7]/60 dark:bg-emerald-950/20 border-[#2E6F4E]/30 opacity-60 cursor-default'
+                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default'
                             : isSelected
                             ? wrongMatchFlash
                               ? 'bg-red-100 border-red-500 text-red-900'
-                              : 'bg-[#FBE9E7] dark:bg-red-950/40 border-[#A82020] ring-2 ring-[#A82020]/20'
-                            : 'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]'
+                              : 'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] ring-1 ring-[#9E2A2B]/30'
+                            : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]'
                         }`}
                       >
                         <div>
-                          <div className="font-nepali text-base font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                          <div className="font-nepali text-sm sm:text-base font-semibold text-[#2D6A4F] dark:text-emerald-400">
                             {item.nepaliMeaning}
                           </div>
-                          <div className="text-xs text-[#78716C] line-clamp-1">
-                            {item.partOfSpeech} · Level {item.level}
+                          <div className="text-[11px] text-[#8E877E]">
+                            {item.partOfSpeech} · {item.level}
                           </div>
                         </div>
-                        {isMatched && (
-                          <span className="text-xs font-semibold text-[#1F5C3D]">✓</span>
-                        )}
+                        {isMatched && <Check className="w-4 h-4 text-[#2D6A4F] shrink-0" />}
                       </button>
                     );
                   })}
@@ -1931,42 +2810,44 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         </div>
       )}
 
-      {/* DICTIONARY LIST & COMPACT VOCABULARY TABLE MODES (Paginated Across 10,400+ Words) */}
+      {/* ===================================================================== */}
+      {/* 10. LEXICON CARDS & VOCAB TABLE MODES (Clean & Mobile-Ergonomic)      */}
+      {/* ===================================================================== */}
       {(viewMode === 'list' || viewMode === 'table') && filteredWords.length > 0 && (
-        <div className="space-y-6">
-          {/* Top Pagination Summary Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#57534E] dark:text-[#A8A29E]">
+        <div className="space-y-4">
+          {/* Compact Count & Pagination Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5E5850] dark:text-[#A8A29E] px-1">
             <div>
               Showing{' '}
-              <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+              <strong className="text-[#1E1B18] dark:text-[#F5F2EB]">
                 {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}–
                 {Math.min(safePage * PAGE_SIZE, filteredWords.length).toLocaleString()}
               </strong>{' '}
               of{' '}
-              <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
+              <strong className="text-[#1E1B18] dark:text-[#F5F2EB]">
                 {filteredWords.length.toLocaleString()}
               </strong>{' '}
-              matching vocabulary entries
-              {selectedLectureNum !== null
-                ? ` in Lecture ${String(selectedLectureNum).padStart(2, '0')}`
+              words
+              {selectedLectureObj
+                ? ` · L${String(selectedLectureObj.lectureNumber).padStart(2, '0')} ${selectedLectureObj.category}`
                 : ''}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={safePage <= 1}
-                className="min-h-[36px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] font-semibold disabled:opacity-40"
+                className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#E8E0D2] dark:border-[#2C2621] bg-white dark:bg-[#191715] font-semibold disabled:opacity-40"
               >
                 Prev
               </button>
-              <span className="font-ipa">
-                Page {safePage} / {totalPages.toLocaleString()}
+              <span className="font-ipa text-[11px] px-1">
+                {safePage} / {totalPages.toLocaleString()}
               </span>
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safePage >= totalPages}
-                className="min-h-[36px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] font-semibold disabled:opacity-40"
+                className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#E8E0D2] dark:border-[#2C2621] bg-white dark:bg-[#191715] font-semibold disabled:opacity-40"
               >
                 Next
               </button>
@@ -1974,34 +2855,115 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
           </div>
 
           {viewMode === 'table' ? (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
+            <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl overflow-hidden">
+              {/* Mobile Compact Row List (< sm) so there is zero horizontal overflow congestion */}
+              <div className="sm:hidden divide-y divide-[#E8E0D2] dark:divide-[#2C2621]">
+                {paginatedWords.map((item) => {
+                  const isSaved = savedWordIds.includes(item.id);
+                  const mastery = getWordMasteryStatus(item.id);
+                  return (
+                    <div key={item.id} className="p-3.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="font-serif text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                            {item.segments?.map((seg, idx) =>
+                              seg.silent ? (
+                                <span
+                                  key={idx}
+                                  className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted underline-offset-4"
+                                >
+                                  {seg.text}
+                                </span>
+                              ) : (
+                                <span key={idx}>{seg.text}</span>
+                              )
+                            )}
+                          </span>
+                          <span className="font-ipa text-[11px] text-[#8E877E]">{item.ipa}</span>
+                          <span className="text-[10px] font-ipa px-1.5 py-0.2 rounded bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850]">
+                            L{String(item.lectureNumber).padStart(2, '0')} · {item.level}
+                          </span>
+                        </div>
+                        <div className="font-nepali text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400 mt-0.5 truncate">
+                          {item.nepaliMeaning}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            speechService.speak(item.word, { rate: preferredSpeechRate })
+                          }
+                          className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] flex items-center justify-center"
+                          aria-label="Listen"
+                        >
+                          <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onToggleSaveWord(item.id)}
+                          className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                            isSaved
+                              ? 'border-[#9E2A2B]/40 bg-[#F9E6E6] text-[#9E2A2B]'
+                              : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E]'
+                          }`}
+                          aria-label="Bookmark"
+                        >
+                          {isSaved ? (
+                            <BookmarkCheck className="w-3.5 h-3.5" />
+                          ) : (
+                            <Bookmark className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        {onToggleMasteredWord && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleMasteredWord(item.id)}
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                              mastery.isMastered
+                                ? 'border-[#2D6A4F] bg-[#2D6A4F] text-white'
+                                : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E]'
+                            }`}
+                            aria-label="Master"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Tablet/Desktop Clean Editorial Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
                   <thead>
-                    <tr className="bg-[#FAF7F2] dark:bg-[#141210] border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      <th className="py-3 px-4 font-semibold">Word (Silent Highlight)</th>
-                      <th className="py-3 px-4 font-semibold">IPA & POS</th>
+                    <tr className="bg-[#FAF8F5] dark:bg-[#141210] border-b border-[#E8E0D2] dark:border-[#2C2621] text-[11px] uppercase tracking-wider text-[#8E877E]">
+                      <th className="py-3 px-4 font-semibold">Word</th>
+                      <th className="py-3 px-4 font-semibold">IPA &amp; POS</th>
                       <th className="py-3 px-4 font-semibold">Nepali Meaning</th>
-                      <th className="py-3 px-4 font-semibold">Mastery Stage</th>
                       <th className="py-3 px-4 font-semibold">Unit</th>
-                      <th className="py-3 px-4 font-semibold">Audio, Save & Mastered</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4 font-semibold text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E7E0D6] dark:divide-[#2E2924]">
+                  <tbody className="divide-y divide-[#E8E0D2] dark:divide-[#2C2621]">
                     {paginatedWords.map((item) => {
                       const isSaved = savedWordIds.includes(item.id);
                       const mastery = getWordMasteryStatus(item.id);
                       return (
                         <tr
                           key={item.id}
-                          className="hover:bg-[#FAF7F2]/60 dark:hover:bg-[#141210]/40"
+                          className="hover:bg-[#FAF8F5]/70 dark:hover:bg-[#141210]/40 transition-colors"
                         >
-                          <td className="py-3 px-4 font-semibold text-base text-[#1C1917] dark:text-[#F5F2EB]">
+                          <td className="py-3 px-4 font-serif font-medium text-base text-[#1E1B18] dark:text-[#F5F2EB]">
                             {item.segments?.map((seg, idx) =>
                               seg.silent ? (
                                 <span
                                   key={idx}
-                                  className="text-[#B91C1C] dark:text-[#F87171] underline decoration-dotted decoration-2 underline-offset-4"
+                                  className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted decoration-2 underline-offset-4"
                                 >
                                   {seg.text}
                                 </span>
@@ -2010,56 +2972,57 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               )
                             )}
                           </td>
-                          <td className="py-3 px-4 font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
-                            {item.ipa} · {item.partOfSpeech}
+                          <td className="py-3 px-4 font-ipa text-xs text-[#5E5850] dark:text-[#A8A29E]">
+                            {item.ipa} · <span className="italic">{item.partOfSpeech}</span>
                           </td>
-                          <td className="py-3 px-4 font-nepali font-semibold text-[#15803D] dark:text-emerald-400">
+                          <td className="py-3 px-4 font-nepali font-semibold text-[#2D6A4F] dark:text-emerald-400">
                             {item.nepaliMeaning}
-                          </td>
-                          <td className="py-3 px-4 text-xs">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-ipa text-[11px] font-semibold ${mastery.badgeClass}`}
-                            >
-                              {mastery.isMastered && <CheckCircle2 className="w-3 h-3" />}
-                              <span>{mastery.label}</span>
-                            </span>
                           </td>
                           <td className="py-3 px-4 font-ipa text-xs">
                             <button
                               type="button"
                               onClick={() => onOpenLecture(item.lectureId)}
-                              className="hover:underline font-semibold text-[#1C1917] dark:text-[#F5F2EB]"
+                              className="hover:underline font-medium text-[#1E1B18] dark:text-[#F5F2EB]"
                             >
                               L{String(item.lectureNumber).padStart(2, '0')} · {item.level}
                             </button>
                           </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-1.5">
+                          <td className="py-3 px-4 text-xs">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-ipa text-[10px] font-semibold ${mastery.badgeClass}`}
+                            >
+                              {mastery.isMastered && <CheckCircle2 className="w-2.5 h-2.5" />}
+                              <span>{mastery.label}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="inline-flex items-center justify-end gap-1">
                               <button
                                 type="button"
                                 onClick={() =>
                                   speechService.speak(item.word, { rate: preferredSpeechRate })
                                 }
-                                className="min-h-[34px] px-2.5 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1"
+                                title="Listen (1.0x)"
+                                className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] inline-flex items-center justify-center hover:border-[#9E2A2B]"
                               >
-                                <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
-                                <span>1.0x</span>
+                                <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => speechService.speak(item.word, { rate: 0.6 })}
-                                className="min-h-[34px] px-2 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1"
+                                title="Slow (0.6x)"
+                                className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] inline-flex items-center justify-center hover:border-[#B8863B]"
                               >
-                                <Turtle className="w-3.5 h-3.5 text-[#D97706]" />
+                                <Turtle className="w-3.5 h-3.5 text-[#B8863B]" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => onToggleSaveWord(item.id)}
-                                title="Save Word"
-                                className={`min-h-[34px] px-2 py-1 rounded-lg border ${
+                                title="Bookmark word"
+                                className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center ${
                                   isSaved
-                                    ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C]'
-                                    : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E]'
+                                    ? 'border-[#9E2A2B]/40 bg-[#F9E6E6] text-[#9E2A2B]'
+                                    : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E]'
                                 }`}
                               >
                                 {isSaved ? (
@@ -2072,19 +3035,14 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => onToggleMasteredWord(item.id)}
-                                  title={
-                                    mastery.isMastered ? 'Mastered (Click to unmark)' : 'Mark Word as Mastered'
-                                  }
-                                  className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-semibold inline-flex items-center gap-1 ${
+                                  title={mastery.isMastered ? 'Mastered' : 'Mark as Mastered'}
+                                  className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center ${
                                     mastery.isMastered
-                                      ? 'border-[#15803D] bg-[#15803D] text-white'
-                                      : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] hover:border-[#15803D]'
+                                      ? 'border-[#2D6A4F] bg-[#2D6A4F] text-white'
+                                      : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E] hover:border-[#2D6A4F]'
                                   }`}
                                 >
                                   <Check className="w-3.5 h-3.5" />
-                                  <span className="hidden xl:inline">
-                                    {mastery.isMastered ? 'Mastered' : 'Master'}
-                                  </span>
                                 </button>
                               )}
                             </div>
@@ -2097,173 +3055,218 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            /* CLEAN EDITORIAL LEXICON CARDS GRID */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
               {paginatedWords.map((item) => {
                 const isSaved = savedWordIds.includes(item.id);
                 const showMeaning = showMeaningsByDefault || Boolean(revealedIds[item.id]);
                 const mastery = getWordMasteryStatus(item.id);
 
                 return (
-                <div
-                  key={item.id}
-                  className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                          onClick={() => onOpenLecture(item.lectureId)}
-                          className="hover:underline text-[#B91C1C] dark:text-[#F87171] font-medium"
-                        >
-                          Lecture {String(item.lectureNumber).padStart(2, '0')}
-                        </button>
-                        <span aria-hidden="true">·</span>
-                        <span>Level {item.level}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{item.partOfSpeech}</span>
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-ipa text-[10px] font-semibold ${mastery.badgeClass}`}
-                        >
-                          {mastery.isMastered && <CheckCircle2 className="w-2.5 h-2.5" />}
-                          <span>{mastery.label}</span>
-                        </span>
+                  <div
+                    key={item.id}
+                    className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#D5CBB8] dark:hover:border-[#3E3730] rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all"
+                  >
+                    <div>
+                      {/* Card Top Meta + Compact Icon Actions */}
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#8E877E]">
+                          <button
+                            onClick={() => onOpenLecture(item.lectureId)}
+                            className="font-semibold text-[#9E2A2B] dark:text-[#F87171] hover:underline"
+                          >
+                            L{String(item.lectureNumber).padStart(2, '0')}
+                          </button>
+                          <span>·</span>
+                          <span>{item.level}</span>
+                          <span>·</span>
+                          <span className="italic">{item.partOfSpeech}</span>
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded border font-ipa text-[10px] font-semibold ${mastery.badgeClass}`}
+                          >
+                            {mastery.isMastered && <CheckCircle2 className="w-2.5 h-2.5" />}
+                            <span>{mastery.label}</span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() =>
+                              speechService.speak(item.word, { rate: preferredSpeechRate })
+                            }
+                            title="Listen (1.0x)"
+                            className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] inline-flex items-center justify-center transition-colors"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
+                          </button>
+                          <button
+                            onClick={() => speechService.speak(item.word, { rate: 0.6 })}
+                            title="Slow pronunciation (0.6x)"
+                            className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#B8863B] inline-flex items-center justify-center transition-colors"
+                          >
+                            <Turtle className="w-3.5 h-3.5 text-[#B8863B]" />
+                          </button>
+                          {onToggleMasteredWord && (
+                            <button
+                              type="button"
+                              onClick={() => onToggleMasteredWord(item.id)}
+                              title={mastery.isMastered ? 'Mastered' : 'Mark as Mastered'}
+                              className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center transition-colors ${
+                                mastery.isMastered
+                                  ? 'border-[#2D6A4F] bg-[#2D6A4F] text-white'
+                                  : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E] hover:border-[#2D6A4F]'
+                              }`}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onToggleSaveWord(item.id)}
+                            title={isSaved ? 'Saved' : 'Save word'}
+                            className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center transition-colors ${
+                              isSaved
+                                ? 'border-[#9E2A2B]/40 bg-[#F9E6E6] text-[#9E2A2B] dark:text-[#F87171]'
+                                : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E] hover:border-[#9E2A2B]/40'
+                            }`}
+                          >
+                            {isSaved ? (
+                              <BookmarkCheck className="w-3.5 h-3.5" />
+                            ) : (
+                              <Bookmark className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      {/* Word Heading + IPA + Meaning */}
+                      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1.5">
+                        <div className="flex items-baseline gap-2.5 flex-wrap">
+                          <h3 className="font-serif text-xl sm:text-2xl font-medium text-[#1E1B18] dark:text-[#F5F2EB]">
+                            {item.segments?.map((seg, idx) =>
+                              seg.silent ? (
+                                <span
+                                  key={idx}
+                                  className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
+                                >
+                                  {seg.text}
+                                </span>
+                              ) : (
+                                <span key={idx}>{seg.text}</span>
+                              )
+                            )}
+                          </h3>
+                          <span className="font-ipa text-xs sm:text-sm text-[#8E877E]">
+                            {item.ipa}
+                          </span>
+                        </div>
+
                         {languageMode === 'english-only' && (
                           <button
                             onClick={() =>
                               setRevealedIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
                             }
-                            className="min-h-[36px] px-2.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-[11px] font-medium inline-flex items-center gap-1"
+                            className="px-2 py-0.5 rounded-md border border-[#E8E0D2] dark:border-[#2C2621] text-[11px] text-[#5E5850] inline-flex items-center gap-1"
                           >
                             {showMeaning ? (
-                              <EyeOff className="w-3.5 h-3.5" />
+                              <EyeOff className="w-3 h-3" />
                             ) : (
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3 h-3" />
                             )}
-                            <span>{showMeaning ? 'Hide Nepali' : 'Meaning'}</span>
+                            <span>{showMeaning ? 'Hide' : 'Meaning'}</span>
                           </button>
                         )}
-                        {onToggleMasteredWord && (
-                          <button
-                            type="button"
-                            onClick={() => onToggleMasteredWord(item.id)}
-                            title={
-                              mastery.isMastered ? 'Mastered (Click to unmark)' : 'Mark Word as Mastered'
-                            }
-                            className={`min-h-[36px] px-2.5 rounded-lg border text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
-                              mastery.isMastered
-                                ? 'border-[#15803D] bg-[#15803D] text-white'
-                                : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:border-[#15803D]'
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>{mastery.isMastered ? 'Mastered' : 'Mark Mastered'}</span>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onToggleSaveWord(item.id)}
-                          aria-label="Toggle bookmark"
-                          className={`min-h-[36px] min-w-[36px] px-2.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1 ${
-                            isSaved
-                              ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]'
-                              : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E]'
-                          }`}
-                        >
-                          {isSaved ? (
-                            <BookmarkCheck className="w-4 h-4" />
-                          ) : (
-                            <Bookmark className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
-                      <div className="flex items-baseline gap-2.5">
-                        <h3 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                          {item.segments?.map((seg, idx) =>
-                            seg.silent ? (
-                              <span
-                                key={idx}
-                                className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
-                              >
-                                {seg.text}
-                              </span>
-                            ) : (
-                              <span key={idx}>{seg.text}</span>
-                            )
-                          )}
-                        </h3>
-                        <span className="font-ipa text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
-                          {item.ipa}
-                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() =>
-                            speechService.speak(item.word, { rate: preferredSpeechRate })
-                          }
-                          className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1.5"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
-                          <span>1.0x</span>
-                        </button>
-                        <button
-                          onClick={() => speechService.speak(item.word, { rate: 0.6 })}
-                          className="min-h-[38px] px-2.5 py-1.5 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium inline-flex items-center gap-1"
-                        >
-                          <Turtle className="w-3.5 h-3.5 text-[#D97706]" />
-                          <span>0.65x</span>
-                        </button>
-                      </div>
-                    </div>
+                      {showMeaning && (
+                        <div className="font-nepali text-sm sm:text-base font-semibold text-[#2D6A4F] dark:text-emerald-400 mb-1.5">
+                          {item.nepaliMeaning}
+                        </div>
+                      )}
 
-                    {showMeaning && (
-                      <div className="font-nepali text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
-                        {item.nepaliMeaning}
-                      </div>
-                    )}
-
-                    <p className="text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] mb-1">
-                      “{item.englishExample}”
-                    </p>
-                    {isFullNepali && (
-                      <p className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        {item.nepaliExampleTranslation}
+                      <p className="text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] leading-relaxed">
+                        “{item.englishExample}”
                       </p>
+                      {isFullNepali && (
+                        <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E] mt-0.5">
+                          {item.nepaliExampleTranslation}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Clean Footer Strip: Phonics Summary + AI Explain */}
+                    <div className="mt-3 pt-2.5 border-t border-[#F0EAE0] dark:border-[#2C2621] flex items-center justify-between gap-2 text-[11px]">
+                      <span className="text-[#9E2A2B] dark:text-[#F87171] font-medium truncate">
+                        {item.silentLettersSummary}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleExplainDictionaryWord(item)}
+                        disabled={aiWordLoadingId === item.id}
+                        className="px-2.5 py-1 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] text-[#9E2A2B] dark:text-[#F87171] font-medium inline-flex items-center gap-1 shrink-0 transition-colors"
+                      >
+                        {aiWordLoadingId === item.id ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Asking AI...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3" />
+                            <span>
+                              {aiWordExplanations[item.id] ? 'AI Guide ✓' : 'AI Guide'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {aiWordExplanations[item.id] && (
+                      <div className="mt-3 p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold uppercase tracking-wider text-[10px] text-[#9E2A2B]">
+                            AI Phonetic Guide
+                          </span>
+                          <span className="font-nepali font-semibold text-[#2D6A4F] dark:text-emerald-400">
+                            उच्चारण: {aiWordExplanations[item.id].nepaliSoundComparison}
+                          </span>
+                        </div>
+                        <p className="font-nepali text-[#1E1B18] dark:text-[#F5F2EB]">
+                          <strong>किन साइलेन्ट:</strong>{' '}
+                          {aiWordExplanations[item.id].silentReasonNepali}
+                        </p>
+                        <p className="font-nepali text-[#5E5850] dark:text-[#A8A29E]">
+                          <strong>जिब्रो र मुख:</strong>{' '}
+                          {aiWordExplanations[item.id].mouthPositionNepali}
+                        </p>
+                        <p className="font-nepali text-[#2D6A4F] dark:text-emerald-400">
+                          <strong>सम्झने तरिका:</strong>{' '}
+                          {aiWordExplanations[item.id].memoryTrickNepali}
+                        </p>
+                      </div>
                     )}
                   </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-[11px] text-[#B91C1C] dark:text-[#F87171]">
-                    <span>Phonics: {item.silentLettersSummary}</span>
-                    <span className="text-[#57534E] dark:text-[#A8A29E]">{item.category}</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
           )}
 
           {/* Bottom Pagination Bar */}
           {totalPages > 1 && (
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#E7E0D6] dark:border-[#2E2924]">
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-[#E8E0D2] dark:border-[#2C2621]">
               <button
                 onClick={() => {
                   setCurrentPage((p) => Math.max(1, p - 1));
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 disabled={safePage <= 1}
-                className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-white dark:bg-[#191715] text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Previous Page</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Previous</span>
               </button>
 
               <div className="flex items-center gap-1.5 text-xs font-ipa">
-                <span>Page</span>
+                <span className="text-[#8E877E]">Page</span>
                 <input
                   type="number"
                   min={1}
@@ -2275,9 +3278,9 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                       setCurrentPage(val);
                     }
                   }}
-                  className="w-16 min-h-[38px] px-2 py-1 text-center rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18]"
+                  className="w-14 min-h-[34px] px-2 py-1 text-center rounded-lg border border-[#E8E0D2] dark:border-[#2C2621] bg-white dark:bg-[#191715]"
                 />
-                <span>of {totalPages.toLocaleString()}</span>
+                <span className="text-[#8E877E]">of {totalPages.toLocaleString()}</span>
               </div>
 
               <button
@@ -2286,10 +3289,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 disabled={safePage >= totalPages}
-                className="min-h-[42px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"
+                className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"
               >
-                <span>Next Page</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Next</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -2298,3 +3301,4 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     </div>
   );
 };
+

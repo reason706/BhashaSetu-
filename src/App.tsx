@@ -34,6 +34,13 @@ import {
   Moon,
   Sliders,
   Puzzle,
+  Menu,
+  MessageSquare,
+  Loader2,
+  Send,
+  Clock,
+  Layers,
+  Play,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { CORE_SYLLABUS } from './data/syllabus';
@@ -80,6 +87,7 @@ import { useOnlineStatus } from './hooks/usePWA';
 import { LecturePlayer, ModuleStep } from './components/LecturePlayer';
 import { DictionaryView } from './components/DictionaryView';
 import { AILessonModal } from './components/AILessonModal';
+import { AIRoleplayModal } from './components/AIRoleplayModal';
 import { ProgressSettingsView } from './components/ProgressSettingsView';
 import { AboutView } from './components/AboutView';
 import { DailyChallengeModal } from './components/DailyChallengeModal';
@@ -106,9 +114,17 @@ export default function App() {
   const [initialModuleStep, setInitialModuleStep] = useState<ModuleStep>(0);
   const [dictionaryLectureFilter, setDictionaryLectureFilter] = useState<number | null>(null);
 
-  // Lessons Curriculum Filter ('ALL' | 'B1' | 'B2' | 'C1')
+  // Lessons Curriculum Filter ('ALL' | 'B1' | 'B2' | 'C1') & Topic Search
   const [levelFilter, setLevelFilter] = useState<'ALL' | CEFRLevel>('ALL');
+  const [lessonTopicSearch, setLessonTopicSearch] = useState('');
   const [expandedLessonPreviewId, setExpandedLessonPreviewId] = useState<string | null>(null);
+  const [lockedLectureNotice, setLockedLectureNotice] = useState<{
+    lectureNumber: number;
+    title: string;
+    prevId: string;
+    prevLectureNumber: number;
+    prevTitle: string;
+  } | null>(null);
 
   // Global Top Search Bar State
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -127,7 +143,7 @@ export default function App() {
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isDailyChallengeOpen, setIsDailyChallengeOpen] = useState(false);
   const [hasAutoCheckedDailyChallenge, setHasAutoCheckedDailyChallenge] = useState(false);
-  const [initialArenaTool, setInitialArenaTool] = useState<ArenaToolTab>('detective');
+  const [initialArenaTool, setInitialArenaTool] = useState<ArenaToolTab | null>(null);
   const [progressSubViewTarget, setProgressSubViewTarget] = useState<'overview' | 'achievements'>(
     'overview'
   );
@@ -149,6 +165,122 @@ export default function App() {
   // Home SRS Quick-Review Interactive Card State
   const [srsQuickIdx, setSrsQuickIdx] = useState(0);
   const [srsQuickFlipped, setSrsQuickFlipped] = useState(false);
+
+  // Gmail-Style Foldable Desktop Sidebar State (persisted in localStorage)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bhashasetu_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bhashasetu_sidebar_collapsed', String(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  // AI Roleplay Conversation Partner Modal State
+  const [isAIRoleplayOpen, setIsAIRoleplayOpen] = useState(false);
+
+  // Home AI Sentence & Grammar Coach State
+  const [sentenceCoachInput, setSentenceCoachInput] = useState('');
+  const [isSentenceCoachLoading, setIsSentenceCoachLoading] = useState(false);
+  const [sentenceCoachError, setSentenceCoachError] = useState<string | null>(null);
+  const [sentenceCoachResult, setSentenceCoachResult] = useState<{
+    isAlreadyCorrect: boolean;
+    correctedEnglish: string;
+    naturalAlternative: string;
+    nepaliMeaning: string;
+    grammarTipNepali: string;
+    svoComparisonNote: string;
+    focusTag: string;
+  } | null>(null);
+
+  // Home Word Spotlight AI Silent-Letter Explainer State
+  const [spotlightAIExplanation, setSpotlightAIExplanation] = useState<{
+    word: string;
+    silentReasonNepali: string;
+    mouthPositionNepali: string;
+    nepaliSoundComparison: string;
+    memoryTrickNepali: string;
+    extraExampleEnglish: string;
+    extraExampleNepali: string;
+  } | null>(null);
+  const [isSpotlightAILoading, setIsSpotlightAILoading] = useState(false);
+
+  const handleRunSentenceCoach = async (customText?: string) => {
+    const text = (customText ?? sentenceCoachInput).trim();
+    if (!text || isSentenceCoachLoading) return;
+    if (customText) setSentenceCoachInput(customText);
+    setIsSentenceCoachLoading(true);
+    setSentenceCoachError(null);
+
+    try {
+      const res = await fetch('/api/ai/sentence-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: text,
+          level: progress.currentLevel || 'B1',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.result) {
+        throw new Error(data.error || 'Could not analyze sentence right now.');
+      }
+      setSentenceCoachResult(data.result);
+    } catch (err: unknown) {
+      setSentenceCoachError(
+        err instanceof Error ? err.message : 'Unable to reach AI Sentence Coach.'
+      );
+    } finally {
+      setIsSentenceCoachLoading(false);
+    }
+  };
+
+  const handleExplainSpotlightWord = async (wordObj: {
+    word: string;
+    ipa: string;
+    silentLettersSummary: string;
+  }) => {
+    if (isSpotlightAILoading) return;
+    if (spotlightAIExplanation && spotlightAIExplanation.word === wordObj.word) {
+      setSpotlightAIExplanation(null);
+      return;
+    }
+    setIsSpotlightAILoading(true);
+    try {
+      const res = await fetch('/api/ai/word-explainer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          word: wordObj.word,
+          ipa: wordObj.ipa,
+          silentLettersSummary: wordObj.silentLettersSummary,
+          level: progress.currentLevel || 'B1',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.explanation) {
+        setSpotlightAIExplanation({
+          ...data.explanation,
+          word: wordObj.word,
+        });
+      }
+    } catch {
+      // Ignore transient errors
+    } finally {
+      setIsSpotlightAILoading(false);
+    }
+  };
 
   const isOnline = useOnlineStatus();
   const languageMode: LanguageMode = progress.languageMode || 'full-nepali';
@@ -340,8 +472,18 @@ export default function App() {
     setProgress((prev) => updateLectureScratchpadNote(prev, lectureId, noteText));
   };
 
-  const handleRecordExamResult = (examRecord: ExamSimulationRecord) => {
-    setProgress((prev) => recordExamSimulationResult(prev, examRecord));
+  const handleRecordExamResult = (
+    examRecord: Omit<ExamSimulationRecord, 'id' | 'completedAt'> | ExamSimulationRecord
+  ) => {
+    const fullRecord: ExamSimulationRecord = {
+      id: 'id' in examRecord && examRecord.id ? examRecord.id : `exam-${Date.now()}`,
+      completedAt:
+        'completedAt' in examRecord && examRecord.completedAt
+          ? examRecord.completedAt
+          : new Date().toISOString(),
+      ...examRecord,
+    };
+    setProgress((prev) => recordExamSimulationResult(prev, fullRecord));
   };
 
   const handleCompleteLecture = (scoreRecord: ModuleScoreRecord) => {
@@ -535,7 +677,11 @@ export default function App() {
         darkMode: progress.darkMode,
         languageMode: progress.languageMode,
         selectedLevel: progress.selectedLevel,
-        dailyGoalMinutes: progress.dailyGoalMinutes,
+        dailyGoalMinutes: (progress.dailyGoalMinutes === 5 ||
+        progress.dailyGoalMinutes === 10 ||
+        progress.dailyGoalMinutes === 30
+          ? progress.dailyGoalMinutes
+          : 15) as 5 | 10 | 15 | 30,
       });
 
       if (includeCloud && firebaseUser) {
@@ -612,6 +758,23 @@ export default function App() {
 
   const activeSRSQuickWord =
     dueSRSWords.length > 0 ? dueSRSWords[srsQuickIdx % dueSRSWords.length] : null;
+
+  // Daily Random High-Frequency 'Word of the Day' for Home Page
+  const [wordOfTheDayOffset, setWordOfTheDayOffset] = useState(0);
+  const wordOfTheDay = useMemo(() => {
+    const coreHighFreqPool = massiveLexicon.filter((w) => w.isCoreLessonWord);
+    const pool = coreHighFreqPool.length > 0 ? coreHighFreqPool : massiveLexicon;
+    if (pool.length === 0) return null;
+
+    const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    let hash = 2166136261;
+    for (let i = 0; i < todayStr.length; i++) {
+      hash ^= todayStr.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    const baseIdx = Math.abs(hash) % pool.length;
+    return pool[(baseIdx + wordOfTheDayOffset) % pool.length];
+  }, [massiveLexicon, wordOfTheDayOffset]);
 
   // Live Achievement Unlock Watcher & Toast Trigger
   useEffect(() => {
@@ -769,6 +932,9 @@ export default function App() {
     }
     if (tab === 'progress') {
       setProgressSubViewTarget('overview');
+    }
+    if (tab === 'arena') {
+      setInitialArenaTool(null);
     }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1017,8 +1183,18 @@ export default function App() {
       {/* TOP HEADER BAR: [भ BhashaSetu] — [Global Search] — [Streak + Avatar] */}
       {/* =================================================================== */}
       <header className="sticky top-0 z-40 h-16 bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-b border-[#E6E0D4] dark:border-[#2E2924] px-4 sm:px-6 flex items-center justify-between gap-4">
-        {/* Left: Brand Mark (भ in crimson rounded square + BhashaSetu) */}
-        <div className="flex items-center gap-6 shrink-0">
+        {/* Left: Gmail-Style Sidebar Hamburger Toggle + Brand Mark */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
+            title={isSidebarCollapsed ? 'Expand menu' : 'Main menu (collapse sidebar)'}
+            className="hidden md:flex w-10 h-10 rounded-full items-center justify-center text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#EFECE4] dark:hover:bg-[#1F1C18] transition-colors focus:outline-none"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
           <a
             href="#home"
             onClick={(e) => {
@@ -1462,66 +1638,76 @@ export default function App() {
       {/* BODY LAYOUT: PERSISTENT LEFT SIDEBAR + MAIN CONTENT WORKSPACE       */}
       {/* =================================================================== */}
       <div className="flex-1 flex min-h-[calc(100vh-4rem)]">
-        {/* Left Sidebar (Desktop >= md) matching Screenshots 1, 2, 3 */}
-        <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-[#E6E0D4] dark:border-[#2E2924] bg-[#FAF8F4] dark:bg-[#141210] px-4 py-6 select-none">
-          <div className="space-y-6">
+        {/* Left Sidebar (Desktop >= md): Gmail-Style Foldable Drawer (240px <-> 72px) */}
+        <aside
+          aria-label="Primary navigation"
+          className={`hidden md:flex shrink-0 flex-col justify-between border-r border-[#E6E0D4] dark:border-[#2E2924] bg-[#FAF8F4] dark:bg-[#141210] py-5 select-none transition-all duration-200 ease-in-out ${
+            isSidebarCollapsed ? 'w-[72px] px-2 items-center' : 'w-60 px-4'
+          }`}
+        >
+          <div className="w-full space-y-5">
             {/* Group 1: LEARN */}
             <div>
-              <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
-                LEARN
-              </div>
+              {!isSidebarCollapsed && (
+                <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
+                  LEARN
+                </div>
+              )}
               <nav className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => navigateTab('home')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'home' && !activeLectureId
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <Home className="w-4 h-4 shrink-0" />
-                  <span>Home</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('lessons')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'lessons' || Boolean(activeLectureId)
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <BookOpen className="w-4 h-4 shrink-0" />
-                  <span>Lessons</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('dictionary')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'dictionary'
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <BookMarked className="w-4 h-4 shrink-0" />
-                  <span>Dictionary</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('arena')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'arena'
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <Puzzle className="w-4 h-4 shrink-0" />
-                  <span>Practice arena</span>
-                </button>
+                {[
+                  {
+                    id: 'home' as NavTab,
+                    label: 'Home',
+                    icon: Home,
+                    isActive: activeTab === 'home' && !activeLectureId,
+                  },
+                  {
+                    id: 'lessons' as NavTab,
+                    label: 'Lessons',
+                    icon: BookOpen,
+                    isActive: activeTab === 'lessons' || Boolean(activeLectureId),
+                  },
+                  {
+                    id: 'dictionary' as NavTab,
+                    label: 'Dictionary',
+                    icon: BookMarked,
+                    isActive: activeTab === 'dictionary',
+                  },
+                  {
+                    id: 'arena' as NavTab,
+                    label: 'Practice arena',
+                    icon: Puzzle,
+                    isActive: activeTab === 'arena',
+                  },
+                ].map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => navigateTab(item.id)}
+                      title={isSidebarCollapsed ? item.label : undefined}
+                      aria-label={item.label}
+                      className={`group relative w-full flex items-center rounded-xl text-sm transition-colors ${
+                        isSidebarCollapsed
+                          ? 'justify-center h-11 w-11 mx-auto'
+                          : 'gap-3 px-3 py-2.5'
+                      } ${
+                        item.isActive
+                          ? 'font-semibold text-[#A82020] dark:text-[#F87171] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                          : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/60'
+                      }`}
+                    >
+                      <IconComponent className="w-4 h-4 shrink-0" />
+                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      {isSidebarCollapsed && (
+                        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#1C1917] text-[#FAF8F4] text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-md">
+                          {item.label}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </nav>
             </div>
 
@@ -1529,66 +1715,142 @@ export default function App() {
 
             {/* Group 2: YOUR JOURNEY */}
             <div>
-              <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
-                YOUR JOURNEY
-              </div>
+              {!isSidebarCollapsed && (
+                <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
+                  YOUR JOURNEY
+                </div>
+              )}
               <nav className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => navigateTab('progress')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'progress'
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4 shrink-0" />
-                  <span>Progress</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('settings')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'settings'
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <Sliders className="w-4 h-4 shrink-0" />
-                  <span>Settings</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('about')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                    activeTab === 'about'
-                      ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB] bg-[#F2EDE4] dark:bg-[#1F1C18]'
-                      : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/50'
-                  }`}
-                >
-                  <Info className="w-4 h-4 shrink-0" />
-                  <span>About guide</span>
-                </button>
+                {[
+                  {
+                    id: 'progress' as NavTab,
+                    label: 'Progress',
+                    icon: BarChart3,
+                    isActive: activeTab === 'progress',
+                  },
+                  {
+                    id: 'settings' as NavTab,
+                    label: 'Settings',
+                    icon: Sliders,
+                    isActive: activeTab === 'settings',
+                  },
+                  {
+                    id: 'about' as NavTab,
+                    label: 'About guide',
+                    icon: Info,
+                    isActive: activeTab === 'about',
+                  },
+                ].map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => navigateTab(item.id)}
+                      title={isSidebarCollapsed ? item.label : undefined}
+                      aria-label={item.label}
+                      className={`group relative w-full flex items-center rounded-xl text-sm transition-colors ${
+                        isSidebarCollapsed
+                          ? 'justify-center h-11 w-11 mx-auto'
+                          : 'gap-3 px-3 py-2.5'
+                      } ${
+                        item.isActive
+                          ? 'font-semibold text-[#A82020] dark:text-[#F87171] bg-[#F2EDE4] dark:bg-[#1F1C18]'
+                          : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/60'
+                      }`}
+                    >
+                      <IconComponent className="w-4 h-4 shrink-0" />
+                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      {isSidebarCollapsed && (
+                        <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#1C1917] text-[#FAF8F4] text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-md">
+                          {item.label}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </nav>
+            </div>
+
+            <div className="border-t border-[#E6E0D4] dark:border-[#2E2924]" />
+
+            {/* Group 3: AI STUDIO TOOLS */}
+            <div className="space-y-1.5">
+              {!isSidebarCollapsed && (
+                <div className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8C857B] dark:text-[#A8A29E] mb-2">
+                  AI STUDIO
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsAIModalOpen(true)}
+                title={isSidebarCollapsed ? 'Create AI lesson' : undefined}
+                aria-label="Create AI lesson"
+                className={`group relative w-full flex items-center rounded-xl text-xs font-medium transition-colors ${
+                  isSidebarCollapsed
+                    ? 'justify-center h-11 w-11 mx-auto bg-[#F8E7E3] dark:bg-red-950/60 text-[#A82020] dark:text-red-300'
+                    : 'gap-2.5 px-3 py-2.5 bg-[#F8E7E3]/70 dark:bg-red-950/40 text-[#A82020] dark:text-red-300 hover:bg-[#F8E7E3]'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">Create AI lesson</span>}
+                {isSidebarCollapsed && (
+                  <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#1C1917] text-[#FAF8F4] text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-md">
+                    Create AI lesson
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAIRoleplayOpen(true)}
+                title={isSidebarCollapsed ? 'AI Roleplay Partner' : undefined}
+                aria-label="AI Roleplay Partner"
+                className={`group relative w-full flex items-center rounded-xl text-xs font-medium transition-colors ${
+                  isSidebarCollapsed
+                    ? 'justify-center h-11 w-11 mx-auto bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300'
+                    : 'gap-2.5 px-3 py-2.5 bg-[#DCECE2]/70 dark:bg-emerald-950/40 text-[#1F5C3D] dark:text-emerald-300 hover:bg-[#DCECE2]'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span className="truncate">AI Roleplay Partner</span>}
+                {isSidebarCollapsed && (
+                  <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#1C1917] text-[#FAF8F4] text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-md">
+                    AI Roleplay Partner
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Bottom Sidebar Offline Readiness Card matching Screenshots 1, 2, 3 */}
-          <div className="p-3.5 rounded-2xl bg-[#EFECE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924]">
-            <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              Ready when you are
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
+          {/* Bottom Sidebar Offline Readiness Card */}
+          {isSidebarCollapsed ? (
+            <div
+              title={isOnline ? 'Ready when you are · Offline lessons available' : 'Offline mode active'}
+              className="w-11 h-11 rounded-2xl bg-[#EFECE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-center"
+            >
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2.5 h-2.5 rounded-full ${
                   isOnline ? 'bg-[#2E6F4E]' : 'bg-[#D97706]'
                 }`}
               />
-              <span>Offline lessons available</span>
             </div>
-          </div>
+          ) : (
+            <div className="w-full p-3.5 rounded-2xl bg-[#EFECE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924]">
+              <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Ready when you are
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-1">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isOnline ? 'bg-[#2E6F4E]' : 'bg-[#D97706]'
+                  }`}
+                />
+                <span>Offline lessons available</span>
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* Main Workspace */}
@@ -1632,7 +1894,7 @@ export default function App() {
               languageMode={languageMode}
               initialLectureFilter={dictionaryLectureFilter}
               onToggleSaveWord={handleToggleSaveWord}
-              onToggleMasterWord={handleToggleMasteredWord}
+              onToggleMasteredWord={handleToggleMasteredWord}
               onUpdateWordSRS={handleUpdateWordSRS}
               onRecordMistake={handleRecordMistake}
               onPracticeMistake={handlePracticeMistake}
@@ -1651,6 +1913,7 @@ export default function App() {
               preferredSpeechRate={progress.preferredSpeechRate}
               languageMode={languageMode}
               initialToolTab={initialArenaTool}
+              onSelectTool={setInitialArenaTool}
               onAddCustomWord={handleAddCustomWord}
               onRemoveCustomWord={handleRemoveCustomWord}
               onRecordSprintScore={handleRecordSprintScore}
@@ -1723,6 +1986,7 @@ export default function App() {
               languageMode={languageMode}
               preferredSpeechRate={progress.preferredSpeechRate}
               onStartCurriculum={() => navigateTab('lessons')}
+              onOpenSettings={() => navigateTab('settings')}
             />
           ) : dashboardStudySheetMode ? (
             <PrintableStudySheetModal
@@ -1741,55 +2005,129 @@ export default function App() {
             <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-8">
               {/* Top Heading */}
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-2">
+                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-1.5">
                   YOUR CURRICULUM
                 </div>
-                <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+                <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
                   Lessons for your next step
                 </h1>
-                <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
+                <p className="text-xs sm:text-sm md:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1">
                   A guided path from everyday fluency to confident expression.
                 </p>
               </div>
 
-              {/* Filter Pills Row + "+ Create AI lesson" Button */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {(
-                    [
-                      { id: 'ALL', label: 'All levels' },
-                      { id: 'B1', label: 'B1 Foundation' },
-                      { id: 'B2', label: 'B2 Workplace' },
-                      { id: 'C1', label: 'C1 Advanced' },
-                    ] as { id: 'ALL' | CEFRLevel; label: string }[]
-                  ).map((pill) => {
-                    const isActive = levelFilter === pill.id;
-                    return (
+              {/* Search Bar + Filter Pills + "+ Create AI lesson" Button on opposite side */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
+                  {/* Small Search Bar by Topic */}
+                  <div className="relative w-full sm:w-56 shrink-0">
+                    <Search className="w-3.5 h-3.5 text-[#78716C] dark:text-[#A8A29E] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={lessonTopicSearch}
+                      onChange={(e) => setLessonTopicSearch(e.target.value)}
+                      placeholder="Search lesson by topic..."
+                      className="w-full h-9 pl-8 pr-7 rounded-full bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] text-xs text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8C857B] focus:outline-none focus:border-[#A82020] transition-colors"
+                    />
+                    {lessonTopicSearch && (
                       <button
-                        key={pill.id}
                         type="button"
-                        onClick={() => setLevelFilter(pill.id)}
-                        className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${
-                          isActive
-                            ? 'bg-[#F6E6E2] dark:bg-red-950/60 text-[#A82020] dark:text-red-300 font-semibold'
-                            : 'bg-[#F2EFE9] dark:bg-[#1F1C18] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]'
-                        }`}
+                        onClick={() => setLessonTopicSearch('')}
+                        aria-label="Clear topic search"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
                       >
-                        {pill.label}
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                    );
-                  })}
+                    )}
+                  </div>
+
+                  {/* Level Filter Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(
+                      [
+                        { id: 'ALL', label: 'All levels' },
+                        { id: 'B1', label: 'B1 Foundation' },
+                        { id: 'B2', label: 'B2 Workplace' },
+                        { id: 'C1', label: 'C1 Advanced' },
+                      ] as { id: 'ALL' | CEFRLevel; label: string }[]
+                    ).map((pill) => {
+                      const isActive = levelFilter === pill.id;
+                      return (
+                        <button
+                          key={pill.id}
+                          type="button"
+                          onClick={() => setLevelFilter(pill.id)}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            isActive
+                              ? 'bg-[#F6E6E2] dark:bg-red-950/60 text-[#A82020] dark:text-red-300 font-semibold'
+                              : 'bg-[#F2EFE9] dark:bg-[#1F1C18] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]'
+                          }`}
+                        >
+                          {pill.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
+                {/* Right Side: Create AI Lesson */}
                 <button
                   type="button"
                   onClick={() => setIsAIModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
+                  className="px-4 py-2 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors shadow-xs shrink-0 self-start lg:self-auto"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>Create AI lesson</span>
                 </button>
               </div>
+
+              {/* Locked Lecture Notice Popup / Callout when user clicks a Lock icon */}
+              {lockedLectureNotice && (
+                <div
+                  role="alert"
+                  className="rounded-2xl bg-[#FFFBEB] dark:bg-amber-950/40 border-[1.5px] border-[#D97706] dark:border-amber-500/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                >
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] dark:bg-amber-900/60 text-[#B45309] dark:text-amber-300 flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                        Lecture {String(lockedLectureNotice.lectureNumber).padStart(2, '0')} is locked
+                      </p>
+                      <p className="text-xs text-[#6E685F] dark:text-[#D6D3CD] mt-0.5">
+                        This lecture is locked — you must finish{' '}
+                        <span className="font-semibold text-[#1C1917] dark:text-white">
+                          Lecture {String(lockedLectureNotice.prevLectureNumber).padStart(2, '0')} (
+                          {lockedLectureNotice.prevTitle})
+                        </span>{' '}
+                        first to unlock it.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetPrevId = lockedLectureNotice.prevId;
+                        setLockedLectureNotice(null);
+                        openLecture(targetPrevId, 0);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs font-medium transition-colors"
+                    >
+                      Go to Lecture {String(lockedLectureNotice.prevLectureNumber).padStart(2, '0')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLockedLectureNotice(null)}
+                      aria-label="Dismiss locked message"
+                      className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Level Group Containers (B1, B2, C1) */}
               <div className="space-y-6">
@@ -1817,25 +2155,47 @@ export default function App() {
                 )
                   .filter((grp) => levelFilter === 'ALL' || levelFilter === grp.level)
                   .map((grp) => {
-                    const groupLessons = CORE_SYLLABUS.filter((l) => l.level === grp.level);
+                    const topicQuery = lessonTopicSearch.trim().toLowerCase();
+                    const groupLessons = CORE_SYLLABUS.filter((l) => {
+                      if (l.level !== grp.level) return false;
+                      if (!topicQuery) return true;
+                      const { displayTitle, displaySub } = getEditorialLessonPresentation(l);
+                      const matchesText =
+                        displayTitle.toLowerCase().includes(topicQuery) ||
+                        displaySub.toLowerCase().includes(topicQuery) ||
+                        l.title.toLowerCase().includes(topicQuery) ||
+                        l.subtitle.toLowerCase().includes(topicQuery) ||
+                        l.category.toLowerCase().includes(topicQuery) ||
+                        l.moduleC_spelling.ruleTitle.toLowerCase().includes(topicQuery) ||
+                        l.moduleD_grammar.topicTitle.toLowerCase().includes(topicQuery) ||
+                        l.moduleA_vocabulary.some(
+                          (v) =>
+                            v.word.toLowerCase().includes(topicQuery) ||
+                            v.nepaliMeaning.toLowerCase().includes(topicQuery)
+                        );
+                      return matchesText;
+                    });
+
+                    if (groupLessons.length === 0) return null;
+
                     return (
                       <section
                         key={grp.level}
-                        className="rounded-2xl bg-[#F5F2EB] dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-5 space-y-3"
+                        className="rounded-2xl bg-[#F5F2EB] dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-3.5 sm:p-5 space-y-3"
                       >
                         {/* Track Header Row */}
                         <div className="flex items-center justify-between gap-2 px-1 py-1">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${grp.badgeBg}`}
+                              className={`px-2 py-0.5 sm:px-2.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 ${grp.badgeBg}`}
                             >
                               {grp.level}
                             </span>
-                            <h2 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                            <h2 className="text-xs sm:text-sm md:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
                               {grp.title}
                             </h2>
                           </div>
-                          <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                          <span className="text-[10px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] shrink-0">
                             {grp.rangeLabel}
                           </span>
                         </div>
@@ -1843,75 +2203,129 @@ export default function App() {
                         {/* Lesson Cards inside Group */}
                         <div className="space-y-2.5">
                           {groupLessons.map((lesson) => {
+                            const syllabusIdx = CORE_SYLLABUS.findIndex(
+                              (item) => item.id === lesson.id
+                            );
+                            const prevLesson =
+                              syllabusIdx > 0 ? CORE_SYLLABUS[syllabusIdx - 1] : null;
                             const isCompleted = progress.completedUnitIds.includes(lesson.id);
                             const stepsDone =
                               progress.completedStepsByLecture?.[lesson.id]?.length || 0;
-                            const isCurrentActive =
-                              !isCompleted &&
-                              (recommendedLecture?.id === lesson.id || stepsDone > 0);
+                            const isUnlocked =
+                              syllabusIdx === 0 ||
+                              isCompleted ||
+                              stepsDone > 0 ||
+                              (prevLesson
+                                ? progress.completedUnitIds.includes(prevLesson.id)
+                                : true);
+                            const isInProgress = !isCompleted && stepsDone > 0;
+                            const isReadyToStart = !isCompleted && stepsDone === 0 && isUnlocked;
+
                             const { displayTitle, displaySub, duration } =
                               getEditorialLessonPresentation(lesson);
                             const isPreviewExpanded = expandedLessonPreviewId === lesson.id;
 
+                            // Border color according to status:
+                            // - Finished: Green
+                            // - In progress: Warm Terracotta / Crimson
+                            // - Unlocked / Ready to start: Amber Gold
+                            // - Locked / Up next: Cool Slate-Stone
+                            const statusBorderClass = isCompleted
+                              ? 'border-[1.5px] border-[#2E6F4E] dark:border-emerald-500/80'
+                              : isInProgress
+                              ? 'border-[1.5px] border-[#C86D63] dark:border-[#F87171] shadow-xs'
+                              : isReadyToStart
+                              ? 'border-[1.5px] border-[#D97706] dark:border-amber-500/80 shadow-xs'
+                              : 'border-[1.5px] border-[#CBD5E1] dark:border-[#334155]';
+
+                            const numberBadgeClass = isCompleted
+                              ? 'bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300'
+                              : isInProgress
+                              ? 'bg-[#F8E7E3] dark:bg-red-950/50 text-[#A82020] dark:text-red-300'
+                              : isReadyToStart
+                              ? 'bg-[#FEF3C7] dark:bg-amber-950/50 text-[#B45309] dark:text-amber-300'
+                              : 'bg-[#EDE8DC] dark:bg-[#26221E] text-[#57534E] dark:text-[#A8A29E]';
+
+                            const triggerLockedMessage = (e?: React.MouseEvent) => {
+                              if (e) e.stopPropagation();
+                              const fallbackPrev = prevLesson || lesson;
+                              const prevPres = getEditorialLessonPresentation(fallbackPrev);
+                              setLockedLectureNotice({
+                                lectureNumber: lesson.lectureNumber,
+                                title: displayTitle,
+                                prevId: fallbackPrev.id,
+                                prevLectureNumber: fallbackPrev.lectureNumber,
+                                prevTitle: prevPres.displayTitle,
+                              });
+                            };
+
                             return (
                               <div
                                 key={lesson.id}
-                                className={`rounded-2xl bg-white dark:bg-[#141210] transition-all ${
-                                  isCurrentActive
-                                    ? 'border-[1.5px] border-[#C86D63] dark:border-[#F87171] shadow-xs'
-                                    : 'border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/50'
-                                }`}
+                                className={`rounded-2xl bg-white dark:bg-[#141210] transition-all overflow-hidden ${statusBorderClass}`}
                               >
+                                {/* Tap Card Row -> Opens/Closes Folded Part */}
                                 <div
                                   onClick={() =>
-                                    openLecture(
-                                      lesson.id,
-                                      isCurrentActive
-                                        ? (Math.min(4, stepsDone) as ModuleStep)
-                                        : 0
+                                    setExpandedLessonPreviewId((prev) =>
+                                      prev === lesson.id ? null : lesson.id
                                     )
                                   }
-                                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
+                                  className="p-3 sm:p-5 flex items-start sm:items-center justify-between gap-2.5 sm:gap-4 cursor-pointer select-none"
                                 >
-                                  {/* Left: Number Box + Title & Subtitle */}
-                                  <div className="flex items-center gap-4 min-w-0">
+                                  {/* Left: Proportional Number Box + Full Mobile-Readable Title & Subtitle */}
+                                  <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
                                     <div
-                                      className={`w-12 h-12 rounded-xl flex items-center justify-center font-serif text-base font-medium shrink-0 ${
-                                        isCurrentActive
-                                          ? 'bg-[#F8E7E3] dark:bg-red-950/50 text-[#A82020] dark:text-red-300'
-                                          : 'bg-[#EDE8DC] dark:bg-[#26221E] text-[#57534E] dark:text-[#A8A29E]'
-                                      }`}
+                                      className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center font-serif text-xs sm:text-base font-semibold shrink-0 mt-0.5 sm:mt-0 ${numberBadgeClass}`}
                                     >
                                       {String(lesson.lectureNumber).padStart(2, '0')}
                                     </div>
-                                    <div className="min-w-0">
-                                      <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
                                         {displayTitle}
                                       </h3>
-                                      <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 truncate">
+                                      <p className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
                                         {displaySub}
                                       </p>
+                                      <div className="flex flex-wrap items-center gap-2 mt-1 md:hidden text-[10px] text-[#78716C] dark:text-[#A8A29E]">
+                                        <span>
+                                          {isInProgress
+                                            ? `Step ${Math.max(1, stepsDone + 1)}/5 · ${duration}m left`
+                                            : `5 steps · ${duration} min`}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  {/* Right: Steps Info + Status Pill + Action */}
-                                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
-                                    <span className="text-xs text-[#78716C] dark:text-[#A8A29E] whitespace-nowrap">
-                                      {isCurrentActive
+                                  {/* Right: Desktop Steps Info + Compact Mobile Status Action (Completed / Continue / Start / Lock Icon) */}
+                                  <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 self-center">
+                                    <span className="hidden md:inline-block text-xs text-[#78716C] dark:text-[#A8A29E] whitespace-nowrap">
+                                      {isInProgress
                                         ? `Step ${Math.max(1, stepsDone + 1)} of 5 · ${duration} min left`
                                         : `5 steps · ${duration} min`}
                                     </span>
 
                                     {isCompleted ? (
-                                      <div className="flex items-center gap-3">
-                                        <span className="px-4 py-1.5 rounded-full bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium min-w-[115px] text-center">
-                                          Completed
+                                      <div className="flex items-center gap-1.5 sm:gap-2">
+                                        <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium">
+                                          <Check className="w-3.5 h-3.5" />
+                                          <span>Completed</span>
                                         </span>
-                                        <Check className="w-4 h-4 text-[#57534E]" />
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openLecture(lesson.id, 0);
+                                          }}
+                                          className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl border border-[#2E6F4E]/40 bg-[#DCECE2]/50 dark:bg-emerald-950/40 text-[11px] sm:text-xs font-semibold text-[#1F5C3D] dark:text-emerald-300 hover:bg-[#DCECE2] transition-colors"
+                                        >
+                                          Start
+                                        </button>
                                       </div>
-                                    ) : isCurrentActive ? (
-                                      <div className="flex items-center gap-2.5">
-                                        <span className="px-3.5 py-1.5 rounded-full bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] text-xs font-medium">
+                                    ) : isInProgress ? (
+                                      <div className="flex items-center gap-1.5 sm:gap-2">
+                                        <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] text-xs font-medium">
                                           In progress
                                         </span>
                                         <button
@@ -1923,47 +2337,104 @@ export default function App() {
                                               Math.min(4, stepsDone) as ModuleStep
                                             );
                                           }}
-                                          className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4]"
+                                          className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl border border-[#C86D63] dark:border-[#F87171] bg-white dark:bg-[#1F1C18] text-[11px] sm:text-xs font-semibold text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] transition-colors"
                                         >
                                           Continue
                                         </button>
                                       </div>
+                                    ) : isReadyToStart ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openLecture(lesson.id, 0);
+                                        }}
+                                        className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-[11px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors shadow-xs"
+                                      >
+                                        <Play className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
+                                        <span>Start</span>
+                                      </button>
                                     ) : (
-                                      <div className="flex items-center gap-3">
-                                        <span className="px-4 py-1.5 rounded-full bg-[#E3ECF6] dark:bg-slate-900 text-[#3B5984] dark:text-blue-300 text-xs font-medium min-w-[115px] text-center">
-                                          Up next
-                                        </span>
-                                        <Lock className="w-4 h-4 text-[#8C857B]" />
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={triggerLockedMessage}
+                                        title="Locked — finish the previous lecture first"
+                                        aria-label={`Lecture ${lesson.lectureNumber} is locked. Click for details.`}
+                                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#F2EFE9] dark:bg-[#26221E] border border-[#CBD5E1] dark:border-[#334155] text-[#64748B] dark:text-[#94A3B8] hover:text-[#A82020] hover:border-[#A82020]/50 flex items-center justify-center transition-colors"
+                                      >
+                                        <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                      </button>
                                     )}
 
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setExpandedLessonPreviewId((prev) =>
-                                          prev === lesson.id ? null : lesson.id
-                                        );
-                                      }}
-                                      aria-label="Preview interactive lesson steps"
-                                      className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] hover:bg-[#FAF8F4] dark:hover:bg-[#1F1C18]"
-                                      title="Preview 5 interactive steps & vocabulary"
+                                    <span
+                                      aria-hidden="true"
+                                      className="p-0.5 sm:p-1 text-[#78716C] dark:text-[#A8A29E]"
                                     >
                                       {isPreviewExpanded ? (
-                                        <ChevronUp className="w-4 h-4" />
+                                        <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                       ) : (
-                                        <ChevronDown className="w-4 h-4" />
+                                        <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                       )}
-                                    </button>
+                                    </span>
                                   </div>
                                 </div>
 
-                                {/* Interactive Step Launcher & Vocabulary Preview Drawer */}
+                                {/* Folded Part: Opens on Tap with Full Info, 5 Steps, Key Vocabulary & Start/Continue CTA */}
                                 {isPreviewExpanded && (
-                                  <div className="px-5 pb-4 pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] bg-[#FAF8F4]/70 dark:bg-[#1A1714] rounded-b-2xl space-y-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                      <span className="font-semibold text-[#57534E] dark:text-[#A8A29E]">
-                                        Jump directly to any interactive step:
+                                  <div className="px-4 sm:px-5 pb-4 pt-3 border-t border-[#EFEAE0] dark:border-[#2E2924] bg-[#FAF8F4]/80 dark:bg-[#1A1714] space-y-3">
+                                    {/* Full Title & Details for Mobile Clarity */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                      <div className="space-y-0.5">
+                                        <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                                          {displayTitle}
+                                        </div>
+                                        <div className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
+                                          {displaySub} · 5 steps · {duration} min
+                                        </div>
+                                      </div>
+
+                                      {isUnlocked ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openLecture(
+                                              lesson.id,
+                                              isInProgress
+                                                ? (Math.min(4, stepsDone) as ModuleStep)
+                                                : 0
+                                            )
+                                          }
+                                          className="px-4 py-2 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 transition-colors"
+                                        >
+                                          <Play className="w-3.5 h-3.5 fill-current" />
+                                          <span>
+                                            {isInProgress
+                                              ? 'Continue lecture'
+                                              : isCompleted
+                                              ? 'Start again'
+                                              : 'Start lecture'}
+                                          </span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={triggerLockedMessage}
+                                          className="px-3.5 py-1.5 rounded-xl bg-[#FEF3C7] dark:bg-amber-950/60 border border-[#D97706]/50 text-[#B45309] dark:text-amber-300 text-xs font-medium inline-flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+                                        >
+                                          <Lock className="w-3.5 h-3.5" />
+                                          <span>
+                                            Finish Lecture{' '}
+                                            {String(prevLesson?.lectureNumber || 1).padStart(2, '0')}{' '}
+                                            first to unlock
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* 5 Interactive Module Steps */}
+                                    <div className="space-y-1.5">
+                                      <span className="block text-[11px] font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                                        5 interactive steps in this lecture:
                                       </span>
                                       <div className="flex flex-wrap items-center gap-1.5">
                                         {[
@@ -1972,21 +2443,43 @@ export default function App() {
                                           { step: 2 as ModuleStep, label: '03 · Grammar & Syntax' },
                                           { step: 3 as ModuleStep, label: '04 · Live Dialogue' },
                                           { step: 4 as ModuleStep, label: '05 · Mastery Quiz' },
-                                        ].map((st) => (
-                                          <button
-                                            key={st.step}
-                                            type="button"
-                                            onClick={() => openLecture(lesson.id, st.step)}
-                                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-[11px] font-medium text-[#1C1917] dark:text-[#F5F2EB]"
-                                          >
-                                            {st.label}
-                                          </button>
-                                        ))}
+                                        ].map((st) => {
+                                          const stepCompleted =
+                                            isCompleted ||
+                                            (progress.completedStepsByLecture?.[lesson.id] || []).includes(
+                                              st.step
+                                            );
+                                          return (
+                                            <button
+                                              key={st.step}
+                                              type="button"
+                                              onClick={() => {
+                                                if (!isUnlocked) {
+                                                  triggerLockedMessage();
+                                                  return;
+                                                }
+                                                openLecture(lesson.id, st.step);
+                                              }}
+                                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium inline-flex items-center gap-1 transition-colors ${
+                                                stepCompleted
+                                                  ? 'bg-[#DCECE2]/60 dark:bg-emerald-950/40 border-[#2E6F4E]/40 text-[#1F5C3D] dark:text-emerald-300'
+                                                  : 'bg-white dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-[#1C1917] dark:text-[#F5F2EB]'
+                                              }`}
+                                            >
+                                              {stepCompleted && <Check className="w-3 h-3" />}
+                                              {!isUnlocked && <Lock className="w-2.5 h-2.5 opacity-60" />}
+                                              <span>{st.label}</span>
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     </div>
 
-                                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                                      <span className="text-[#78716C]">Key Words (click to hear):</span>
+                                    {/* Key Words Preview */}
+                                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                      <span className="text-[#78716C] mr-1">
+                                        Key Words (tap to hear):
+                                      </span>
                                       {lesson.moduleA_vocabulary.slice(0, 6).map((vocab) => (
                                         <button
                                           key={vocab.id}
@@ -2015,6 +2508,37 @@ export default function App() {
                       </section>
                     );
                   })}
+
+                {/* Empty search state if no lessons match */}
+                {lessonTopicSearch.trim() &&
+                  CORE_SYLLABUS.filter((l) => {
+                    if (levelFilter !== 'ALL' && l.level !== levelFilter) return false;
+                    const q = lessonTopicSearch.trim().toLowerCase();
+                    const { displayTitle, displaySub } = getEditorialLessonPresentation(l);
+                    return (
+                      displayTitle.toLowerCase().includes(q) ||
+                      displaySub.toLowerCase().includes(q) ||
+                      l.title.toLowerCase().includes(q) ||
+                      l.subtitle.toLowerCase().includes(q) ||
+                      l.category.toLowerCase().includes(q) ||
+                      l.moduleC_spelling.ruleTitle.toLowerCase().includes(q) ||
+                      l.moduleD_grammar.topicTitle.toLowerCase().includes(q) ||
+                      l.moduleA_vocabulary.some(
+                        (v) =>
+                          v.word.toLowerCase().includes(q) ||
+                          v.nepaliMeaning.toLowerCase().includes(q)
+                      )
+                    );
+                  }).length === 0 && (
+                    <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-6 text-center space-y-2">
+                      <p className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB]">
+                        No lessons found for “{lessonTopicSearch}”
+                      </p>
+                      <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        Try another topic keyword or create a custom AI lesson on this topic.
+                      </p>
+                    </div>
+                  )}
               </div>
 
               {/* Bottom Section: Your custom lessons (Exact match to Screenshot 2) */}
@@ -2042,26 +2566,26 @@ export default function App() {
                       <div
                         key={customLec.id}
                         onClick={() => openLecture(customLec.id, 0)}
-                        className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] flex items-center justify-between gap-4 cursor-pointer transition-colors"
+                        className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] flex items-center justify-between gap-3 sm:gap-4 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-xl bg-[#F8E7E3] text-[#A82020] flex items-center justify-center font-serif font-semibold text-sm">
+                        <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-[#F8E7E3] text-[#A82020] flex items-center justify-center font-serif font-semibold text-xs sm:text-sm shrink-0">
                             AI
                           </div>
-                          <div>
-                            <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
                               {customLec.title}
                             </h3>
-                            <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                            <p className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] line-clamp-1">
                               {customLec.subtitle}
                             </p>
                           </div>
                         </div>
                         <button
                           type="button"
-                          className="px-4 py-2 rounded-xl bg-[#A82020] text-white text-xs font-medium"
+                          className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-[#A82020] text-white text-[11px] sm:text-xs font-medium shrink-0"
                         >
-                          Open lesson
+                          Open
                         </button>
                       </div>
                     ))}
@@ -2071,39 +2595,81 @@ export default function App() {
             </div>
           ) : (
             /* =============================================================== */
-            /* HOME VIEW (Exact Editorial Match to Screenshot 1)               */
+            /* HOME VIEW: EXACT EDITORIAL LAYOUT + AI COACH & WORD SPOTLIGHT   */
             /* =============================================================== */
             <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-6">
-              {/* Greeting Header */}
-              <div>
-                <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
-                  Namaste, {firstName}
-                </h1>
-                <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
-                  Take a quiet moment for yourself. Your next English lesson is ready.
-                </p>
+              {/* Top Greeting Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9E2A2B] dark:text-[#F87171]">
+                    {new Date()
+                      .toLocaleDateString('en-US', { weekday: 'long' })
+                      .toUpperCase()}{' '}
+                    · YOUR LEARNING SPACE
+                  </div>
+                  <h1 className="font-serif text-3xl sm:text-[38px] leading-tight font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight mt-1">
+                    Namaste, {firstName}
+                  </h1>
+                  <p className="text-sm text-[#6E685F] dark:text-[#A8A29E] mt-1">
+                    A little practice today goes a long way.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => navigateTab('lessons')}
+                    className="px-3.5 py-1.5 rounded-full bg-[#F4E6E2] dark:bg-red-950/50 text-[#9E2A2B] dark:text-red-300 text-xs font-medium hover:bg-[#EDD8D2] transition-colors"
+                  >
+                    {progress.currentLevel || 'B1'} ·{' '}
+                    {progress.currentLevel === 'C1'
+                      ? 'Advanced'
+                      : progress.currentLevel === 'B2'
+                      ? 'Workplace'
+                      : 'Foundation'}
+                  </button>
+                </div>
               </div>
 
-              {/* Hero Card: CONTINUE YOUR PATH + Open Book अ | A Illustration */}
-              <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-6 sm:p-8 shadow-[0_1px_2px_rgba(28,25,23,0.03)]">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171]">
-                      {progress.completedUnitIds.length === 0 &&
-                      (progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) === 0
-                        ? 'START YOUR PATH'
-                        : 'CONTINUE YOUR PATH'}
+              {/* First Hero Banner: CONTINUE YOUR PATH + Tilted Open Book अ | A Illustration */}
+              <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#EFEADE] via-[#EAE1D2] to-[#E2D6C3] dark:from-[#221E1A] dark:via-[#1E1A17] dark:to-[#181512] border border-[#E4DDD0] dark:border-[#2E2924] p-7 sm:p-9">
+                {/* Subtle Devanagari Watermark in Bottom Right */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none select-none absolute right-6 -bottom-4 font-nepali text-[68px] sm:text-[78px] font-bold text-[#CFC2AE]/45 dark:text-[#3A332C]/35 leading-none"
+                >
+                  भाषासेतु
+                </div>
+
+                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  <div className="lg:col-span-7 space-y-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9E3B2E] dark:text-[#F87171]">
+                      CONTINUE YOUR PATH
                     </div>
-                    <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#1C1917] dark:text-[#F5F2EB] leading-snug">
-                      {`Lesson ${String(recommendedLecture.lectureNumber).padStart(2, '0')} · ${
-                        getEditorialLessonPresentation(recommendedLecture).displayTitle
-                      }`}
+                    <h2 className="font-serif text-3xl sm:text-[34px] leading-[1.18] font-normal text-[#1C1917] dark:text-[#F5F2EB] max-w-lg">
+                      Speak with confidence, one lesson at a time.
                     </h2>
-                    <p className="text-sm text-[#6E685F] dark:text-[#A8A29E] max-w-xl leading-relaxed">
-                      {recommendedLecture.subtitle}
+                    <p className="text-sm text-[#655E54] dark:text-[#A8A29E] max-w-md leading-relaxed">
+                      Pick up where you left off and keep building your English, at your own pace.
                     </p>
 
-                    <div className="pt-2 flex flex-wrap items-center gap-4">
+                    {/* Lesson Duration & Index Metadata Row */}
+                    <div className="pt-1 flex flex-wrap items-center gap-5 text-xs text-[#655E54] dark:text-[#A8A29E]">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#78716C]" />
+                        <span>{getEditorialLessonPresentation(recommendedLecture).duration} min</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#78716C]" />
+                        <span>
+                          Lesson {String(recommendedLecture.lectureNumber).padStart(2, '0')} of{' '}
+                          {courseStats.totalUnits}
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Primary Crimson CTA Button */}
+                    <div className="pt-2">
                       <button
                         type="button"
                         onClick={() =>
@@ -2115,88 +2681,117 @@ export default function App() {
                             ) as ModuleStep
                           )
                         }
-                        className="px-5 py-3 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
+                        className="px-5 py-3 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-sm font-medium inline-flex items-center gap-2.5 transition-colors shadow-xs"
                       >
-                        <span>
-                          {(progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) > 0
-                            ? 'Continue lesson'
-                            : 'Start lesson'}
-                        </span>
-                        <ArrowRight className="w-4 h-4" />
+                        <Play className="w-3.5 h-3.5" />
+                        <span>Continue lesson</span>
                       </button>
-                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                        Step{' '}
-                        {Math.min(
-                          5,
-                          (progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0) +
-                            1
-                        )}{' '}
-                        of 5 · About{' '}
-                        {getEditorialLessonPresentation(recommendedLecture).duration} minutes
-                      </span>
                     </div>
                   </div>
 
-                  {/* Right Open-Book Bridge Illustration Box (अ | A) */}
-                  <div className="lg:col-span-4 flex justify-center lg:justify-end">
+                  {/* Right Column: Circular Sandstone Backdrop + Tilted Open Book (अ | A) */}
+                  <div className="lg:col-span-5 flex justify-center lg:justify-end">
                     <button
                       type="button"
                       onClick={() =>
-                        speechService.speak('Knowledge, subtle, castle', {
+                        speechService.speak('Speak with confidence, one lesson at a time.', {
                           rate: progress.preferredSpeechRate,
                         })
                       }
-                      title="Click to hear sample pronunciation"
-                      className="w-full max-w-[240px] h-36 rounded-2xl bg-[#F4EFE4] dark:bg-[#26221E] border border-[#E6E0D4] dark:border-[#3A342E] flex items-center justify-center p-4 hover:border-[#A82020]/50 transition-colors group"
+                      title="Click to hear pronunciation"
+                      className="w-44 h-44 sm:w-48 sm:h-48 rounded-full bg-[#D7C6AE]/80 dark:bg-[#2C2620] flex items-center justify-center relative group transition-transform hover:scale-[1.02] focus:outline-none"
                     >
                       <svg
-                        viewBox="0 0 200 120"
-                        className="w-40 h-28"
+                        viewBox="0 0 220 165"
+                        className="w-44 h-36 -rotate-6 drop-shadow-[0_8px_16px_rgba(28,25,23,0.08)]"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                       >
                         {/* Left Page */}
-                        <path
-                          d="M100 28 C78 22, 46 22, 24 28 L24 94 C46 88, 78 88, 100 94 Z"
-                          fill="#FAF8F4"
-                          stroke="#8C7A6B"
-                          strokeWidth="2"
+                        <rect
+                          x="18"
+                          y="20"
+                          width="86"
+                          height="122"
+                          rx="6"
+                          fill="#FAF7F0"
+                          stroke="#E2DACB"
+                          strokeWidth="1.5"
                         />
                         {/* Right Page */}
-                        <path
-                          d="M100 28 C122 22, 154 22, 176 28 L176 94 C154 88, 122 88, 100 94 Z"
-                          fill="#FAF8F4"
-                          stroke="#8C7A6B"
-                          strokeWidth="2"
+                        <rect
+                          x="112"
+                          y="20"
+                          width="86"
+                          height="122"
+                          rx="6"
+                          fill="#FAF7F0"
+                          stroke="#E2DACB"
+                          strokeWidth="1.5"
                         />
-                        {/* Center Spine */}
+                        {/* Center Crimson Spine */}
+                        <rect x="103" y="18" width="10" height="126" rx="4" fill="#9E2A2B" />
+
+                        {/* Ruling Lines on Left Page */}
                         <line
-                          x1="100"
-                          y1="28"
-                          x2="100"
-                          y2="94"
-                          stroke="#8C7A6B"
-                          strokeWidth="2"
+                          x1="34"
+                          y1="44"
+                          x2="86"
+                          y2="44"
+                          stroke="#CFC8BC"
+                          strokeWidth="3"
+                          strokeLinecap="round"
                         />
-                        {/* Left Character: अ */}
+                        <line
+                          x1="34"
+                          y1="62"
+                          x2="78"
+                          y2="62"
+                          stroke="#CFC8BC"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+
+                        {/* Ruling Lines on Right Page */}
+                        <line
+                          x1="128"
+                          y1="44"
+                          x2="180"
+                          y2="44"
+                          stroke="#CFC8BC"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                        <line
+                          x1="128"
+                          y1="62"
+                          x2="172"
+                          y2="62"
+                          stroke="#CFC8BC"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+
+                        {/* Left Page Character: अ */}
                         <text
                           x="62"
-                          y="68"
+                          y="114"
                           textAnchor="middle"
-                          fill="#A82020"
-                          fontSize="26"
+                          fill="#9E2A2B"
+                          fontSize="36"
                           fontWeight="600"
                           fontFamily="Noto Sans Devanagari, serif"
                         >
                           अ
                         </text>
-                        {/* Right Character: A */}
+
+                        {/* Right Page Character: A */}
                         <text
-                          x="138"
-                          y="68"
+                          x="155"
+                          y="114"
                           textAnchor="middle"
-                          fill="#A82020"
-                          fontSize="26"
+                          fill="#3F6A52"
+                          fontSize="38"
                           fontWeight="500"
                           fontFamily="Newsreader, Georgia, serif"
                         >
@@ -2208,163 +2803,216 @@ export default function App() {
                 </div>
               </section>
 
-              {/* 4 KPI Summary Cards Row (Starting cleanly from 0) */}
+              {/* 4 KPI Summary Cards Row */}
               <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  type="button"
-                  onClick={() => navigateTab('dictionary')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
-                >
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Words learned</div>
-                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
-                    {wordsLearnedDisplayCount}
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigateTab('lessons')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
-                >
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                    Lessons completed
-                  </div>
-                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
-                    {courseStats.completedCount}{' '}
-                    <span className="text-base font-sans text-[#78716C]">
-                      of {courseStats.totalUnits}
-                    </span>
-                  </div>
-                </button>
-
+                {/* KPI 1: Learning streak */}
                 <button
                   type="button"
                   onClick={() => openProgressSubView('overview')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
                 >
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Daily streak</div>
-                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
-                    {progress.currentStreakDays || 0}{' '}
-                    <span className="text-base font-sans text-[#78716C]">days</span>
+                  <div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      Learning streak
+                    </div>
+                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                      {progress.currentStreakDays || 0} days
+                    </div>
+                  </div>
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                    Your longest is{' '}
+                    {Math.max(progress.longestStreakDays || 0, progress.currentStreakDays || 0)}{' '}
+                    days
                   </div>
                 </button>
 
+                {/* KPI 2: Words explored */}
+                <button
+                  type="button"
+                  onClick={() => navigateTab('dictionary')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Words explored</div>
+                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                      {wordsLearnedDisplayCount}
+                    </div>
+                  </div>
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                    +{progress.savedWordIds.length + (progress.masteredWordIds || []).length} this week
+                  </div>
+                </button>
+
+                {/* KPI 3: Lessons completed */}
+                <button
+                  type="button"
+                  onClick={() => navigateTab('lessons')}
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      Lessons completed
+                    </div>
+                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                      {courseStats.completedCount}{' '}
+                      <span className="text-sm font-sans text-[#78716C]">
+                        / {courseStats.totalUnits}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                    You&apos;re building momentum
+                  </div>
+                </button>
+
+                {/* KPI 4: Today's goal */}
                 <button
                   type="button"
                   onClick={() => navigateTab('settings')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#A82020]/50 transition-colors"
+                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
                 >
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Current level</div>
-                  <div className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] mt-2">
-                    {progress.currentLevel || 'B1'}
+                  <div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      Today&apos;s goal
+                    </div>
+                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                      {homeWeekBars.entries[6]?.minutes || 0}{' '}
+                      <span className="text-sm font-sans text-[#78716C]">
+                        / {progress.dailyGoalMinutes || 15} min
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-3.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.round(
+                            ((homeWeekBars.entries[6]?.minutes || 0) /
+                              (progress.dailyGoalMinutes || 15)) *
+                              100
+                          )
+                        )}%`,
+                      }}
+                    />
                   </div>
                 </button>
               </section>
 
-              {/* Two-Column Middle Section: "Pick up where you left off" + "Your week" Bar Chart */}
+              {/* Two-Column Section: "Pick up where you left off" + "Your week" */}
               <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                {/* Left Column: Pick up where you left off (with 3 action rows) */}
-                <div className="lg:col-span-7 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2.5">
-                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                {/* Left Column: Pick up where you left off */}
+                <div className="lg:col-span-7 flex flex-col justify-between space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
                       Pick up where you left off
                     </h2>
-
-                    {/* Row 1: Saved words or Flashcard refresher */}
                     <button
                       type="button"
-                      onClick={() => navigateTab('dictionary')}
-                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
+                      onClick={() => navigateTab('lessons')}
+                      className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:underline"
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-[#F8E7E3] dark:bg-red-950/50 text-[#A82020] dark:text-red-300 flex items-center justify-center shrink-0">
-                          <BookMarked className="w-4 h-4" />
+                      All lessons →
+                    </button>
+                  </div>
+
+                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-6 flex flex-col justify-center">
+                    <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                      LESSON {String(recommendedLecture.lectureNumber).padStart(2, '0')} ·{' '}
+                      {recommendedLecture.category.toUpperCase()}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 sm:gap-4 mt-3">
+                      <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
+                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] font-serif text-xs sm:text-base font-semibold flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                          {String(recommendedLecture.lectureNumber).padStart(2, '0')}
                         </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            {progress.savedWordIds.length > 0
-                              ? `Review ${progress.savedWordIds.length} saved words`
-                              : 'Explore silent-letter flashcards'}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
+                            {getEditorialLessonPresentation(recommendedLecture).displayTitle}
                           </div>
-                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            {progress.savedWordIds.length > 0
-                              ? 'A 3-minute flashcard refresher from your saved deck'
-                              : 'Browse 10,000+ words and bookmark your study deck'}
+                          <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
+                            Step{' '}
+                            {Math.min(
+                              5,
+                              (progress.completedStepsByLecture?.[recommendedLecture.id]?.length ||
+                                0) + 1
+                            )}{' '}
+                            of 5 · {getEditorialLessonPresentation(recommendedLecture).displaySub}
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-2.5 sm:mt-3 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
+                              style={{
+                                width: `${Math.max(
+                                  12,
+                                  Math.round(
+                                    ((progress.completedStepsByLecture?.[recommendedLecture.id]
+                                      ?.length || 0) /
+                                      5) *
+                                      100
+                                  )
+                                )}%`,
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#A82020] transition-colors" />
-                    </button>
 
-                    {/* Row 2: Quick pronunciation check */}
-                    <button
-                      type="button"
-                      onClick={() => openArenaTool('shadowing')}
-                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
-                    >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-[#DCECE2] dark:bg-emerald-950/50 text-[#1F5C3D] dark:text-emerald-300 flex items-center justify-center shrink-0">
-                          <Mic className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            Quick pronunciation check
-                          </div>
-                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            Listen and compare your voice
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#1F5C3D] transition-colors" />
-                    </button>
-
-                    {/* Row 3: 60-second word sprint */}
-                    <button
-                      type="button"
-                      onClick={() => openArenaTool('sprint')}
-                      className="w-full p-4 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60 flex items-center justify-between gap-4 text-left transition-colors group"
-                    >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-[#F4E8D1] dark:bg-amber-950/50 text-[#B45309] dark:text-amber-300 flex items-center justify-center shrink-0">
-                          <Zap className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            60-second word sprint
-                          </div>
-                          <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                            Warm up with a gentle spelling game
-                          </div>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-[#78716C] group-hover:text-[#B45309] transition-colors" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openLecture(
+                            recommendedLecture.id,
+                            Math.min(
+                              4,
+                              progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0
+                            ) as ModuleStep
+                          )
+                        }
+                        className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl border border-[#DFD9CE] dark:border-[#2E2924] text-xs sm:text-sm font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#26221E] transition-colors shrink-0"
+                      >
+                        Resume
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Right Column: "Your week" Interactive 7-Day Vertical Capsule Bar Chart */}
-                <div className="lg:col-span-5 flex flex-col justify-between space-y-2.5">
+                {/* Right Column: Your week */}
+                <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                    <h2 className="font-serif text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
                       Your week
                     </h2>
-                    {selectedWeekDayIdx !== null ? (
-                      <span className="text-xs text-[#A82020] font-medium">
-                        {homeWeekBars.entries[selectedWeekDayIdx]?.dayName}:{' '}
-                        {homeWeekBars.entries[selectedWeekDayIdx]?.minutes} mins
-                      </span>
-                    ) : (
-                      <span className="text-xs text-[#78716C]">
-                        Goal: {progress.dailyGoalMinutes || 15}m/day
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => openProgressSubView('overview')}
+                      className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:underline"
+                    >
+                      Details →
+                    </button>
                   </div>
 
-                  <div className="flex-1 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between min-h-[236px]">
+                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        {selectedWeekDayIdx !== null
+                          ? `${homeWeekBars.entries[selectedWeekDayIdx]?.dayName} studied`
+                          : 'Minutes studied'}
+                      </span>
+                      <span className="font-serif text-xl sm:text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
+                        {selectedWeekDayIdx !== null
+                          ? `${homeWeekBars.entries[selectedWeekDayIdx]?.minutes} min`
+                          : `${homeWeekBars.totalMinutes} min`}
+                      </span>
+                    </div>
+
                     {/* 7 Vertical Capsule Bars M T W T F S S */}
-                    <div className="grid grid-cols-7 gap-3 items-end h-36 pt-2 px-1">
+                    <div className="grid grid-cols-7 gap-2.5 items-end pt-4">
                       {homeWeekBars.entries.map((bar) => {
                         const isSelected = selectedWeekDayIdx === bar.idx;
+                        const isTodayBar = bar.idx === 6;
                         return (
                           <button
                             key={bar.idx}
@@ -2375,27 +3023,26 @@ export default function App() {
                               )
                             }
                             title={`${bar.dayName}: ${bar.minutes} minutes studied`}
-                            className="flex flex-col items-center gap-2 h-full justify-end group focus:outline-none"
+                            className="flex flex-col items-center gap-2 group focus:outline-none"
                           >
-                            <span className="text-[10px] font-ipa text-[#78716C] group-hover:text-[#A82020]">
-                              {bar.minutes}m
-                            </span>
-                            <div className="w-full max-w-[26px] h-24 rounded-full bg-[#EFECE4] dark:bg-[#26221E] flex items-end overflow-hidden p-0.5">
+                            <div className="w-full max-w-[26px] h-20 rounded-xl bg-[#EAE6DF] dark:bg-[#26221E] flex items-end overflow-hidden">
                               <div
-                                className={`w-full rounded-full transition-all duration-300 ${
-                                  isSelected
-                                    ? 'bg-[#1F5C3D]'
+                                className={`w-full rounded-xl transition-all duration-300 ${
+                                  isTodayBar
+                                    ? 'bg-[#9E2A2B]'
+                                    : isSelected
+                                    ? 'bg-[#3F624D]'
                                     : bar.isFilled
-                                    ? 'bg-[#A82020] group-hover:bg-[#8E1B1B]'
-                                    : 'bg-[#E2DDD2] dark:bg-[#3A342E]'
+                                    ? 'bg-[#7E9987] group-hover:bg-[#3F624D]'
+                                    : 'bg-[#DFDAD0] dark:bg-[#3A342E]'
                                 }`}
                                 style={{ height: `${bar.pct}%` }}
                               />
                             </div>
                             <span
-                              className={`text-xs ${
+                              className={`text-[11px] ${
                                 isSelected
-                                  ? 'font-bold text-[#A82020]'
+                                  ? 'font-bold text-[#9E2A2B]'
                                   : 'text-[#78716C] dark:text-[#A8A29E]'
                               }`}
                             >
@@ -2405,306 +3052,430 @@ export default function App() {
                         );
                       })}
                     </div>
-
-                    <div className="pt-4 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      <span>{homeWeekBars.totalMinutes} minutes studied this week</span>
-                      <button
-                        type="button"
-                        onClick={() => openProgressSubView('overview')}
-                        className="text-[#A82020] dark:text-[#F87171] font-medium hover:underline"
-                      >
-                        Full analytics →
-                      </button>
-                    </div>
                   </div>
                 </div>
               </section>
 
-              {/* ============================================================= */}
-              {/* NEW INTERACTIVE HOME CHARTS: 4-PILLAR SKILL BREAKDOWN +       */}
-              {/* CEFR CURRICULUM ROADMAP CHART (B1 -> B2 -> C1)                */}
-              {/* ============================================================= */}
-              <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                {/* Left Chart Card (7 cols): 4-Pillar Language Mastery Breakdown Chart */}
-                <div className="lg:col-span-7 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171]">
-                        SKILL MASTERY CHART
-                      </div>
-                      <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                        4-Pillar Language Breakdown
-                      </h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openProgressSubView('overview')}
-                      className="text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:underline"
-                    >
-                      Detailed report →
-                    </button>
+              {/* Daily Challenge Banner (Matching Reference Image) */}
+              <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-[#F2EBDC] dark:bg-[#26221E] text-[#8C6527] dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5" />
                   </div>
-
-                  <div className="space-y-4">
-                    {homeSkillPillars.map((pillar) => (
-                      <div key={pillar.id} className="space-y-1.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                          <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            {pillar.label}
-                          </span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[#78716C] dark:text-[#A8A29E]">
-                              {pillar.metricLabel}
-                            </span>
-                            <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB] min-w-[34px] text-right">
-                              {pillar.pct}%
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2.5 rounded-full bg-[#EFECE4] dark:bg-[#26221E] overflow-hidden">
-                            <div
-                              className={`h-full ${pillar.color} rounded-full transition-all duration-500`}
-                              style={{ width: `${Math.max(4, pillar.pct)}%` }}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={pillar.onAction}
-                            className="px-2.5 py-1 rounded-lg border border-[#E6E0D4] dark:border-[#2E2924] text-[11px] font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#A82020] hover:text-[#A82020] transition-colors shrink-0"
-                          >
-                            {pillar.actionLabel}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right Chart Card (5 cols): CEFR Curriculum Track Roadmap Chart */}
-                <div className="lg:col-span-5 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171]">
-                        CURRICULUM ROADMAP
-                      </div>
-                      <span className="font-ipa text-xs font-semibold text-[#1F5C3D] dark:text-emerald-400">
-                        {courseStats.overallPercent}% Complete
-                      </span>
-                    </div>
-                    <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                      CEFR Track Progress
-                    </h2>
-                    <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-1">
-                      Complete all 4 lessons in each level to unlock your track certificate.
+                    <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                      A small daily challenge
+                    </h3>
+                    <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                      3 quick questions to keep yesterday&apos;s learning fresh
                     </p>
                   </div>
-
-                  {/* Visual Track Bars (B1, B2, C1) */}
-                  <div className="space-y-3">
-                    {[
-                      {
-                        level: 'B1' as CEFRLevel,
-                        title: 'B1 Foundation · Lessons 01–04',
-                        done: courseStats.b1Done,
-                        total: courseStats.b1Total,
-                        barColor: 'bg-[#2E6F4E]',
-                        badgeClass: 'bg-[#DCECE2] text-[#1F5C3D]',
-                      },
-                      {
-                        level: 'B2' as CEFRLevel,
-                        title: 'B2 Workplace · Lessons 05–08',
-                        done: courseStats.b2Done,
-                        total: courseStats.b2Total,
-                        barColor: 'bg-[#284B7A]',
-                        badgeClass: 'bg-[#DCE6F2] text-[#284B7A]',
-                      },
-                      {
-                        level: 'C1' as CEFRLevel,
-                        title: 'C1 Advanced · Lessons 09–12',
-                        done: courseStats.c1Done,
-                        total: courseStats.c1Total,
-                        barColor: 'bg-[#A82020]',
-                        badgeClass: 'bg-[#F6E3DF] text-[#A82020]',
-                      },
-                    ].map((trk) => {
-                      const pct = trk.total > 0 ? Math.round((trk.done / trk.total) * 100) : 0;
-                      return (
-                        <button
-                          key={trk.level}
-                          type="button"
-                          onClick={() => {
-                            setLevelFilter(trk.level);
-                            navigateTab('lessons');
-                          }}
-                          className="w-full p-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/50 text-left space-y-2 transition-colors"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${trk.badgeClass}`}
-                              >
-                                {trk.level}
-                              </span>
-                              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                                {trk.title}
-                              </span>
-                            </div>
-                            <span className="font-ipa text-xs text-[#78716C]">
-                              {trk.done}/{trk.total}
-                            </span>
-                          </div>
-                          <div className="w-full h-2 rounded-full bg-[#ECE6DA] dark:bg-[#26221E] overflow-hidden">
-                            <div
-                              className={`h-full ${trk.barColor} rounded-full transition-all duration-500`}
-                              style={{ width: `${Math.max(4, pct)}%` }}
-                            />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between text-xs">
-                    <span className="text-[#78716C]">
-                      Quiz accuracy:{' '}
-                      <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
-                        {courseStats.avgQuizAccuracy !== null
-                          ? `${courseStats.avgQuizAccuracy}%`
-                          : 'No quizzes yet'}
-                      </strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openProgressSubView('achievements')}
-                      className="text-[#A82020] dark:text-[#F87171] font-medium hover:underline inline-flex items-center gap-1"
-                    >
-                      <Trophy className="w-3.5 h-3.5" />
-                      <span>Badges ({progress.unlockedBadgeIds.length}/12)</span>
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              {/* Interactive Quick SRS Flashcard Strip on Home */}
-              {activeSRSQuickWord && (
-                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        speechService.speak(activeSRSQuickWord.word, {
-                          rate: progress.preferredSpeechRate,
-                        })
-                      }
-                      className="w-11 h-11 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-center text-[#A82020] hover:border-[#A82020] shrink-0"
-                      title="Listen to word"
-                    >
-                      <Volume2 className="w-5 h-5" />
-                    </button>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#A82020]">
-                          Silent-Letter Word Spotlight ({(srsQuickIdx % dueSRSWords.length) + 1}/{dueSRSWords.length})
-                        </span>
-                        <span className="font-ipa text-xs text-[#78716C]">
-                          {activeSRSQuickWord.ipa}
-                        </span>
-                      </div>
-                      <div className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                        {activeSRSQuickWord.segments?.map((seg, idx) =>
-                          seg.silent ? (
-                            <span
-                              key={idx}
-                              className="text-[#A82020] underline decoration-dotted underline-offset-4"
-                            >
-                              {seg.text}
-                            </span>
-                          ) : (
-                            <span key={idx}>{seg.text}</span>
-                          )
-                        )}
-                        {srsQuickFlipped && (
-                          <span className="ml-3 font-nepali text-base text-[#1F5C3D] dark:text-emerald-400">
-                            — {activeSRSQuickWord.nepaliMeaning}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-[#78716C] mt-0.5">
-                        {activeSRSQuickWord.silentLettersSummary} · “{activeSRSQuickWord.englishExample}”
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        speechService.speak(activeSRSQuickWord.word, {
-                          rate: 0.5,
-                        })
-                      }
-                      className="px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#A82020]"
-                      title="Listen slowly at 0.5x speed"
-                    >
-                      0.5× Slow
-                    </button>
-                    {!srsQuickFlipped ? (
-                      <button
-                        type="button"
-                        onClick={() => setSrsQuickFlipped(true)}
-                        className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#A82020]"
-                      >
-                        Reveal Nepali meaning
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleUpdateWordSRS(activeSRSQuickWord.id, false);
-                            setSrsQuickFlipped(false);
-                            setSrsQuickIdx((i) => i + 1);
-                          }}
-                          className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] text-xs font-medium text-[#78716C]"
-                        >
-                          Next word
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleToggleMasteredWord(activeSRSQuickWord.id);
-                            setSrsQuickFlipped(false);
-                            setSrsQuickIdx((i) => i + 1);
-                          }}
-                          className="px-4 py-2 rounded-xl bg-[#2E6F4E] text-white text-xs font-medium"
-                        >
-                          Mark Mastered ✓
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {/* Bottom Banner: "A small daily challenge" (Exact match to Screenshot 1) */}
-              <section className="rounded-2xl bg-[#F4EFE4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:px-7 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    A small daily challenge
-                  </h3>
-                  <p className="text-xs sm:text-sm text-[#6E685F] dark:text-[#A8A29E] mt-0.5">
-                    Three quick questions on silent letters — takes under two minutes.
-                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsDailyChallengeOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs sm:text-sm font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] transition-colors self-start sm:self-center shrink-0"
+                  className="px-4 py-2 rounded-xl border border-[#DFD9CE] dark:border-[#2E2924] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors self-start sm:self-center shrink-0"
                 >
-                  Start
+                  Start · 2 min
                 </button>
+              </section>
+
+              {/* Word of the Day Card */}
+              {wordOfTheDay && (
+                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                          WORD OF THE DAY
+                        </span>
+                        <span className="text-xs text-[#8C857B]">·</span>
+                        <span className="px-2 py-0.5 rounded-full bg-[#F2EFE9] dark:bg-[#26221E] text-[11px] font-medium text-[#57534E] dark:text-[#A8A29E]">
+                          {wordOfTheDay.partOfSpeech} · {wordOfTheDay.level}
+                        </span>
+                        {wordOfTheDay.silentLettersSummary &&
+                          wordOfTheDay.silentLettersSummary !== 'Standard pronunciation' && (
+                            <span className="px-2 py-0.5 rounded-full bg-[#F8E7E3] dark:bg-red-950/50 text-[11px] font-medium text-[#9E2A2B] dark:text-red-300">
+                              {wordOfTheDay.silentLettersSummary}
+                            </span>
+                          )}
+                      </div>
+
+                      <div className="flex flex-wrap items-baseline gap-3">
+                        <h2 className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB]">
+                          {wordOfTheDay.segments?.map((seg, idx) =>
+                            seg.silent ? (
+                              <span
+                                key={idx}
+                                className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted underline-offset-4"
+                              >
+                                {seg.text}
+                              </span>
+                            ) : (
+                              <span key={idx}>{seg.text}</span>
+                            )
+                          )}
+                        </h2>
+                        <span className="font-ipa text-sm sm:text-base text-[#78716C] dark:text-[#A8A29E]">
+                          {wordOfTheDay.ipa}
+                        </span>
+                        <span className="font-nepali text-base sm:text-lg font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                          {wordOfTheDay.nepaliMeaning}
+                        </span>
+                      </div>
+
+                      <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
+                        “{wordOfTheDay.englishExample}”
+                        {wordOfTheDay.nepaliExampleTranslation && (
+                          <span className="font-nepali ml-2 text-[#78716C] dark:text-[#8C857B]">
+                            ({wordOfTheDay.nepaliExampleTranslation})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          speechService.speak(wordOfTheDay.word, {
+                            rate: progress.preferredSpeechRate,
+                          })
+                        }
+                        aria-label={`Play pronunciation for ${wordOfTheDay.word}`}
+                        className="px-4 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        <span>Listen</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          speechService.speak(wordOfTheDay.word, {
+                            rate: 0.55,
+                          })
+                        }
+                        title="Listen slowly at 0.55x speed"
+                        className="px-3 py-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] transition-colors"
+                      >
+                        0.5× Slow
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setWordOfTheDayOffset((n) => n + 1)}
+                        title="Show another high-frequency word"
+                        className="px-3 py-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Another word</span>
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* ============================================================= */}
+              {/* AI SENTENCE & GRAMMAR COACH + SILENT-LETTER WORD SPOTLIGHT    */}
+              {/* ============================================================= */}
+              <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* Left Card (6 cols): AI Sentence & Grammar Coach (SVO vs SOV) */}
+                <div className="lg:col-span-6 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>AI SENTENCE & GRAMMAR COACH</span>
+                        </div>
+                        <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                          Check grammar or translate a thought
+                        </h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAIRoleplayOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-[#FAF8F4] dark:bg-[#26221E] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#3F624D] text-[11px] font-medium text-[#3F624D] dark:text-emerald-400 inline-flex items-center gap-1 transition-colors"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Roleplay</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
+                      Type any English sentence to check grammar and word order, or write in Nepali
+                      to get natural English phrasing.
+                    </p>
+
+                    {/* Quick Try Chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'I am having a doubt in this work.',
+                        'Yesterday I have gone to office.',
+                        'म भोलि बिहान मिटिङमा उपस्थित हुनेछु।',
+                      ].map((sample) => (
+                        <button
+                          key={sample}
+                          type="button"
+                          onClick={() => handleRunSentenceCoach(sample)}
+                          className="px-2.5 py-1 rounded-lg bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-[11px] text-[#57534E] dark:text-[#A8A29E] transition-colors"
+                        >
+                          “{sample}”
+                        </button>
+                      ))}
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleRunSentenceCoach();
+                      }}
+                      className="flex items-center gap-2 pt-1"
+                    >
+                      <input
+                        type="text"
+                        value={sentenceCoachInput}
+                        onChange={(e) => setSentenceCoachInput(e.target.value)}
+                        placeholder="Type an English sentence or Nepali thought..."
+                        className="flex-1 h-10 px-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSentenceCoachLoading || !sentenceCoachInput.trim()}
+                        className="h-10 px-4 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] disabled:opacity-40 text-white text-xs font-medium inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                      >
+                        {isSentenceCoachLoading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        <span>Check</span>
+                      </button>
+                    </form>
+
+                    {sentenceCoachError && (
+                      <div className="text-xs text-[#9E2A2B] dark:text-red-300 bg-[#F8E7E3]/60 px-3 py-2 rounded-xl">
+                        {sentenceCoachError}
+                      </div>
+                    )}
+
+                    {sentenceCoachResult && (
+                      <div className="p-4 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-[#DCECE2] text-[#1F5C3D] font-semibold text-[10px]">
+                            {sentenceCoachResult.focusTag}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              speechService.speak(sentenceCoachResult.correctedEnglish, {
+                                rate: progress.preferredSpeechRate,
+                              })
+                            }
+                            className="text-[#9E2A2B] dark:text-[#F87171] font-medium inline-flex items-center gap-1 hover:underline"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                            <span>Listen</span>
+                          </button>
+                        </div>
+
+                        <div>
+                          <span className="text-[#78716C]">Polished English: </span>
+                          <strong className="text-sm text-[#1C1917] dark:text-[#F5F2EB]">
+                            “{sentenceCoachResult.correctedEnglish}”
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span className="text-[#78716C]">Natural Workplace Option: </span>
+                          <span className="text-[#1F5C3D] dark:text-emerald-400 font-medium">
+                            “{sentenceCoachResult.naturalAlternative}”
+                          </span>
+                        </div>
+
+                        <div className="font-nepali text-[#1C1917] dark:text-[#F5F2EB]">
+                          <span className="text-[#78716C] font-sans">Nepali Meaning: </span>
+                          {sentenceCoachResult.nepaliMeaning}
+                        </div>
+
+                        <div className="pt-1.5 border-t border-[#EFEAE0] dark:border-[#2E2924] font-nepali text-[#57534E] dark:text-[#A8A29E] space-y-1">
+                          <p>
+                            <strong>व्याकरण टिप:</strong> {sentenceCoachResult.grammarTipNepali}
+                          </p>
+                          <p>
+                            <strong>वाक्य संरचना (SVO vs SOV):</strong>{' '}
+                            {sentenceCoachResult.svoComparisonNote}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Card (6 cols): Silent-Letter Word Spotlight + AI Phonetic Explainer */}
+                {activeSRSQuickWord && (
+                  <div className="lg:col-span-6 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                            SILENT-LETTER WORD SPOTLIGHT ({(srsQuickIdx % dueSRSWords.length) + 1}/
+                            {dueSRSWords.length})
+                          </div>
+                          <div className="flex items-baseline gap-2.5 mt-1">
+                            <h2 className="font-serif text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
+                              {activeSRSQuickWord.segments?.map((seg, idx) =>
+                                seg.silent ? (
+                                  <span
+                                    key={idx}
+                                    className="text-[#9E2A2B] underline decoration-dotted underline-offset-4"
+                                  >
+                                    {seg.text}
+                                  </span>
+                                ) : (
+                                  <span key={idx}>{seg.text}</span>
+                                )
+                              )}
+                            </h2>
+                            <span className="font-ipa text-xs text-[#78716C]">
+                              {activeSRSQuickWord.ipa}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              speechService.speak(activeSRSQuickWord.word, {
+                                rate: progress.preferredSpeechRate,
+                              })
+                            }
+                            className="w-10 h-10 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-center text-[#9E2A2B] hover:border-[#9E2A2B]"
+                            title="Listen at 1.0x speed"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              speechService.speak(activeSRSQuickWord.word, {
+                                rate: 0.5,
+                              })
+                            }
+                            className="h-10 px-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#9E2A2B]"
+                            title="Listen slowly at 0.5x speed"
+                          >
+                            0.5×
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
+                        {activeSRSQuickWord.silentLettersSummary} · “
+                        {activeSRSQuickWord.englishExample}”
+                      </div>
+
+                      {srsQuickFlipped && (
+                        <div className="p-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] font-nepali text-sm text-[#1F5C3D] dark:text-emerald-400">
+                          अर्थ: <strong>{activeSRSQuickWord.nepaliMeaning}</strong> —{' '}
+                          <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                            {activeSRSQuickWord.nepaliExampleTranslation}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* AI Phonetic & Silent-Letter Breakdown Drawer */}
+                      {spotlightAIExplanation &&
+                        spotlightAIExplanation.word === activeSRSQuickWord.word && (
+                          <div className="p-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold uppercase tracking-wider text-[10px] text-[#9E2A2B]">
+                                AI Silent-Letter & Phonetic Guide
+                              </span>
+                              <span className="font-nepali font-semibold text-[#1F5C3D] dark:text-emerald-400">
+                                उच्चारण: {spotlightAIExplanation.nepaliSoundComparison}
+                              </span>
+                            </div>
+                            <p className="font-nepali text-[#1C1917] dark:text-[#F5F2EB]">
+                              <strong>किन साइलेन्ट हुन्छ:</strong>{' '}
+                              {spotlightAIExplanation.silentReasonNepali}
+                            </p>
+                            <p className="font-nepali text-[#57534E] dark:text-[#A8A29E]">
+                              <strong>मुख र जिब्रोको स्थिति:</strong>{' '}
+                              {spotlightAIExplanation.mouthPositionNepali}
+                            </p>
+                            <p className="font-nepali text-[#1F5C3D] dark:text-emerald-400">
+                              <strong>सम्झने ट्रिक:</strong>{' '}
+                              {spotlightAIExplanation.memoryTrickNepali}
+                            </p>
+                          </div>
+                        )}
+                    </div>
+
+                    <div className="pt-3 border-t border-[#EFEAE0] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleExplainSpotlightWord(activeSRSQuickWord)}
+                        disabled={isSpotlightAILoading}
+                        className="px-3 py-2 rounded-xl bg-[#F4E6E2] dark:bg-red-950/50 text-[#9E2A2B] dark:text-red-300 text-xs font-medium inline-flex items-center gap-1.5 hover:bg-[#EDD8D2] transition-colors"
+                      >
+                        {isSpotlightAILoading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Asking AI...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>
+                              {spotlightAIExplanation?.word === activeSRSQuickWord.word
+                                ? 'Hide AI Guide'
+                                : 'Ask AI Why & How'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        {!srsQuickFlipped ? (
+                          <button
+                            type="button"
+                            onClick={() => setSrsQuickFlipped(true)}
+                            className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]"
+                          >
+                            Reveal Nepali
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleToggleMasteredWord(activeSRSQuickWord.id);
+                              setSrsQuickFlipped(false);
+                              setSpotlightAIExplanation(null);
+                              setSrsQuickIdx((i) => i + 1);
+                            }}
+                            className="px-3.5 py-2 rounded-xl bg-[#3F624D] text-white text-xs font-medium"
+                          >
+                            Mastered ✓
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSrsQuickFlipped(false);
+                            setSpotlightAIExplanation(null);
+                            setSrsQuickIdx((i) => i + 1);
+                          }}
+                          className="px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#78716C] hover:text-[#1C1917]"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -2800,6 +3571,17 @@ export default function App() {
         languageMode={languageMode}
         onClose={() => setIsAIModalOpen(false)}
         onLectureGenerated={handleLectureGenerated}
+      />
+
+      {/* AI Roleplay Conversation Partner Modal */}
+      <AIRoleplayModal
+        isOpen={isAIRoleplayOpen}
+        isOnline={isOnline}
+        defaultLevel={progress.selectedLevel}
+        preferredSpeechRate={progress.preferredSpeechRate}
+        languageMode={languageMode}
+        onClose={() => setIsAIRoleplayOpen(false)}
+        onCompleteRoleplayTurn={(scenarioId) => handleRecordRolePlayCompleted(scenarioId)}
       />
 
       {/* 24-Hour 3-Question Daily Challenge Pop-Up Modal */}

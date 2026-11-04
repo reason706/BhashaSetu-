@@ -39,7 +39,7 @@ export const DEFAULT_USER_PROGRESS: UserProgressState = {
   lectureNotes: {},
   customLectures: [],
   customWords: [],
-  preferredSpeechRate: 0.75,
+  preferredSpeechRate: 1.0,
   darkMode: false,
   languageMode: 'full-nepali',
   pendingSyncQueue: [],

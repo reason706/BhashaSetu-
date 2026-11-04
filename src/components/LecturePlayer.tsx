@@ -223,7 +223,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
   // Module E: Real-life dialogue, two-speaker audio & role-play state
   const [isPlayingFullDialogue, setIsPlayingFullDialogue] = useState(false);
-  const [dialoguePlaybackRate, setDialoguePlaybackRate] = useState<0.5 | 0.75 | 1.0>(
+  const [dialoguePlaybackRate, setDialoguePlaybackRate] = useState<number>(
     () => speechService.getDialogueCalibration().dialogueRate
   );
   const [activeDialogueLineIdx, setActiveDialogueLineIdx] = useState<number | null>(null);
@@ -457,7 +457,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   };
 
   const handlePlayFullDialogue = (
-    speedRate: 0.5 | 0.75 | 1.0 = speechService.getDialogueCalibration().dialogueRate
+    speedRate: number = speechService.getDialogueCalibration().dialogueRate
   ) => {
     const lines = lecture.moduleE_dialogue?.lines || [];
     if (lines.length === 0) return;
@@ -600,12 +600,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
         lectureNumber: lecture.lectureNumber,
         category: 'spelling',
         sourceType: 'spelling',
-        prompt: quiz.promptEnglish,
-        nepaliHint: quiz.promptNepaliHint,
+        prompt: quiz.promptEnglish || quiz.prompt || '',
+        nepaliHint: quiz.promptNepaliHint || quiz.nepaliHint,
         userWrongAnswer: selectedOption,
         correctAnswer: quiz.correctAnswer,
         options: quiz.options,
-        explanation: englishExpl || quiz.commonMistakeExplanationNepali,
+        explanation: englishExpl || quiz.commonMistakeExplanationNepali || quiz.explanationNepali || '',
       });
     }
   };
@@ -2753,7 +2753,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       </span>
                       <button
                         onClick={() =>
-                          handleSpeak(comp.englishFullSentence, `${comp.id}-audio`, preferredSpeechRate)
+                          handleSpeak(comp.englishFullSentence || '', `${comp.id}-audio`, preferredSpeechRate)
                         }
                         className="min-h-[38px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-medium inline-flex items-center gap-1.5"
                       >
@@ -3272,7 +3272,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     </span>
                   </div>
                   <span className="font-ipa text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                    Speed: {dialoguePlaybackRate === 'slow' ? '0.75x Slow' : '1.0x Natural'}
+                    Speed: {dialoguePlaybackRate === 0.75 ? '0.75x Slow' : dialoguePlaybackRate === 0.5 ? '0.5x Slow' : '1.0x Natural'}
                   </span>
                 </div>
               )}

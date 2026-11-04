@@ -76,7 +76,7 @@ export function exportSavedWordsToCSV(
     item.silentLettersSummary || 'Standard phonetic pronunciation',
     item.nepaliMeaning,
     item.englishExample,
-    item.nepaliExample || '',
+    item.nepaliExampleTranslation || item.nepaliExample || '',
     getMasteryLabelForExport(item.id, masteredWordIds, wordSRS),
     '[ ] Pass 1   [ ] Pass 2   [ ] Mastered',
   ]);
@@ -107,7 +107,7 @@ export function exportMistakeNotebookToCSV(mistakes: MistakeItem[]): void {
 
   const rows = mistakes.map((m, idx) => [
     idx + 1,
-    m.sourceType.toUpperCase(),
+    (m.sourceType || 'QUIZ').toUpperCase(),
     `Lecture ${String(m.lectureNumber).padStart(2, '0')}`,
     m.prompt,
     m.userWrongAnswer,
@@ -161,7 +161,7 @@ export function exportCombinedStudySheetToCSV(
   ]);
 
   const mistakeRows = mistakes.map((m, idx) => [
-    `MISTAKE (${m.sourceType.toUpperCase()})`,
+    `MISTAKE (${(m.sourceType || 'QUIZ').toUpperCase()})`,
     idx + 1,
     m.prompt,
     `Missed: ${m.userWrongAnswer}`,

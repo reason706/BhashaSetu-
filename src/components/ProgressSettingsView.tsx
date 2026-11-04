@@ -41,6 +41,15 @@ import {
   Trash2,
   AlertTriangle,
   X,
+  Clock,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  RotateCcw,
+  PenTool,
+  GraduationCap,
+  Brain,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import {
@@ -334,6 +343,149 @@ const MINIMAL_PAIR_CONTRASTS: MinimalPairContrast[] = [
   },
 ];
 
+interface EditorialDropdownOption<T extends string | number> {
+  value: T;
+  label: string;
+  sub?: string;
+  badge?: string;
+}
+
+interface EditorialSelectDropdownProps<T extends string | number> {
+  ariaLabel: string;
+  value: T;
+  options: EditorialDropdownOption<T>[];
+  onChange: (value: T) => void;
+  align?: 'left' | 'right';
+  compact?: boolean;
+}
+
+function EditorialSelectDropdown<T extends string | number>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+  align = 'right',
+  compact = false,
+}: EditorialSelectDropdownProps<T>) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  const selectedOption =
+    options.find((opt) => String(opt.value) === String(value)) || options[0];
+
+  return (
+    <div ref={containerRef} className="relative inline-block text-left shrink-0">
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`inline-flex items-center justify-between gap-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border transition-all ${
+          open
+            ? 'border-[#A82020] dark:border-[#F87171] ring-2 ring-[#A82020]/15'
+            : 'border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60'
+        } ${
+          compact
+            ? 'h-9 px-3 text-xs'
+            : 'min-h-[38px] px-3.5 py-2 text-xs sm:text-sm'
+        } font-medium text-[#1C1917] dark:text-[#F5F2EB]`}
+      >
+        <span className="truncate max-w-[165px] sm:max-w-[210px]">
+          {selectedOption?.label}
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-[#78716C] dark:text-[#A8A29E] transition-transform duration-200 shrink-0 ${
+            open ? 'rotate-180 text-[#A82020] dark:text-[#F87171]' : ''
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          className={`absolute ${
+            align === 'right' ? 'right-0' : 'left-0'
+          } mt-1.5 w-60 sm:w-68 max-h-72 overflow-y-auto rounded-2xl bg-[#FFFDF9] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-[0_14px_34px_rgba(28,25,23,0.16)] p-1.5 z-40 space-y-1`}
+        >
+          {options.map((opt) => {
+            const isSelected = String(opt.value) === String(value);
+            return (
+              <button
+                key={String(opt.value)}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`w-full px-3 py-2.5 rounded-xl text-left flex items-start justify-between gap-2.5 transition-colors ${
+                  isSelected
+                    ? 'bg-[#F8E9E5] dark:bg-red-950/50 text-[#A82020] dark:text-red-300'
+                    : 'text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#F5F2EB] dark:hover:bg-[#292521]'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs sm:text-[13px] font-semibold leading-snug">
+                      {opt.label}
+                    </span>
+                    {opt.badge && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${
+                          isSelected
+                            ? 'bg-[#A82020] text-white'
+                            : 'bg-[#EDE8DC] dark:bg-[#2E2924] text-[#6E685F] dark:text-[#A8A29E]'
+                        }`}
+                      >
+                        {opt.badge}
+                      </span>
+                    )}
+                  </div>
+                  {opt.sub && (
+                    <p
+                      className={`text-[11px] mt-0.5 leading-snug ${
+                        isSelected
+                          ? 'text-[#8C2D2D] dark:text-red-200/80'
+                          : 'text-[#78716C] dark:text-[#A8A29E]'
+                      }`}
+                    >
+                      {opt.sub}
+                    </p>
+                  )}
+                </div>
+                {isSelected && (
+                  <Check className="w-4 h-4 text-[#A82020] dark:text-red-300 shrink-0 mt-0.5" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   mode,
   progress,
@@ -416,6 +568,11 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   const [progressSubView, setProgressSubView] = useState<'overview' | 'achievements'>(
     initialProgressSubView
   );
+  const [progressPeriod, setProgressPeriod] = useState<'week' | 'month' | 'all'>('week');
+  const [badgeCategoryFilter, setBadgeCategoryFilter] = useState<
+    'all' | 'earned' | 'streak' | 'learning' | 'practice' | 'mastery'
+  >('all');
+  const [showAll16Badges, setShowAll16Badges] = useState<boolean>(false);
   const [achievementStatusFilter, setAchievementStatusFilter] = useState<
     'all' | 'unlocked' | 'locked'
   >('all');
@@ -974,7 +1131,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     setDialogueCalibration(updated);
   };
 
-  const handlePlayCalibrationDialogue = (overrideRate?: 0.5 | 0.75 | 1.0) => {
+  const handlePlayCalibrationDialogue = (overrideRate?: number) => {
     if (isPlayingCalibrationDialogue && !overrideRate) {
       speechService.stop();
       setIsPlayingCalibrationDialogue(false);
@@ -1519,1100 +1676,1534 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   };
 
   // ===========================================================================
-  // DEDICATED PROGRESS & ANALYTICS VIEW (mode === 'progress')
+  // DEDICATED PROGRESS & ACHIEVEMENTS VIEW (mode === 'progress')
   // ===========================================================================
   if (mode === 'progress') {
-    const achievementCompletionPct = Math.round(
-      (unlockedBadgesCount / achievementsList.length) * 100
+    const streakDays = progress.currentStreakDays || 0;
+    const bestStreak = Math.max(progress.longestStreakDays || 0, streakDays);
+    const completedLessonsCount = progress.completedUnitIds.length;
+    const totalLessonsCount = lectures.length || 12;
+
+    // Build 7-day current week study bars (Mon -> Sun)
+    const weekDayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const weekDayFullNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const now = new Date();
+    const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ...
+    const mondayOffset = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+
+    const weekEntries = weekDayLabels.map((letter, idx) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() + mondayOffset + idx);
+      const dateStr = d.toISOString().split('T')[0];
+      const rawUnits = progress.studyActivityByDate?.[dateStr] || 0;
+      const minutes = rawUnits * 5;
+      const isToday = d.toDateString() === now.toDateString();
+      return {
+        idx,
+        letter,
+        dayName: weekDayFullNames[idx],
+        dateStr,
+        minutes,
+        isToday,
+      };
+    });
+
+    const weeklyMinutesTotal = weekEntries.reduce((sum, e) => sum + e.minutes, 0);
+    const activeDaysThisWeek = weekEntries.filter((e) => e.minutes > 0).length;
+    const maxDayMinutes = Math.max(20, ...weekEntries.map((e) => e.minutes));
+    const bestDayEntry = weekEntries.reduce(
+      (best, curr) => (curr.minutes > best.minutes ? curr : best),
+      weekEntries[0]
     );
-    const scholarRankTitle =
-      unlockedBadgesCount >= 10
-        ? 'C1 Grandmaster Linguist'
-        : unlockedBadgesCount >= 6
-        ? 'B2 Syntax & Phonics Architect'
-        : unlockedBadgesCount >= 3
-        ? 'B1 Silent-Letter Scholar'
-        : 'Phonics & Bridge Initiate';
+
+    // Total study minutes across all recorded dates
+    const allRecordedUnits = Object.values(progress.studyActivityByDate || {}).reduce(
+      (sum, v) => sum + (typeof v === 'number' ? v : 0),
+      0
+    );
+    const totalStudyMinutes = Math.max(
+      weeklyMinutesTotal,
+      allRecordedUnits * 5 + completedLessonsCount * 15
+    );
+    const studyHours = Math.floor(totalStudyMinutes / 60);
+    const studyRemMinutes = totalStudyMinutes % 60;
+    const studyTimeFormatted =
+      studyHours > 0 ? `${studyHours}h ${studyRemMinutes}m` : `${totalStudyMinutes}m`;
+
+    const weeklyGoalTarget = (progress.dailyGoalMinutes || 15) * 7;
+    const weeklyGoalPct = Math.min(100, Math.round((weeklyMinutesTotal / weeklyGoalTarget) * 100));
+
+    const totalGoalMetDays = Object.values(progress.studyActivityByDate || {}).filter(
+      (u) => (u || 0) * 5 >= (progress.dailyGoalMinutes || 15)
+    ).length;
+
+    // 4-Skill percentages
+    const vocabSkillPct = skillMetrics.vocabPercent || 0;
+    const pronunciationPracticedTotal = scoreEntries.reduce(
+      (sum, s) => sum + (s.pronunciationPracticed || 0),
+      0
+    );
+    const pronunciationSkillPct = Math.min(
+      100,
+      Math.round(
+        pronunciationPracticedTotal * 12 +
+          completedLessonsCount * 8 +
+          (progress.rolePlayCompletedIds?.length || 0) * 15
+      )
+    );
+    const spellingSkillPct = skillMetrics.spellingPercent ?? 0;
+    const grammarSkillPct = skillMetrics.grammarPercent ?? 0;
+
+    // GitHub-Style 20-Week (140 Days) Contribution Heatmap
+    const TOTAL_WEEKS = 20;
+    const endSunday = new Date(now);
+    const daysToSunday = (7 - endSunday.getDay()) % 7;
+    endSunday.setDate(endSunday.getDate() + daysToSunday);
+
+    const heatmapWeeks: {
+      weekIndex: number;
+      monthLabel: string | null;
+      days: {
+        dateStr: string;
+        formattedDate: string;
+        minutes: number;
+        actions: number;
+        level: 0 | 1 | 2 | 3 | 4;
+        isToday: boolean;
+        isFuture: boolean;
+      }[];
+    }[] = [];
+
+    let lastMonth = -1;
+    let totalActiveDaysInHeatmap = 0;
+    let totalHeatmapMinutes = 0;
+
+    for (let w = 0; w < TOTAL_WEEKS; w++) {
+      const weekDays = [];
+      let monthLabel: string | null = null;
+
+      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+        // dayIdx 0 = Mon ... 6 = Sun
+        const offsetDays = (TOTAL_WEEKS - 1 - w) * 7 + (6 - dayIdx);
+        const cellDate = new Date(endSunday);
+        cellDate.setDate(endSunday.getDate() - offsetDays);
+
+        const dateStr = cellDate.toISOString().split('T')[0];
+        const isFuture = cellDate > now && cellDate.toDateString() !== now.toDateString();
+        const isToday = cellDate.toDateString() === now.toDateString();
+        const actions = isFuture ? 0 : progress.studyActivityByDate?.[dateStr] || 0;
+        const minutes = actions * 5;
+
+        if (actions > 0) {
+          totalActiveDaysInHeatmap += 1;
+          totalHeatmapMinutes += minutes;
+        }
+
+        if (dayIdx === 0) {
+          const m = cellDate.getMonth();
+          if (m !== lastMonth) {
+            monthLabel = cellDate.toLocaleDateString('en-US', { month: 'short' });
+            lastMonth = m;
+          }
+        }
+
+        let level: 0 | 1 | 2 | 3 | 4 = 0;
+        if (minutes >= 25) level = 4;
+        else if (minutes >= 15) level = 3;
+        else if (minutes >= 10) level = 2;
+        else if (minutes > 0) level = 1;
+
+        weekDays.push({
+          dateStr,
+          formattedDate: cellDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          minutes,
+          actions,
+          level,
+          isToday,
+          isFuture,
+        });
+      }
+
+      heatmapWeeks.push({
+        weekIndex: w,
+        monthLabel,
+        days: weekDays,
+      });
+    }
+
+    // 16 Editorial Badges matching the HTML design
+    const notesCount = Object.values(progress.lectureNotes || {}).filter(
+      (n) => n && n.trim().length > 0
+    ).length;
+    const srsReviewedCount = Object.keys(progress.wordSRS || {}).length;
+    const dailyChallengesDone = progress.dailyChallengeTotalCompleted || 0;
+    const practicedWordsTotal = Math.max(
+      unifiedMasteredWordsCount,
+      progress.savedWordIds.length + srsReviewedCount
+    );
+    const listeningAndSpeakingCount =
+      pronunciationPracticedTotal +
+      (progress.rolePlayCompletedIds?.length || 0) +
+      completedLessonsCount * 2;
+    const sprintsCompletedCount =
+      (progress.sprintHighScore || 0) > 0
+        ? Math.max(1, Math.floor((progress.sprintHighScore || 0) / 10))
+        : 0;
+
+    const editorialBadges = [
+      {
+        id: 'first-spark',
+        title: 'First spark',
+        desc: 'Study 7 days in a row',
+        category: 'streak' as const,
+        artClass: 'from-[#F6C78E] to-[#C7684E] text-[#FFF5E6]',
+        cornerLabel: '7',
+        icon: 'flame' as const,
+        tier: 'bronze' as const,
+        earned: streakDays >= 7,
+        current: Math.min(7, streakDays),
+        target: 7,
+        statusText:
+          streakDays >= 7 ? 'BRONZE · EARNED' : `BRONZE · ${Math.max(1, 7 - streakDays)} DAYS LEFT`,
+      },
+      {
+        id: 'page-turner',
+        title: 'Page turner',
+        desc: 'Complete your first 3 lessons',
+        category: 'learning' as const,
+        artClass: 'from-[#D4E3D2] to-[#719274] text-[#F8FFF8]',
+        cornerLabel: '3',
+        icon: 'book' as const,
+        tier: 'silver' as const,
+        earned: completedLessonsCount >= 3,
+        current: Math.min(3, completedLessonsCount),
+        target: 3,
+        statusText:
+          completedLessonsCount >= 3
+            ? 'SILVER · EARNED'
+            : `SILVER · ${Math.max(1, 3 - completedLessonsCount)} LESSONS LEFT`,
+      },
+      {
+        id: 'word-collector',
+        title: 'Word collector',
+        desc: 'Master 50 new words',
+        category: 'mastery' as const,
+        artClass: 'from-[#D5D8F2] to-[#777DAA] text-white',
+        cornerLabel: '50',
+        icon: 'languages' as const,
+        tier: 'silver' as const,
+        earned: unifiedMasteredWordsCount >= 50,
+        current: Math.min(50, unifiedMasteredWordsCount),
+        target: 50,
+        statusText:
+          unifiedMasteredWordsCount >= 50
+            ? 'SILVER · EARNED'
+            : `SILVER · ${Math.max(1, 50 - unifiedMasteredWordsCount)} WORDS LEFT`,
+      },
+      {
+        id: 'careful-listener',
+        title: 'Careful listener',
+        desc: 'Finish 10 listening practices',
+        category: 'practice' as const,
+        artClass: 'from-[#E7D5F0] to-[#A57DB1] text-white',
+        cornerLabel: '♪',
+        icon: 'ear' as const,
+        tier: 'bronze' as const,
+        earned: listeningAndSpeakingCount >= 10,
+        current: Math.min(10, listeningAndSpeakingCount),
+        target: 10,
+        statusText:
+          listeningAndSpeakingCount >= 10
+            ? 'BRONZE · EARNED'
+            : `BRONZE · ${Math.max(1, 10 - listeningAndSpeakingCount)} LEFT`,
+      },
+      {
+        id: 'daily-bright-spot',
+        title: 'Daily bright spot',
+        desc: 'Finish 3 daily challenges',
+        category: 'practice' as const,
+        artClass: 'from-[#F6DD99] to-[#D49B43] text-[#FFFAF0]',
+        cornerLabel: '3',
+        icon: 'calendar' as const,
+        tier: 'bronze' as const,
+        earned: dailyChallengesDone >= 3,
+        current: Math.min(3, dailyChallengesDone),
+        target: 3,
+        statusText:
+          dailyChallengesDone >= 3
+            ? 'BRONZE · EARNED'
+            : `BRONZE · ${Math.max(1, 3 - dailyChallengesDone)} LEFT`,
+      },
+      {
+        id: 'early-bird',
+        title: 'Early bird',
+        desc: 'Build a 3-day study habit',
+        category: 'streak' as const,
+        artClass: 'from-[#F2D1AE] to-[#CF865E] text-white',
+        cornerLabel: '3',
+        icon: 'sunrise' as const,
+        tier: 'bronze' as const,
+        earned: streakDays >= 3,
+        current: Math.min(3, streakDays),
+        target: 3,
+        statusText:
+          streakDays >= 3 ? 'BRONZE · EARNED' : `BRONZE · ${Math.max(1, 3 - streakDays)} DAYS LEFT`,
+      },
+      {
+        id: 'thoughtful-learner',
+        title: 'Thoughtful learner',
+        desc: 'Save 5 lesson notes or bookmarks',
+        category: 'learning' as const,
+        artClass: 'from-[#CAE5E0] to-[#619A8C] text-white',
+        cornerLabel: '5',
+        icon: 'notes' as const,
+        tier: 'bronze' as const,
+        earned: notesCount + progress.savedWordIds.length >= 5,
+        current: Math.min(5, notesCount + progress.savedWordIds.length),
+        target: 5,
+        statusText:
+          notesCount + progress.savedWordIds.length >= 5
+            ? 'BRONZE · EARNED'
+            : `BRONZE · ${Math.max(1, 5 - (notesCount + progress.savedWordIds.length))} LEFT`,
+      },
+      {
+        id: 'memory-maker',
+        title: 'Memory maker',
+        desc: 'Review 25 words with SRS',
+        category: 'mastery' as const,
+        artClass: 'from-[#C9D9E9] to-[#6487A5] text-white',
+        cornerLabel: '25',
+        icon: 'srs' as const,
+        tier: 'silver' as const,
+        earned: srsReviewedCount >= 25 || unifiedMasteredWordsCount >= 25,
+        current: Math.min(25, Math.max(srsReviewedCount, unifiedMasteredWordsCount)),
+        target: 25,
+        statusText:
+          srsReviewedCount >= 25 || unifiedMasteredWordsCount >= 25
+            ? 'SILVER · EARNED'
+            : `SILVER · ${Math.max(1, 25 - Math.max(srsReviewedCount, unifiedMasteredWordsCount))} WORDS LEFT`,
+      },
+      {
+        id: 'streak-keeper',
+        title: 'Streak keeper',
+        desc: 'Study 14 days in a row',
+        category: 'streak' as const,
+        artClass: 'from-[#F4DAA5] to-[#C18B47] text-[#6A4623]',
+        cornerLabel: '14',
+        icon: 'flame' as const,
+        tier: 'gold' as const,
+        earned: streakDays >= 14,
+        current: Math.min(14, streakDays),
+        target: 14,
+        statusText:
+          streakDays >= 14
+            ? 'GOLD · EARNED'
+            : `GOLD · ${Math.max(1, 14 - streakDays)} DAYS LEFT`,
+      },
+      {
+        id: 'lesson-voyager',
+        title: 'Lesson voyager',
+        desc: 'Complete 5 full lessons',
+        category: 'learning' as const,
+        artClass: 'from-[#D4E3D2] to-[#719274] text-white',
+        cornerLabel: '5',
+        icon: 'grad' as const,
+        tier: 'gold' as const,
+        earned: completedLessonsCount >= 5,
+        current: Math.min(5, completedLessonsCount),
+        target: 5,
+        statusText:
+          completedLessonsCount >= 5
+            ? 'GOLD · EARNED'
+            : `GOLD · ${Math.max(1, 5 - completedLessonsCount)} LESSONS LEFT`,
+      },
+      {
+        id: 'word-champion',
+        title: 'Word champion',
+        desc: 'Master 100 vocabulary words',
+        category: 'mastery' as const,
+        artClass: 'from-[#F6DD99] to-[#D49B43] text-[#6A4623]',
+        cornerLabel: '100',
+        icon: 'trophy' as const,
+        tier: 'gold' as const,
+        earned: unifiedMasteredWordsCount >= 100,
+        current: Math.min(100, unifiedMasteredWordsCount),
+        target: 100,
+        statusText:
+          unifiedMasteredWordsCount >= 100
+            ? 'GOLD · EARNED'
+            : `GOLD · ${Math.max(1, 100 - unifiedMasteredWordsCount)} WORDS LEFT`,
+      },
+      {
+        id: 'brave-voice',
+        title: 'Brave voice',
+        desc: 'Complete 20 speaking practices',
+        category: 'practice' as const,
+        artClass: 'from-[#E7D5F0] to-[#A57DB1] text-white',
+        cornerLabel: '20',
+        icon: 'mic' as const,
+        tier: 'gold' as const,
+        earned: listeningAndSpeakingCount >= 20,
+        current: Math.min(20, listeningAndSpeakingCount),
+        target: 20,
+        statusText:
+          listeningAndSpeakingCount >= 20 ? 'GOLD · EARNED' : 'GOLD · KEEP PRACTISING',
+      },
+      {
+        id: 'one-month-strong',
+        title: 'One month strong',
+        desc: 'Build a 30-day learning streak',
+        category: 'streak' as const,
+        artClass: 'from-[#F6C78E] to-[#C7684E] text-white',
+        cornerLabel: '30',
+        icon: 'calendar' as const,
+        tier: 'platinum' as const,
+        earned: streakDays >= 30,
+        current: Math.min(30, streakDays),
+        target: 30,
+        statusText: streakDays >= 30 ? 'PLATINUM · EARNED' : 'PLATINUM',
+      },
+      {
+        id: 'curriculum-complete',
+        title: 'Curriculum complete',
+        desc: 'Finish all 12 core lessons',
+        category: 'learning' as const,
+        artClass: 'from-[#D4E3D2] to-[#719274] text-white',
+        cornerLabel: '12',
+        icon: 'book' as const,
+        tier: 'platinum' as const,
+        earned: completedLessonsCount >= 12,
+        current: Math.min(12, completedLessonsCount),
+        target: 12,
+        statusText: completedLessonsCount >= 12 ? 'PLATINUM · EARNED' : 'PLATINUM',
+      },
+      {
+        id: 'quick-thinker',
+        title: 'Quick thinker',
+        desc: 'Complete 10 spelling sprints',
+        category: 'practice' as const,
+        artClass: 'from-[#F6DD99] to-[#D49B43] text-white',
+        cornerLabel: '10',
+        icon: 'zap' as const,
+        tier: 'silver' as const,
+        earned: sprintsCompletedCount >= 10,
+        current: Math.min(10, sprintsCompletedCount),
+        target: 10,
+        statusText: sprintsCompletedCount >= 10 ? 'SILVER · EARNED' : 'SILVER',
+      },
+      {
+        id: 'language-architect',
+        title: 'Language architect',
+        desc: 'Practise 500 unique words',
+        category: 'mastery' as const,
+        artClass: 'from-[#C9D9E9] to-[#6487A5] text-white',
+        cornerLabel: '500',
+        icon: 'brain' as const,
+        tier: 'platinum' as const,
+        earned: practicedWordsTotal >= 500,
+        current: Math.min(500, practicedWordsTotal),
+        target: 500,
+        statusText: practicedWordsTotal >= 500 ? 'PLATINUM · EARNED' : 'PLATINUM',
+      },
+    ];
+
+    const earnedEditorialCount = editorialBadges.filter((b) => b.earned).length;
+    const nextLockedBadge =
+      editorialBadges.find((b) => !b.earned) || editorialBadges[editorialBadges.length - 1];
+    const nextLockedPct = Math.min(
+      100,
+      Math.round((nextLockedBadge.current / nextLockedBadge.target) * 100)
+    );
+
+    const visibleEditorialBadges = editorialBadges
+      .slice(0, showAll16Badges ? 16 : 12)
+      .filter((b) => {
+        if (badgeCategoryFilter === 'all') return true;
+        if (badgeCategoryFilter === 'earned') return b.earned;
+        return b.category === badgeCategoryFilter;
+      });
+
+    const renderBadgeIcon = (iconType: (typeof editorialBadges)[number]['icon']) => {
+      switch (iconType) {
+        case 'flame':
+          return <Flame className="w-5 h-5" />;
+        case 'book':
+          return <BookOpen className="w-5 h-5" />;
+        case 'languages':
+          return <Globe className="w-5 h-5" />;
+        case 'ear':
+          return <Headphones className="w-5 h-5" />;
+        case 'calendar':
+          return <Calendar className="w-5 h-5" />;
+        case 'sunrise':
+          return <Sun className="w-5 h-5" />;
+        case 'notes':
+          return <PenTool className="w-5 h-5" />;
+        case 'srs':
+          return <RotateCcw className="w-5 h-5" />;
+        case 'grad':
+          return <GraduationCap className="w-5 h-5" />;
+        case 'trophy':
+          return <Trophy className="w-5 h-5" />;
+        case 'mic':
+          return <Mic className="w-5 h-5" />;
+        case 'zap':
+          return <Zap className="w-5 h-5" />;
+        case 'brain':
+          return <Brain className="w-5 h-5" />;
+      }
+    };
+
+    const b1Track = trackStats.find((t) => t.level === 'B1') || { done: 0, total: 4, pct: 0 };
+    const b2Track = trackStats.find((t) => t.level === 'B2') || { done: 0, total: 4, pct: 0 };
+    const c1Track = trackStats.find((t) => t.level === 'C1') || { done: 0, total: 4, pct: 0 };
 
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-8">
-        {/* Page Header + Segmented View Switcher (Overview vs. Achievements) */}
-        <div className="pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924] flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-6">
+        {/* Top Eyebrow + Title + Progress / Achievements Toggle + Period Filter */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
-              Learning Analytics, Milestones & Syllabus Mastery
+            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+              YOUR LEARNING STORY
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              {progressSubView === 'achievements'
-                ? 'Achievements & Unlockable Milestones'
-                : 'Your Study Progress & Skill Breakdown'}
+            <h1 className="font-serif text-3xl sm:text-[34px] font-normal text-[#282522] dark:text-[#F1ECE4] tracking-tight mt-1">
+              Progress &amp; achievements
             </h1>
-            <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
-              {progressSubView === 'achievements'
-                ? 'Track your unlockable badges across First Lecture Finished, 10-Day Streak, 50 Words Mastered, and CEFR track milestones.'
-                : 'Track your daily streak, visual skill charts across Vocabulary, Spelling, Grammar, and Dialogue, and unit-by-unit mastery from B1 to C1.'}
+            <p className="text-xs sm:text-sm text-[#79736D] dark:text-[#A69F96] mt-1">
+              Every small step is building lasting confidence.
             </p>
           </div>
 
-          {/* Sub-View Switcher Tabs inside Progress */}
-          <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] self-start lg:self-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => setProgressSubView('overview')}
-              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-all ${
-                progressSubView === 'overview'
-                  ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] shadow-xs'
-                  : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Overview & Analytics</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setProgressSubView('achievements')}
-              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-all ${
-                progressSubView === 'achievements'
-                  ? 'bg-[#B91C1C] text-white shadow-xs'
-                  : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
-              }`}
-            >
-              <Trophy className="w-4 h-4 text-[#D97706]" />
-              <span>
-                Achievements ({unlockedBadgesCount}/{achievementsList.length})
-              </span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-end shrink-0">
+            {/* Segmented Toggle Button: Progress vs Achievements */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-[#F0ECE5] dark:bg-[#262422] border border-[#E8E2D9] dark:border-[#3B3834]">
+              <button
+                type="button"
+                onClick={() => setProgressSubView('overview')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
+                  progressSubView === 'overview'
+                    ? 'bg-[#FFFDF9] dark:bg-[#1E1D1B] text-[#B7332C] dark:text-[#F0A59B] shadow-xs'
+                    : 'text-[#615C55] dark:text-[#C7C0B6] hover:text-[#282522]'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Progress</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProgressSubView('achievements')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
+                  progressSubView === 'achievements'
+                    ? 'bg-[#B7332C] text-white shadow-xs'
+                    : 'text-[#615C55] dark:text-[#C7C0B6] hover:text-[#282522]'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>
+                  Achievements ({earnedEditorialCount}/{editorialBadges.length})
+                </span>
+              </button>
+            </div>
+
+            <EditorialSelectDropdown
+              ariaLabel="Select progress period"
+              value={progressPeriod}
+              compact
+              options={[
+                { value: 'week', label: 'This week', sub: 'Current 7-day learning rhythm' },
+                { value: 'month', label: 'This month', sub: 'Last 30 days of study activity' },
+                { value: 'all', label: 'All time', sub: 'Complete BhashaSetu history' },
+              ]}
+              onChange={(val) => setProgressPeriod(val)}
+            />
           </div>
         </div>
 
-        {/* Google Account Login & Cloud Data Backup Card */}
-        {renderGoogleAccountProfileCard()}
+        {/* Hero Welcome Banner (Matching HTML .progress-welcome) */}
+        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#29231F] via-[#45352E] to-[#6F483B] text-white p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          {/* Decorative Concentric Background Rings */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-[10%] -top-32 w-68 h-68 rounded-full border border-white/10 shadow-[0_0_0_24px_rgba(255,255,255,0.03),0_0_0_50px_rgba(255,255,255,0.02)]"
+          />
 
-        {progressSubView === 'achievements' ? (
+          <div className="relative z-10 max-w-xl space-y-2.5">
+            <div className="flex items-center gap-2 text-[#E7B979] text-[10px] font-bold tracking-[0.14em] uppercase">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>LOOK AT YOU GO</span>
+            </div>
+            <h2 className="font-serif text-2xl sm:text-[30px] leading-[1.2] font-normal tracking-tight">
+              {streakDays} {streakDays === 1 ? 'day' : 'days'} of showing up.
+              <br />
+              <em className="font-normal text-[#E8BD86] italic">
+                That’s something to be proud of.
+              </em>
+            </h2>
+            <p className="text-xs sm:text-sm text-[#E0D1C7] max-w-md leading-relaxed">
+              You’ve spent {studyTimeFormatted} learning{' '}
+              {progressPeriod === 'week'
+                ? 'this week'
+                : progressPeriod === 'month'
+                ? 'this month'
+                : 'so far'}
+              . Your steady practice is turning new words into natural confidence.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 text-[#F4E4D5] text-[11px]">
+                <Flame className="w-3.5 h-3.5 text-[#EFBF7A]" />
+                <span>Best streak · {bestStreak} days</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 text-[#F4E4D5] text-[11px]">
+                <Calendar className="w-3.5 h-3.5 text-[#EFBF7A]" />
+                <span>{activeDaysThisWeek} of 7 days this week</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Right Orbital Streak Emblem */}
+          <div className="relative w-36 h-36 sm:w-40 sm:h-40 shrink-0 flex items-center justify-center self-center sm:mr-4">
+            <div className="absolute w-34 h-26 rounded-full border border-[#F0CF9D]/35 -rotate-25" />
+            <div className="absolute w-26 h-34 rounded-full border border-[#F0CF9D]/20 rotate-35" />
+            <div className="relative w-22 h-22 rounded-full bg-radial from-[#F6D79F] to-[#C18447] shadow-[0_0_0_6px_rgba(215,166,107,0.16),0_9px_25px_rgba(16,10,8,0.45)] text-[#512F20] flex flex-col items-center justify-center">
+              <Flame className="w-5 h-5" />
+              <b className="font-serif text-2xl leading-none mt-0.5">{streakDays}</b>
+              <small className="text-[7px] font-bold tracking-[0.12em] mt-1">
+                DAY STREAK
+              </small>
+            </div>
+            <span className="absolute top-3 right-4 text-[#F1CB91] text-base select-none">
+              ✦
+            </span>
+            <span className="absolute bottom-2.5 left-3 text-[#F1CB91] text-lg select-none">
+              ✧
+            </span>
+          </div>
+        </section>
+
+        {/* 4 KPI Summary Cards Row (Matching HTML .progress-kpis) */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* KPI 1: Study time */}
+          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-[#F7E9E5] dark:bg-red-950/50 text-[#A94D43] dark:text-red-300 flex items-center justify-center shrink-0">
+                <Clock className="w-4 h-4" />
+              </span>
+              <span className="text-xs text-[#79736D] dark:text-[#A69F96]">Study time</span>
+            </div>
+            <div className="font-serif text-2xl text-[#282522] dark:text-[#F1ECE4] mt-3">
+              {studyTimeFormatted}
+            </div>
+            <div className="text-[11px] text-[#63846C] dark:text-emerald-400 mt-1">
+              {weeklyMinutesTotal} min studied this week
+            </div>
+          </div>
+
+          {/* KPI 2: Lessons finished */}
+          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-[#E8F1EB] dark:bg-emerald-950/50 text-[#4D7A5B] dark:text-emerald-300 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4" />
+              </span>
+              <span className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                Lessons finished
+              </span>
+            </div>
+            <div className="font-serif text-2xl text-[#282522] dark:text-[#F1ECE4] mt-3">
+              {completedLessonsCount}{' '}
+              <span className="text-xs font-sans text-[#79736D]">
+                / {totalLessonsCount}
+              </span>
+            </div>
+            <div className="text-[11px] text-[#63846C] dark:text-emerald-400 mt-1">
+              Next up: Lesson{' '}
+              {String(nextUnfinishedLecture?.lectureNumber || 1).padStart(2, '0')}
+            </div>
+          </div>
+
+          {/* KPI 3: Words practised */}
+          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-[#F6EEDF] dark:bg-amber-950/50 text-[#A57735] dark:text-amber-300 flex items-center justify-center shrink-0">
+                <Globe className="w-4 h-4" />
+              </span>
+              <span className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                Words practised
+              </span>
+            </div>
+            <div className="font-serif text-2xl text-[#282522] dark:text-[#F1ECE4] mt-3">
+              {practicedWordsTotal}
+            </div>
+            <div className="text-[11px] text-[#63846C] dark:text-emerald-400 mt-1">
+              {unifiedMasteredWordsCount} words mastered
+            </div>
+          </div>
+
+          {/* KPI 4: Daily goal met */}
+          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-[#EAF0F4] dark:bg-sky-950/50 text-[#587992] dark:text-sky-300 flex items-center justify-center shrink-0">
+                <Target className="w-4 h-4" />
+              </span>
+              <span className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                Daily goal met
+              </span>
+            </div>
+            <div className="font-serif text-2xl text-[#282522] dark:text-[#F1ECE4] mt-3">
+              {totalGoalMetDays}{' '}
+              <span className="text-xs font-sans text-[#79736D]">/ 12 days</span>
+            </div>
+            <div className="text-[11px] text-[#63846C] dark:text-emerald-400 mt-1">
+              {Math.max(1, 12 - totalGoalMetDays)} more to your next badge
+            </div>
+          </div>
+        </section>
+
+        {progressSubView === 'overview' ? (
           /* ================================================================= */
-          /* DEDICATED ACHIEVEMENTS & MILESTONE BADGES VIEW                    */
+          /* PROGRESS SUB-VIEW: 2x2 ANALYTICS + GITHUB HEATMAP + TIMELINE      */
           /* ================================================================= */
-          <div className="space-y-8">
-            {/* Hero Achievement Banner & Rank Card */}
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                <div className="lg:col-span-8 space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs font-semibold text-[#D97706]">
-                    <Trophy className="w-3.5 h-3.5" />
-                    <span>Current Scholar Rank: {scholarRankTitle}</span>
+          <div className="space-y-6">
+            {/* 2x2 Analytics Grid matching HTML .analytics-grid */}
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Panel 1 (7 cols): Your learning rhythm (Study minutes each day) */}
+              <div className="lg:col-span-7 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                      CONSISTENCY BUILDS FLUENCY
+                    </div>
+                    <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-1">
+                      Your learning rhythm
+                    </h2>
+                    <p className="text-xs text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                      Study minutes each day · this week
+                    </p>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    {unlockedBadgesCount} of {achievementsList.length} Milestone Badges Unlocked ({achievementCompletionPct}%)
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                    Every lecture you finish, daily streak you maintain, and vocabulary word you master progresses your permanent BhashaSetu achievement badges.
-                  </p>
-
-                  <div className="pt-2 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                        Overall Trophy Case Completion
-                      </span>
-                      <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                        {unlockedBadgesCount}/{achievementsList.length} Badges ({achievementCompletionPct}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                      <div
-                        className="h-full bg-[#B91C1C] rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(5, achievementCompletionPct)}%` }}
-                      />
-                    </div>
+                  <div className="text-right">
+                    <b className="font-serif text-2xl sm:text-[26px] font-normal text-[#282522] dark:text-[#F1ECE4] block leading-none">
+                      {weeklyMinutesTotal}
+                    </b>
+                    <span className="text-[10px] text-[#79736D] dark:text-[#A69F96]">
+                      minutes
+                    </span>
                   </div>
                 </div>
 
-                {/* Featured Core 3 Milestones Spotlight */}
-                <div className="lg:col-span-4 p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
-                  <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                    <span>Core Milestone Tracker</span>
-                    <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
+                {/* Bar Chart with Y-Axis & Gridlines */}
+                <div className="h-40 flex gap-3 mt-4">
+                  <div className="flex flex-col justify-between text-[10px] text-[#A29B92] pb-6">
+                    <span>{maxDayMinutes}</span>
+                    <span>{Math.round(maxDayMinutes * 0.75)}</span>
+                    <span>{Math.round(maxDayMinutes * 0.5)}</span>
+                    <span>{Math.round(maxDayMinutes * 0.25)}</span>
+                    <span>0</span>
                   </div>
-                  <div className="space-y-2">
-                    {achievementsList.slice(0, 3).map((core) => {
-                      const pct = Math.min(100, Math.round((core.current / core.target) * 100));
+
+                  <div className="relative flex-1 flex items-end justify-around gap-2 pt-4 px-1">
+                    {/* Horizontal Gridlines */}
+                    <div className="absolute inset-x-0 top-[10%] h-px bg-[#EEE9E2] dark:bg-[#3E3B37]" />
+                    <div className="absolute inset-x-0 top-[32%] h-px bg-[#EEE9E2] dark:bg-[#3E3B37]" />
+                    <div className="absolute inset-x-0 top-[54%] h-px bg-[#EEE9E2] dark:bg-[#3E3B37]" />
+                    <div className="absolute inset-x-0 top-[76%] h-px bg-[#EEE9E2] dark:bg-[#3E3B37]" />
+
+                    {weekEntries.map((entry) => {
+                      const heightPct =
+                        entry.minutes > 0
+                          ? Math.min(100, Math.max(12, Math.round((entry.minutes / maxDayMinutes) * 100)))
+                          : 4;
+                      const isBest =
+                        entry.minutes > 0 && entry.minutes === bestDayEntry.minutes;
+
+                      let barGradient = 'bg-[#ECE7DF] dark:bg-[#3A3632]';
+                      if (entry.isToday && entry.minutes > 0) {
+                        barGradient = 'bg-gradient-to-b from-[#D78370] to-[#B74B40]';
+                      } else if (isBest) {
+                        barGradient = 'bg-gradient-to-b from-[#D4A45E] to-[#B5793E]';
+                      } else if (entry.minutes > 0) {
+                        barGradient = 'bg-gradient-to-b from-[#9EAF91] to-[#6F8D70]';
+                      } else if (entry.isToday) {
+                        barGradient = 'bg-[#D78370]/50';
+                      }
+
                       return (
                         <div
-                          key={core.id}
-                          className="p-2.5 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1"
+                          key={entry.idx}
+                          className="relative z-10 flex-1 h-full flex flex-col items-center justify-end gap-1.5"
                         >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                              {core.title}
-                            </span>
-                            <span
-                              className={`font-ipa text-[11px] font-semibold ${
-                                core.unlocked
-                                  ? 'text-[#15803D] dark:text-emerald-400'
-                                  : 'text-[#B91C1C] dark:text-[#F87171]'
-                              }`}
-                            >
-                              {core.unlocked ? '✓ Unlocked' : `${core.current}/${core.target}`}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
+                          <div className="w-full flex-1 flex items-end justify-center">
                             <div
-                              className={`h-full rounded-full ${
-                                core.unlocked ? 'bg-[#15803D]' : 'bg-[#D97706]'
-                              }`}
-                              style={{ width: `${Math.max(6, pct)}%` }}
-                            />
+                              className={`w-full max-w-[26px] rounded-t-md rounded-b-xs relative transition-all duration-300 ${barGradient}`}
+                              style={{ height: `${heightPct}%` }}
+                            >
+                              {entry.minutes > 0 && (
+                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-[#777067] dark:text-[#A69F96] font-medium">
+                                  {entry.minutes}
+                                </span>
+                              )}
+                            </div>
                           </div>
+                          <small className="text-[10px] text-[#79736D] dark:text-[#A69F96]">
+                            {entry.letter}
+                          </small>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Filter Bar for Achievements */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-3">
-              {/* Status Filter */}
-              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-                {(
-                  [
-                    { id: 'all', label: `All Badges (${achievementsList.length})` },
-                    { id: 'unlocked', label: `Unlocked (${unlockedBadgesCount})` },
+                <div className="pt-3 mt-2 border-t border-[#E8E2D9] dark:border-[#3B3834] flex items-center justify-between text-[11px] text-[#79736D] dark:text-[#A69F96]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#79937B]" />
+                    <span>Your study time</span>
+                  </span>
+                  <span>
+                    {bestDayEntry.minutes > 0
+                      ? `Best day: ${bestDayEntry.dayName} · ${bestDayEntry.minutes} min`
+                      : 'Complete a lesson or drill today to start your week'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Panel 2 (5 cols): Weekly goal conic ring + 7 day circles */}
+              <div className="lg:col-span-5 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                    A HABIT THAT STICKS
+                  </div>
+                  <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-1">
+                    Weekly goal
+                  </h2>
+                  <p className="text-xs text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                    {weeklyMinutesTotal >= weeklyGoalTarget
+                      ? `You’ve reached your ${weeklyGoalTarget}-minute weekly goal!`
+                      : `You’re building toward your ${weeklyGoalTarget}-minute goal.`}
+                  </p>
+                </div>
+
+                {/* Conic Progress Ring + Copy */}
+                <div className="flex items-center gap-5 my-4">
+                  <div
+                    className="w-24 h-24 rounded-full grid place-items-center relative shrink-0"
+                    style={{
+                      background: `conic-gradient(#688E70 0 ${weeklyGoalPct}%, #EEE9E2 ${weeklyGoalPct}% 100%)`,
+                    }}
+                  >
+                    <div className="w-19 h-19 rounded-full bg-[#FFFDF9] dark:bg-[#292725] flex flex-col items-center justify-center">
+                      <b className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] leading-none">
+                        {weeklyGoalPct}%
+                      </b>
+                      <small className="text-[8px] tracking-wider text-[#79736D] uppercase mt-1">
+                        THIS WEEK
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <strong className="font-serif text-lg font-normal text-[#282522] dark:text-[#F1ECE4] block">
+                      {weeklyMinutesTotal}{' '}
+                      <small className="text-xs font-sans text-[#79736D]">
+                        / {weeklyGoalTarget} min
+                      </small>
+                    </strong>
+                    <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] leading-relaxed">
+                      {weeklyMinutesTotal >= weeklyGoalTarget
+                        ? 'Wonderful consistency this week!'
+                        : `Just ${Math.max(0, weeklyGoalTarget - weeklyMinutesTotal)} more minutes to reach your goal.`}
+                    </p>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#E8F1EB] dark:bg-emerald-950/60 text-[#3C705D] dark:text-emerald-300 text-[10px] font-medium">
+                      {weeklyGoalPct >= 50 ? 'On track' : 'Building rhythm'}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-1.5">
+                    {weekEntries.map((d) => (
+                      <span
+                        key={d.idx}
+                        className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-medium ${
+                          d.isToday
+                            ? 'bg-[#B7332C] text-white'
+                            : d.minutes > 0
+                            ? 'bg-[#E5EEE6] dark:bg-emerald-950/60 text-[#487052] dark:text-emerald-300'
+                            : 'bg-[#F0ECE5] dark:bg-[#393631] text-[#79736D]'
+                        }`}
+                      >
+                        {d.letter}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-[#79736D] dark:text-[#A69F96] mt-2">
+                    <span>{activeDaysThisWeek} study days</span>
+                    <span>{Math.max(0, 7 - activeDaysThisWeek)} days left</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Panel 3 (6 cols): Learning balance (4 Skills) */}
+              <div className="lg:col-span-6 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                      YOUR SKILLS, GROWING
+                    </div>
+                    <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-1">
+                      Learning balance
+                    </h2>
+                  </div>
+                  <span className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                    Last 30 days
+                  </span>
+                </div>
+
+                <div className="space-y-3.5 mt-4">
+                  {[
                     {
-                      id: 'locked',
-                      label: `In Progress (${achievementsList.length - unlockedBadgesCount})`,
+                      name: 'Vocabulary',
+                      status: vocabSkillPct >= 60 ? 'Strong progress' : 'Growing steadily',
+                      pct: vocabSkillPct,
+                      iconBg: 'bg-[#F7E9E5] text-[#A94D43]',
+                      barColor: 'bg-[#79947B]',
+                      icon: <BookOpen className="w-3.5 h-3.5" />,
                     },
-                  ] as const
-                ).map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => setAchievementStatusFilter(st.id)}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                      achievementStatusFilter === st.id
-                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] shadow-xs'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    {st.label}
-                  </button>
-                ))}
+                    {
+                      name: 'Pronunciation',
+                      status: pronunciationSkillPct >= 50 ? 'Growing steadily' : 'On your way',
+                      pct: pronunciationSkillPct,
+                      iconBg: 'bg-[#EAF0F4] text-[#55738A]',
+                      barColor: 'bg-[#68859B]',
+                      icon: <Volume2 className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      name: 'Spelling',
+                      status: spellingSkillPct >= 50 ? 'Good momentum' : 'Keep practising',
+                      pct: spellingSkillPct,
+                      iconBg: 'bg-[#F6EEDF] text-[#A57735]',
+                      barColor: 'bg-[#C49550]',
+                      icon: <PenTool className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      name: 'Grammar',
+                      status: grammarSkillPct >= 50 ? 'New confidence' : 'Building foundations',
+                      pct: grammarSkillPct,
+                      iconBg: 'bg-[#E8F1EB] text-[#4D7A5B]',
+                      barColor: 'bg-[#B87769]',
+                      icon: <MessageSquare className="w-3.5 h-3.5" />,
+                    },
+                  ].map((sk) => (
+                    <div key={sk.name} className="flex items-center gap-3">
+                      <span
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${sk.iconBg}`}
+                      >
+                        {sk.icon}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-xs">
+                          <b className="font-semibold text-[#282522] dark:text-[#F1ECE4]">
+                            {sk.name}
+                          </b>
+                          <span className="text-[11px] text-[#79736D] dark:text-[#A69F96]">
+                            {sk.status}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-[#EEE9E2] dark:bg-[#403C37] mt-1.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${sk.barColor} transition-all duration-300`}
+                            style={{ width: `${Math.max(4, sk.pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <strong className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] w-9 text-right">
+                        {sk.pct}%
+                      </strong>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Category Filter */}
-              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#FAF7F2] dark:bg-[#141210] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924]">
-                {(
-                  [
-                    { id: 'all', label: 'All Categories' },
-                    { id: 'curriculum', label: 'Lectures & CEFR' },
-                    { id: 'streak', label: 'Streaks & Habits' },
-                    { id: 'vocabulary', label: 'Words Mastered' },
-                    { id: 'arena', label: 'Fluency Arena' },
-                  ] as const
-                ).map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setAchievementCategoryFilter(cat.id)}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      achievementCategoryFilter === cat.id
-                        ? 'bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] font-semibold shadow-xs'
-                        : 'text-[#57534E] dark:text-[#A8A29E]'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+              {/* Panel 4 (6 cols): Your CEFR journey */}
+              <div className="lg:col-span-6 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                      A PATH WORTH CELEBRATING
+                    </div>
+                    <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-1">
+                      Your CEFR journey
+                    </h2>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-[#EAF0F4] dark:bg-sky-950/60 text-[#55738A] dark:text-sky-300 text-[10px] font-semibold">
+                    {progress.selectedLevel || 'B1'}{' '}
+                    {progress.selectedLevel === 'C1'
+                      ? 'Advanced'
+                      : progress.selectedLevel === 'B2'
+                      ? 'Workplace'
+                      : 'Foundation'}
+                  </span>
+                </div>
 
-            {/* Unlockable Badge Cards Grid */}
-            {filteredAchievements.length === 0 ? (
-              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-8 text-center space-y-3">
-                <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  No badges match the selected filter
+                {/* 3-Node Connected Stepper */}
+                <div className="flex items-center my-6 px-2">
+                  {/* Node B1 */}
+                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                    <span
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                        b1Track.done >= b1Track.total
+                          ? 'bg-[#E6EFE7] text-[#52765B]'
+                          : 'bg-[#B7332C] text-white shadow-[0_0_0_5px_#F8E9E5] dark:shadow-none'
+                      }`}
+                    >
+                      {b1Track.done >= b1Track.total ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        String(nextUnfinishedLecture?.lectureNumber || 1).padStart(2, '0')
+                      )}
+                    </span>
+                    <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">B1</b>
+                    <small className="text-[10px] text-[#79736D]">Foundation</small>
+                  </div>
+
+                  {/* Segment B1 -> B2 */}
+                  <div className="h-1 flex-1 bg-[#ECE7DF] dark:bg-[#403C37] -mx-1 mb-7 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#77947A] rounded-full transition-all duration-300"
+                      style={{ width: `${b1Track.pct}%` }}
+                    />
+                  </div>
+
+                  {/* Node B2 */}
+                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                    <span
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                        b2Track.done >= b2Track.total
+                          ? 'bg-[#E6EFE7] text-[#52765B]'
+                          : b1Track.done >= b1Track.total
+                          ? 'bg-[#B7332C] text-white shadow-[0_0_0_5px_#F8E9E5] dark:shadow-none'
+                          : 'bg-[#F0ECE5] dark:bg-[#383530] text-[#A49C92]'
+                      }`}
+                    >
+                      {b2Track.done >= b2Track.total ? (
+                        <Check className="w-4 h-4" />
+                      ) : b1Track.done >= b1Track.total ? (
+                        String(nextUnfinishedLecture?.lectureNumber || 5).padStart(2, '0')
+                      ) : (
+                        <Lock className="w-3.5 h-3.5" />
+                      )}
+                    </span>
+                    <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">B2</b>
+                    <small className="text-[10px] text-[#79736D]">Workplace</small>
+                  </div>
+
+                  {/* Segment B2 -> C1 */}
+                  <div className="h-1 flex-1 bg-[#ECE7DF] dark:bg-[#403C37] -mx-1 mb-7 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#77947A] rounded-full transition-all duration-300"
+                      style={{ width: `${b2Track.pct}%` }}
+                    />
+                  </div>
+
+                  {/* Node C1 */}
+                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                    <span
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                        c1Track.done >= c1Track.total
+                          ? 'bg-[#E6EFE7] text-[#52765B]'
+                          : b2Track.done >= b2Track.total
+                          ? 'bg-[#B7332C] text-white shadow-[0_0_0_5px_#F8E9E5] dark:shadow-none'
+                          : 'bg-[#F0ECE5] dark:bg-[#383530] text-[#A49C92]'
+                      }`}
+                    >
+                      {c1Track.done >= c1Track.total ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Lock className="w-3.5 h-3.5" />
+                      )}
+                    </span>
+                    <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">C1</b>
+                    <small className="text-[10px] text-[#79736D]">Advanced</small>
+                  </div>
+                </div>
+
+                {/* Bottom Callout */}
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#F7F2E9] dark:bg-[#34302A] text-xs text-[#79736D] dark:text-[#A69F96]">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#B6813D] shrink-0" />
+                    <span>
+                      <b className="text-[#514539] dark:text-[#E3D4C4]">
+                        One lesson at a time.
+                      </b>{' '}
+                      Complete Lesson{' '}
+                      {String(nextUnfinishedLecture?.lectureNumber || 1).padStart(2, '0')} to open
+                      your next milestone.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCertificateTrack(progress.selectedLevel || 'B1')}
+                    className="text-[11px] font-semibold text-[#B7332C] dark:text-[#F87171] hover:underline shrink-0"
+                  >
+                    Certificate →
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* GitHub-Style Contribution Heatmap Card */}
+            <section className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                    DAILY CONSISTENCY GRAPH
+                  </div>
+                  <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-0.5">
+                    Study activity heatmap
+                  </h2>
+                  <p className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                    {totalActiveDaysInHeatmap} active study{' '}
+                    {totalActiveDaysInHeatmap === 1 ? 'day' : 'days'} ({totalHeatmapMinutes} mins)
+                    in the last 20 weeks · Click any square to inspect
+                  </p>
+                </div>
+
+                {selectedActivityDate && (
+                  <div className="px-3 py-1.5 rounded-xl bg-[#F7F2E9] dark:bg-[#34302A] border border-[#E8E2D9] dark:border-[#3B3834] text-xs text-[#282522] dark:text-[#F1ECE4]">
+                    <strong>{selectedActivityDate}</strong>:{' '}
+                    {(progress.studyActivityByDate?.[selectedActivityDate] || 0) * 5} mins studied
+                  </div>
+                )}
+              </div>
+
+              {/* GitHub-Style Grid: Day-of-Week Labels + 20 Week Columns */}
+              <div className="overflow-x-auto pb-1">
+                <div className="min-w-[600px]">
+                  {/* Month Labels Row */}
+                  <div className="flex items-center pl-9 mb-1.5">
+                    {heatmapWeeks.map((week) => (
+                      <div
+                        key={`month-${week.weekIndex}`}
+                        className="flex-1 text-[10px] text-[#79736D] dark:text-[#A69F96] font-medium"
+                      >
+                        {week.monthLabel || ''}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    {/* Left Day-of-Week Labels (Mon, Wed, Fri, Sun) */}
+                    <div className="grid grid-rows-7 gap-1.5 text-[10px] text-[#79736D] dark:text-[#A69F96] pr-1 leading-none">
+                      <span className="h-3.5 flex items-center">Mon</span>
+                      <span className="h-3.5 flex items-center opacity-0">Tue</span>
+                      <span className="h-3.5 flex items-center">Wed</span>
+                      <span className="h-3.5 flex items-center opacity-0">Thu</span>
+                      <span className="h-3.5 flex items-center">Fri</span>
+                      <span className="h-3.5 flex items-center opacity-0">Sat</span>
+                      <span className="h-3.5 flex items-center">Sun</span>
+                    </div>
+
+                    {/* 20 Columns x 7 Rows of Contribution Squares */}
+                    <div className="flex-1 grid grid-cols-20 gap-1.5">
+                      {heatmapWeeks.map((week) => (
+                        <div
+                          key={`week-${week.weekIndex}`}
+                          className="grid grid-rows-7 gap-1.5"
+                        >
+                          {week.days.map((day) => {
+                            const isSelected = selectedActivityDate === day.dateStr;
+                            let cellColor =
+                              'bg-[#EEEAE3] dark:bg-[#35322E] hover:ring-1 hover:ring-[#B7332C]';
+                            if (day.isFuture) {
+                              cellColor = 'bg-[#F5F2EC] dark:bg-[#23211F] opacity-40';
+                            } else if (day.level === 4) {
+                              cellColor = 'bg-[#3C705D] dark:bg-[#5FA372]';
+                            } else if (day.level === 3) {
+                              cellColor = 'bg-[#6F9B7A] dark:bg-[#497D57]';
+                            } else if (day.level === 2) {
+                              cellColor = 'bg-[#A8C5AE] dark:bg-[#35593E]';
+                            } else if (day.level === 1) {
+                              cellColor = 'bg-[#D7E4D8] dark:bg-[#273B2C]';
+                            }
+
+                            return (
+                              <button
+                                key={day.dateStr}
+                                type="button"
+                                disabled={day.isFuture}
+                                onClick={() =>
+                                  setSelectedActivityDate((prev) =>
+                                    prev === day.dateStr ? null : day.dateStr
+                                  )
+                                }
+                                title={`${day.formattedDate}: ${day.minutes} mins (${day.actions} study actions)`}
+                                className={`w-full h-3.5 rounded-[3px] transition-transform hover:scale-110 focus:outline-none ${cellColor} ${
+                                  day.isToday
+                                    ? 'ring-1.5 ring-[#B7332C]'
+                                    : isSelected
+                                    ? 'ring-1.5 ring-[#282522] dark:ring-white'
+                                    : ''
+                                }`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legend Row */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#E8E2D9] dark:border-[#3B3834] text-[11px] text-[#79736D] dark:text-[#A69F96]">
+                <span>Last 20 weeks · Daily study consistency</span>
+                <div className="flex items-center gap-1.5">
+                  <span>Less</span>
+                  <span className="w-3 h-3 rounded-[3px] bg-[#EEEAE3] dark:bg-[#35322E] inline-block" />
+                  <span className="w-3 h-3 rounded-[3px] bg-[#D7E4D8] dark:bg-[#273B2C] inline-block" />
+                  <span className="w-3 h-3 rounded-[3px] bg-[#A8C5AE] dark:bg-[#35593E] inline-block" />
+                  <span className="w-3 h-3 rounded-[3px] bg-[#6F9B7A] dark:bg-[#497D57] inline-block" />
+                  <span className="w-3 h-3 rounded-[3px] bg-[#3C705D] dark:bg-[#5FA372] inline-block" />
+                  <span>More</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Recent Activity Timeline (Matching HTML .recent-activity) */}
+            <section className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                    YOUR EFFORT ADDS UP
+                  </div>
+                  <h2 className="font-serif text-xl text-[#282522] dark:text-[#F1ECE4] mt-0.5">
+                    Recent activity
+                  </h2>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAchievementStatusFilter('all');
-                    setAchievementCategoryFilter('all');
-                  }}
-                  className="min-h-[38px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
+                  onClick={() =>
+                    nextUnfinishedLecture && onOpenLecture(nextUnfinishedLecture.id)
+                  }
+                  className="px-3.5 py-2 rounded-xl border border-[#E8E2D9] dark:border-[#3B3834] text-xs font-semibold text-[#B7332C] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#34302A] transition-colors"
                 >
-                  Show All Achievements
+                  View learning path
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredAchievements.map((badge) => {
-                  const pct = Math.min(100, Math.round((badge.current / badge.target) * 100));
-                  const tierStyles =
-                    badge.tier === 'Platinum'
-                      ? 'bg-purple-100 dark:bg-purple-950/50 text-purple-900 dark:text-purple-300 border-purple-300 dark:border-purple-800'
-                      : badge.tier === 'Gold'
-                      ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                      : badge.tier === 'Silver'
-                      ? 'bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border-stone-300 dark:border-stone-700'
-                      : 'bg-orange-100 dark:bg-orange-950/40 text-orange-900 dark:text-orange-300 border-orange-300 dark:border-orange-800';
 
-                  return (
-                    <article
-                      key={badge.id}
-                      className={`rounded-2xl border p-5 flex flex-col justify-between transition-all ${
-                        badge.unlocked
-                          ? 'bg-white dark:bg-[#1F1C18] border-emerald-400 dark:border-emerald-700 shadow-xs'
-                          : 'bg-white/80 dark:bg-[#1F1C18]/80 border-[#E7E0D6] dark:border-[#2E2924]'
-                      }`}
-                    >
-                      <div className="space-y-3.5">
-                        {/* Top Badge Icon + Tier & Unlock Status */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div
-                            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
-                              badge.unlocked
-                                ? 'bg-[#15803D] text-white border-[#15803D]'
-                                : 'bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] border-[#E7E0D6] dark:border-[#2E2924]'
-                            }`}
-                          >
-                            {badge.unlocked ? (
-                              <Trophy className="w-6 h-6" />
-                            ) : badge.category === 'streak' ? (
-                              <Flame className="w-6 h-6 text-[#D97706]" />
-                            ) : badge.category === 'vocabulary' ? (
-                              <BookmarkCheck className="w-6 h-6 text-[#B91C1C]" />
-                            ) : badge.category === 'curriculum' ? (
-                              <BookOpen className="w-6 h-6 text-[#B91C1C]" />
-                            ) : (
-                              <Zap className="w-6 h-6 text-[#D97706]" />
-                            )}
-                          </div>
+              <div className="mt-4 divide-y divide-[#EEE9E2] dark:divide-[#3E3B37]">
+                <div className="flex items-center gap-3.5 py-3">
+                  <span className="w-8 h-8 rounded-lg bg-[#E8F1EB] dark:bg-emerald-950/50 text-[#4D7A5B] dark:text-emerald-300 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] block">
+                      {completedLessonsCount > 0
+                        ? `Completed ${completedLessonsCount} curriculum ${
+                            completedLessonsCount === 1 ? 'lesson' : 'lessons'
+                          }`
+                        : `Next up: Lesson ${String(
+                            nextUnfinishedLecture?.lectureNumber || 1
+                          ).padStart(2, '0')} · ${nextUnfinishedLecture?.title || 'Silent Consonants'}`}
+                    </b>
+                    <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                      {nextUnfinishedLecture?.category || 'Spelling & phonics patterns'} ·{' '}
+                      {nextUnfinishedLecture?.estimatedMinutes || 15} minutes
+                    </p>
+                  </div>
+                  <time className="text-[11px] text-[#79736D] dark:text-[#A69F96] whitespace-nowrap">
+                    Active path
+                  </time>
+                </div>
 
-                          <div className="flex flex-wrap items-center justify-end gap-1.5">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-md border text-[10px] font-ipa font-semibold ${tierStyles}`}
-                            >
-                              {badge.tier}
-                            </span>
-                            {badge.unlocked ? (
-                              <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-[#15803D] dark:text-emerald-400 text-[10px] font-ipa font-semibold inline-flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Unlocked</span>
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-md bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] text-[10px] font-ipa inline-flex items-center gap-1">
-                                <Lock className="w-3 h-3" />
-                                <span>Locked</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                <div className="flex items-center gap-3.5 py-3">
+                  <span className="w-8 h-8 rounded-lg bg-[#F6EEDF] dark:bg-amber-950/50 text-[#A57735] dark:text-amber-300 flex items-center justify-center shrink-0">
+                    <Award className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] block">
+                      {earnedEditorialCount > 0
+                        ? `Unlocked ${earnedEditorialCount} achievement ${
+                            earnedEditorialCount === 1 ? 'badge' : 'badges'
+                          }`
+                        : `Working toward “${nextLockedBadge.title}” badge`}
+                    </b>
+                    <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                      {nextLockedBadge.desc}
+                    </p>
+                  </div>
+                  <time className="text-[11px] text-[#79736D] dark:text-[#A69F96] whitespace-nowrap">
+                    Milestone
+                  </time>
+                </div>
 
-                        {/* Title & Description */}
-                        <div>
-                          <div className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                            {badge.categoryLabel}
-                          </div>
-                          <h3 className="text-base sm:text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                            {badge.title}
-                          </h3>
-                          {isFullNepali && (
-                            <div className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
-                              {badge.nepaliTitle}
-                            </div>
-                          )}
-                          <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1.5 leading-relaxed">
-                            {badge.desc}
-                          </p>
-                        </div>
-                      </div>
+                <div className="flex items-center gap-3.5 py-3">
+                  <span className="w-8 h-8 rounded-lg bg-[#EAF0F4] dark:bg-sky-950/50 text-[#55738A] dark:text-sky-300 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] block">
+                      {practicedWordsTotal > 0
+                        ? `Practised ${practicedWordsTotal} vocabulary words (${unifiedMasteredWordsCount} mastered)`
+                        : '10,400+ silent-letter & high-utility words ready to explore'}
+                    </b>
+                    <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                      {progress.savedWordIds.length} saved in personal study deck ·{' '}
+                      {progress.mistakeNotebook.length} mistake notes
+                    </p>
+                  </div>
+                  <time className="text-[11px] text-[#79736D] dark:text-[#A69F96] whitespace-nowrap">
+                    Word bank
+                  </time>
+                </div>
 
-                      {/* Progress Bar, Direct 1-Click Action Button & Shareable Card */}
-                      <div className="pt-4 mt-4 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-2.5">
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-[#57534E] dark:text-[#A8A29E]">
-                              Milestone Progress
-                            </span>
-                            <span className="font-ipa font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                              {badge.current} / {badge.target} {badge.unit} ({pct}%)
-                            </span>
-                          </div>
-                          <div className="w-full h-2 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                badge.unlocked ? 'bg-[#15803D]' : 'bg-[#B91C1C]'
-                              }`}
-                              style={{ width: `${Math.max(6, pct)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[11px] text-[#57534E] dark:text-[#A8A29E] space-y-2">
-                          <div>{badge.howToUnlock}</div>
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#E7E0D6]/70 dark:border-[#2E2924]">
-                            {badge.unlocked ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedBadgeForPrint(badge.id)}
-                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#15803D] text-white text-xs font-semibold hover:bg-emerald-800 inline-flex items-center gap-1.5 w-full justify-center transition-colors"
-                              >
-                                <Share2 className="w-3.5 h-3.5" />
-                                <span>Print / Share Achievement Card</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={badge.onTriggerAction}
-                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-1.5 w-full justify-center transition-colors"
-                              >
-                                <span>{badge.actionLabel}</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                <div className="flex items-center gap-3.5 py-3">
+                  <span className="w-8 h-8 rounded-lg bg-[#F8E9E5] dark:bg-red-950/50 text-[#A94D43] dark:text-red-300 flex items-center justify-center shrink-0">
+                    <Flame className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] block">
+                      {streakDays > 0
+                        ? `Reached a ${streakDays}-day learning streak`
+                        : 'Start your daily study streak today'}
+                    </b>
+                    <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                      Your longest streak is {bestStreak} days · Daily goal:{' '}
+                      {progress.dailyGoalMinutes || 15} min
+                    </p>
+                  </div>
+                  <time className="text-[11px] text-[#79736D] dark:text-[#A69F96] whitespace-nowrap">
+                    Habit
+                  </time>
+                </div>
               </div>
-            )}
+            </section>
           </div>
         ) : (
           /* ================================================================= */
-          /* OVERVIEW & ANALYTICS SUB-VIEW                                     */
+          /* ACHIEVEMENTS SUB-VIEW: MATCHING HTML .achievement-section         */
           /* ================================================================= */
-          <>
-            {/* 4 KPI Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                  <span>Daily Streak & Grace Shield</span>
-                  <Flame className="w-4 h-4 text-[#D97706]" />
+          <section className="space-y-5 pt-2">
+            {/* Achievement Heading Row */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
+                  LITTLE WINS. LASTING CONFIDENCE.
                 </div>
-                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  {progress.currentStreakDays} {progress.currentStreakDays === 1 ? 'Day' : 'Days'}
-                </div>
-                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 flex items-center justify-between">
-                  <span>Goal: {progress.dailyGoalMinutes || 15}m/day</span>
-                  <span className="inline-flex items-center gap-1 font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>{progress.streakFreezeShields ?? 1} Shield</span>
-                  </span>
-                </div>
+                <h2 className="font-serif text-2xl sm:text-[26px] text-[#282522] dark:text-[#F1ECE4] mt-1">
+                  Your achievements
+                </h2>
+                <p className="text-xs text-[#79736D] dark:text-[#A69F96] mt-0.5">
+                  Every badge marks something you worked for.
+                </p>
               </div>
-
-              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                  <span>Lectures Completed</span>
-                  <CheckCircle2 className="w-4 h-4 text-[#15803D]" />
-                </div>
-                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  {progress.completedUnitIds.length} / {lectures.length}
-                </div>
-                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                  {overallCoursePercent}% of B1–C1 syllabus
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                  <span>Unified Words Mastered</span>
-                  <Trophy className="w-4 h-4 text-[#D97706]" />
-                </div>
-                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  {unifiedMasteredWordsCount} Words
-                </div>
-                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                  {Math.min(50, unifiedMasteredWordsCount)}/50 toward Gold Badge ({progress.masteredWordIds?.length || 0} manual)
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-                <div className="flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E] mb-2">
-                  <span>Saved / Total Lexicon</span>
-                  <BookmarkCheck className="w-4 h-4 text-[#B91C1C]" />
-                </div>
-                <div className="font-ipa text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                  {progress.savedWordIds.length} / {totalLexiconCount.toLocaleString()}+
-                </div>
-                <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 flex items-center justify-between gap-2">
-                  <span>{progress.mistakeNotebook.length} mistake notes</span>
-                  <button
-                    type="button"
-                    onClick={() => setStudySheetPrintMode('combined')}
-                    className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                  >
-                    <Printer className="w-3 h-3" />
-                    <span>PDF/CSV</span>
-                  </button>
-                </div>
-              </div>
+              <span className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                <b className="font-serif text-lg text-[#282522] dark:text-[#F1ECE4]">
+                  {earnedEditorialCount}
+                </b>{' '}
+                earned · {editorialBadges.length - earnedEditorialCount} to discover
+              </span>
             </div>
 
-            {/* Visual Skill Breakdown Charts + Recommended Focus Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-8 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
-                <div>
-                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                    4-Skill Mastery Analytics
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    Visual Skill Breakdown Charts
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
-                    Performance across each module pillar based on your completed quizzes, dictation bees, and vocabulary practice:
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  {[
-                    {
-                      label: '01 · Vocabulary & Silent-Letter Phonics',
-                      pct: skillMetrics.vocabPercent,
-                      detail: `${skillMetrics.practicedWordsCount} / ${skillMetrics.totalCoreWords} core words practiced`,
-                      color: 'bg-[#B91C1C]',
-                    },
-                    {
-                      label: '02 & 03 · Spelling Rules & Audio Dictation Bee',
-                      pct: skillMetrics.spellingPercent ?? 0,
-                      detail:
-                        skillMetrics.spellingTotal > 0
-                          ? `${skillMetrics.spellingCorrect}/${skillMetrics.spellingTotal} correct (${skillMetrics.spellingPercent}%)`
-                          : 'Complete a Step 03 Spelling & Dictation quiz to record score',
-                      color: 'bg-[#D97706]',
-                    },
-                    {
-                      label: '04 · Grammar Syntax & Sentence Builder',
-                      pct: skillMetrics.grammarPercent ?? 0,
-                      detail:
-                        skillMetrics.grammarTotal > 0
-                          ? `${skillMetrics.grammarCorrect}/${skillMetrics.grammarTotal} correct (${skillMetrics.grammarPercent}%)`
-                          : 'Complete a Step 04 Grammar Capstone quiz to record score',
-                      color: 'bg-[#15803D]',
-                    },
-                    {
-                      label: '05 · Real-Life Dialogue Comprehension',
-                      pct: skillMetrics.dialoguePercent ?? 0,
-                      detail:
-                        skillMetrics.dialogueTotal > 0
-                          ? `${skillMetrics.dialogueCorrect}/${skillMetrics.dialogueTotal} correct (${skillMetrics.dialoguePercent}%)`
-                          : 'Complete a Step 05 Dialogue Comprehension quiz to record score',
-                      color: 'bg-sky-700',
-                    },
-                  ].map((bar) => (
-                    <div key={bar.label} className="space-y-1.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                          {bar.label}
-                        </span>
-                        <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
-                          {bar.detail}
-                        </span>
-                      </div>
-                      <div className="w-full h-3 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                        <div
-                          className={`h-full ${bar.color} rounded-full transition-all duration-300`}
-                          style={{ width: `${Math.max(4, bar.pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recommended Focus Area & Track Certificates */}
-              <div className="lg:col-span-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
-                <div className="space-y-3">
-                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                    <Target className="w-4 h-4" />
-                    <span>Recommended Focus Area</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    {skillMetrics.focusArea.name}
-                  </h3>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                    {skillMetrics.focusArea.hint}
-                  </p>
-
-                  <div className="pt-2 space-y-2.5">
-                    <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      CEFR Track Progress & Certificates:
-                    </div>
-                    {trackStats.map((t) => (
-                      <div
-                        key={t.level}
-                        className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            Level {t.level} ({t.done}/{t.total})
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setCertificateTrack(t.level)}
-                            className="text-[11px] font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                          >
-                            <Award className="w-3 h-3" />
-                            <span>View Certificate</span>
-                          </button>
-                        </div>
-                        <div className="w-full h-2 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden">
-                          <div
-                            className="h-full bg-[#B91C1C] rounded-full"
-                            style={{ width: `${Math.max(5, t.pct)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* =============================================================== */}
-            {/* 14-DAY STUDY HEATMAP & ACHIEVEMENTS PREVIEW                     */}
-            {/* =============================================================== */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Interactive 7-Day Bar Chart + 14-Day Study Activity Heatmap */}
-              <div className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-[#A82020] dark:text-[#F87171]">
-                    Consistency & Daily Habit Tracker
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-serif font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    Interactive Weekly Bar Chart & 14-Day Heatmap
-                  </h2>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1">
-                    Click any day bar below to inspect your study actions or launch a quick daily drill:
-                  </p>
-                </div>
-
-                {/* Interactive 7-Day Vertical Capsule Bar Chart */}
-                <div className="p-4 rounded-2xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924]">
-                  <div className="flex items-center justify-between text-xs mb-3">
-                    <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                      Last 7 Days Study Volume
-                    </span>
-                    <span className="font-ipa text-[11px] text-[#78716C]">
-                      Goal: {progress.dailyGoalMinutes || 15}m/day
+            {/* Featured Next Milestone Banner (Matching HTML .featured-badge) */}
+            <div className="rounded-2xl border border-[#EBDEC5] dark:border-[#4B4030] bg-gradient-to-r from-[#FCF7EB] to-[#FFFDF9] dark:from-[#342D23] dark:to-[#292725] p-5 sm:p-6 grid grid-cols-1 md:grid-cols-12 items-center gap-5">
+              {/* Left Medal */}
+              <div className="md:col-span-2 flex justify-start md:justify-center">
+                <div className="w-18 h-18 relative grid place-items-center">
+                  <div className="w-15 h-15 rounded-full bg-radial from-[#F4DAA5] to-[#C18B47] shadow-[0_0_0_4px_rgba(230,201,141,0.35),0_4px_10px_rgba(102,68,29,0.15)] text-[#6A4623] flex flex-col items-center justify-center relative z-10">
+                    {renderBadgeIcon(nextLockedBadge.icon)}
+                    <span className="font-serif text-sm font-semibold leading-none mt-0.5">
+                      {nextLockedBadge.cornerLabel}
                     </span>
                   </div>
-                  <div className="grid grid-cols-7 gap-2 items-end h-32 pt-2 px-1">
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const d = new Date(Date.now() - (6 - i) * 86400000);
-                      const dateStr = d.toISOString().split('T')[0];
-                      const dayShort = d
-                        .toLocaleDateString('en-US', { weekday: 'short' })
-                        .slice(0, 1);
-                      const dayFull = d.toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      });
-                      const count = progress.studyActivityByDate?.[dateStr] ?? 0;
-                      const heightPct = count > 0 ? Math.min(100, Math.max(18, count * 20)) : 8;
-                      const isToday = i === 6;
-                      const isSelected = selectedActivityDate === dateStr;
-
-                      return (
-                        <button
-                          key={`bar-${dateStr}`}
-                          type="button"
-                          onClick={() =>
-                            setSelectedActivityDate((prev) =>
-                              prev === dateStr ? null : dateStr
-                            )
-                          }
-                          className="group flex flex-col items-center gap-1.5 h-full justify-end focus:outline-none"
-                          title={`${dayFull}: ${count * 5} mins (${count} actions)`}
-                        >
-                          <span className="text-[10px] font-ipa text-[#78716C] group-hover:text-[#A82020]">
-                            {count * 5}m
-                          </span>
-                          <div className="w-full max-w-[26px] h-20 rounded-full bg-[#ECE6DA] dark:bg-[#26221E] p-0.5 flex items-end overflow-hidden">
-                            <div
-                              className={`w-full rounded-full transition-all duration-300 ${
-                                isSelected
-                                  ? 'bg-[#1F5C3D]'
-                                  : count >= 3
-                                  ? 'bg-[#A82020]'
-                                  : count >= 1
-                                  ? 'bg-[#A82020]/65'
-                                  : 'bg-[#D6CFC2] dark:bg-[#3A342E]'
-                              }`}
-                              style={{ height: `${heightPct}%` }}
-                            />
-                          </div>
-                          <span
-                            className={`text-[11px] font-semibold ${
-                              isToday
-                                ? 'text-[#A82020] font-bold'
-                                : 'text-[#57534E] dark:text-[#A8A29E]'
-                            }`}
-                          >
-                            {dayShort}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {selectedActivityDate && (
-                    <div className="mt-3 pt-2.5 border-t border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-between text-xs">
-                      <span className="text-[#57534E] dark:text-[#A8A29E]">
-                        <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
-                          {selectedActivityDate}
-                        </strong>
-                        :{' '}
-                        {(progress.studyActivityByDate?.[selectedActivityDate] || 0) * 5} mins logged (
-                        {progress.studyActivityByDate?.[selectedActivityDate] || 0} study units)
-                      </span>
-                      {onOpenDailyChallenge && (
-                        <button
-                          type="button"
-                          onClick={onOpenDailyChallenge}
-                          className="text-[#A82020] font-semibold hover:underline"
-                        >
-                          + Add Study Session
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 14-Day Grid */}
-                <div className="grid grid-cols-7 gap-1.5">
-                  {Array.from({ length: 14 }).map((_, i) => {
-                    const d = new Date(Date.now() - (13 - i) * 86400000);
-                    const dateStr = d.toISOString().split('T')[0];
-                    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
-                    const dayNum = d.getDate();
-                    const count = progress.studyActivityByDate?.[dateStr] || 0;
-
-                    let cellStyle =
-                      'bg-[#FAF8F4] dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E]';
-                    if (count >= 4) {
-                      cellStyle = 'bg-[#A82020] border-[#A82020] text-white font-bold';
-                    } else if (count >= 2) {
-                      cellStyle =
-                        'bg-[#A82020]/20 dark:bg-[#A82020]/40 border-[#A82020] text-[#1C1917] dark:text-[#F5F2EB] font-semibold';
-                    } else if (count >= 1) {
-                      cellStyle =
-                        'bg-amber-100 dark:bg-amber-950/50 border-[#D97706] text-[#1C1917] dark:text-[#F5F2EB]';
-                    }
-
-                    return (
-                      <button
-                        key={dateStr}
-                        type="button"
-                        onClick={() => setSelectedActivityDate(dateStr)}
-                        title={`${dateStr}: ${count} study actions`}
-                        className={`p-1.5 rounded-xl border text-center space-y-0.5 transition-transform hover:scale-105 ${cellStyle}`}
-                      >
-                        <div className="text-[9px] opacity-80">{dayLabel}</div>
-                        <div className="font-ipa text-xs">{dayNum}</div>
-                        <div className="text-[9px] font-ipa">{count > 0 ? `${count}pt` : '—'}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#E6E0D4] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  <span>
-                    Daily Challenges Completed:{' '}
-                    <strong className="text-[#1C1917] dark:text-[#F5F2EB]">
-                      {progress.dailyChallengeTotalCompleted || 0}
-                    </strong>
-                  </span>
-                  <span>
-                    60s Sprint High Score:{' '}
-                    <strong className="text-[#A82020] dark:text-[#F87171]">
-                      {progress.sprintHighScore || 0} pts
-                    </strong>
-                  </span>
+                  <span className="absolute right-0 top-0 text-[#C58B43] text-sm">✦</span>
                 </div>
               </div>
 
-              {/* Mastery Milestones Trophy Case Preview + Link to Full Achievements View */}
-              <div className="lg:col-span-7 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                        Unlockable Badges ({unlockedBadgesCount}/{achievementsList.length} Unlocked)
-                      </div>
-                      <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                        Achievements & Mastery Milestones
-                      </h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setProgressSubView('achievements')}
-                      className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      <Trophy className="w-3.5 h-3.5" />
-                      <span>Open Achievements View</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+              {/* Middle Copy */}
+              <div className="md:col-span-7 space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#F6EEDF] text-[#946B31] text-[10px] font-semibold uppercase tracking-wider">
+                  NEXT MILESTONE
+                </span>
+                <h3 className="font-serif text-lg sm:text-xl text-[#282522] dark:text-[#F1ECE4]">
+                  {nextLockedBadge.title}
+                </h3>
+                <p className="text-xs text-[#79736D] dark:text-[#A69F96]">
+                  {nextLockedBadge.desc}. Keep going — you’re closer than you think.
+                </p>
+                <div className="max-w-sm pt-2">
+                  <div className="flex items-center justify-between text-[11px] text-[#79736D] dark:text-[#A69F96]">
+                    <span>
+                      {nextLockedBadge.current} of {nextLockedBadge.target}
+                    </span>
+                    <b className="text-[#996B30] dark:text-amber-300">
+                      {Math.max(0, nextLockedBadge.target - nextLockedBadge.current)} left
+                    </b>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {achievementsList.slice(0, 6).map((badge) => {
-                      const pct = Math.min(100, Math.round((badge.current / badge.target) * 100));
-                      return (
-                        <div
-                          key={badge.id}
-                          className={`p-3.5 rounded-xl border flex items-start gap-3 ${
-                            badge.unlocked
-                              ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800'
-                              : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
-                          }`}
-                        >
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              badge.unlocked
-                                ? 'bg-[#15803D] text-white'
-                                : 'bg-[#E7E0D6] dark:bg-[#2E2924] text-[#57534E]'
-                            }`}
-                          >
-                            <Trophy className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between gap-1.5">
-                              <span className="truncate">{badge.title}</span>
-                              <span
-                                className={`text-[10px] font-ipa shrink-0 ${
-                                  badge.unlocked
-                                    ? 'text-[#15803D] dark:text-emerald-400'
-                                    : 'text-[#57534E] dark:text-[#A8A29E]'
-                                }`}
-                              >
-                                {badge.unlocked
-                                  ? '✓ Unlocked'
-                                  : `${badge.current}/${badge.target}`}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-[#57534E] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
-                              {badge.desc}
-                            </p>
-                            <div className="w-full h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden mt-2">
-                              <div
-                                className={`h-full rounded-full ${
-                                  badge.unlocked ? 'bg-[#15803D]' : 'bg-[#B91C1C]'
-                                }`}
-                                style={{ width: `${Math.max(6, pct)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  <span>Rank: {scholarRankTitle}</span>
-                  <button
-                    type="button"
-                    onClick={() => setProgressSubView('achievements')}
-                    className="font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>View all {achievementsList.length} unlockable badges</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* =============================================================== */}
-            {/* FLUENCY HEATMAP: SILENT CLUSTERS & NEPALI-TO-ENGLISH PILLARS    */}
-            {/* =============================================================== */}
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
-                <div>
-                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                    Orthographic & Syntactic Fluency Matrix
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
-                    Interactive Fluency Heatmap (12 Silent Clusters & 4 Nepali-to-English Grammar Pillars)
-                  </h2>
-                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                    Color-coded mastery across English silent-letter families and Nepali L1 interference patterns:
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] font-ipa shrink-0">
-                  <span className="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                    Developing (&lt;50%)
-                  </span>
-                  <span className="px-2 py-1 rounded-md bg-[#B91C1C]/15 text-[#B91C1C] dark:text-[#F87171] border border-[#B91C1C]/40">
-                    Strong (50–74%)
-                  </span>
-                  <span className="px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-[#15803D] dark:text-emerald-400 border border-emerald-400">
-                    Fluent (75%+)
-                  </span>
-                </div>
-              </div>
-
-              {/* 12 Silent-Letter Cluster Heatmap Grid */}
-              <div className="space-y-2.5">
-                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                  <span>12 Silent-Letter Cluster Fluency Cells</span>
-                  {onOpenDictionary && (
-                    <button
-                      type="button"
-                      onClick={onOpenDictionary}
-                      className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>Drill Silent Families in Dictionary</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                  {fluencyHeatmapCells.silentClusters.map((cell) => {
-                    const heatClass =
-                      cell.score >= 75
-                        ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-700 text-[#15803D] dark:text-emerald-300'
-                        : cell.score >= 50
-                        ? 'bg-[#B91C1C]/10 dark:bg-[#B91C1C]/25 border-[#B91C1C]/50 text-[#1C1917] dark:text-[#F5F2EB]'
-                        : 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-[#1C1917] dark:text-[#F5F2EB]';
-
-                    return (
-                      <div
-                        key={cell.id}
-                        className={`p-3 rounded-xl border space-y-1 transition-all ${heatClass}`}
-                      >
-                        <div className="flex items-center justify-between text-xs font-bold">
-                          <span>{cell.label}</span>
-                          <span className="font-ipa text-[11px]">{cell.score}%</span>
-                        </div>
-                        <div className="text-[11px] opacity-80 truncate">{cell.example}</div>
-                        <div className="w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              cell.score >= 75
-                                ? 'bg-[#15803D]'
-                                : cell.score >= 50
-                                ? 'bg-[#B91C1C]'
-                                : 'bg-[#D97706]'
-                            }`}
-                            style={{ width: `${cell.score}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 4 Nepali-to-English L1 Interference & Syntax Pillars */}
-              <div className="space-y-2.5 pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924]">
-                <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                  <span>4 Nepali-to-English Translation & L1 Interference Pillars</span>
-                  {onOpenArenaTool && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenArenaTool('interference')}
-                      className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                    >
-                      <span>Open Nepali-to-English Translation Lab</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {fluencyHeatmapCells.syntaxPillars.map((pillar) => (
+                  <div className="h-1.5 rounded-full bg-[#EEE9E2] dark:bg-[#403C37] mt-1.5 overflow-hidden">
                     <div
-                      key={pillar.id}
-                      className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                        <span>{pillar.label}</span>
-                        <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
-                          {pillar.score}%
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                        {pillar.sub}
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] overflow-hidden">
-                        <div
-                          className="h-full bg-[#15803D] rounded-full"
-                          style={{ width: `${pillar.score}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                      className="h-full rounded-full bg-gradient-to-r from-[#D4AD69] to-[#B8823F]"
+                      style={{ width: `${Math.max(8, nextLockedPct)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Recent 10-Min IELTS / PTE / Career Exam Simulator Results */}
-              {progress.examHistory && progress.examHistory.length > 0 && (
-                <div className="space-y-2.5 pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924]">
-                  <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-between">
-                    <span>Recent 10-Minute IELTS / PTE / Career Readiness Mock Exam History</span>
-                    {onOpenArenaTool && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenArenaTool('exam-simulator')}
-                        className="text-[#B91C1C] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
-                      >
-                        <span>Retake 10-Min Exam Simulator</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {progress.examHistory.slice(0, 3).map((rec) => (
-                      <div
-                        key={rec.id}
-                        className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                            {rec.estimatedBand} ({rec.cefrEquivalent})
-                          </div>
-                          <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                            {new Date(rec.completedAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <span className="font-ipa text-sm font-bold text-[#15803D] dark:text-emerald-400">
-                          {rec.overallPercent}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Right Reward Box */}
+              <div className="md:col-span-3 md:border-l border-[#E9DFCE] dark:border-[#4A4237] md:pl-5 flex flex-col gap-1">
+                <span className="text-[10px] text-[#79736D] dark:text-[#A69F96]">
+                  Next reward
+                </span>
+                <b className="text-xs font-semibold text-[#282522] dark:text-[#F1ECE4]">
+                  {nextLockedBadge.title}
+                </b>
+                <small className="text-[10px] font-semibold text-[#9B733C] uppercase">
+                  {nextLockedBadge.tier} · TARGET {nextLockedBadge.target}
+                </small>
+              </div>
             </div>
 
-        {/* Responsive Syllabus Mastery Breakdown (Mobile Cards + Desktop Table) */}
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-              Complete Curriculum Mastery Breakdown (Lectures 01–{String(lectures.length).padStart(2, '0')})
-            </h2>
-            <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-              Sequential unit progress across B1 (01–04), B2 (05–08), and C1 (09–12):
-            </p>
-          </div>
-
-          {/* Mobile Stacked Cards (< md) */}
-          <div className="grid grid-cols-1 gap-3 md:hidden">
-            {lectures.map((lec) => {
-              const score = progress.moduleScores[lec.id];
-              const done = progress.completedUnitIds.includes(lec.id);
-              const stepsCompleted = (progress.completedStepsByLecture?.[lec.id] || []).length;
-              const stepPct = done ? 100 : Math.round((stepsCompleted / 5) * 100);
-
-              return (
-                <div
-                  key={lec.id}
-                  className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2.5"
-                >
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
-                      Lecture {String(lec.lectureNumber).padStart(2, '0')} · {lec.level}
-                    </span>
-                    <span className="font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
-                      {stepPct}% Complete
-                    </span>
-                  </div>
-                  <div className="font-semibold text-sm text-[#1C1917] dark:text-[#F5F2EB]">
-                    {lec.title}
-                  </div>
-                  <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                    <div>• Spelling: {lec.moduleC_spelling.ruleTitle}</div>
-                    <div>• Grammar: {lec.moduleD_grammar.topicTitle}</div>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924]">
-                    <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
-                      {score
-                        ? `Score: ${score.spellingScore + score.grammarScore + (score.dialogueScore || 0)}/${
-                            score.spellingTotal + score.grammarTotal + (score.dialogueTotal || 0)
-                          }`
-                        : done
-                        ? 'Completed'
-                        : 'Not started'}
-                    </span>
-                    <button
-                      onClick={() => onOpenLecture(lec.id)}
-                      className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold"
-                    >
-                      {done ? 'Review' : 'Start'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Desktop Table (>= md) */}
-          <div className="hidden md:block overflow-x-auto border border-[#E7E0D6] dark:border-[#2E2924] rounded-xl">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-[#FAF7F2] dark:bg-[#141210] border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
-                  <th className="py-3 px-4 font-semibold">Lecture</th>
-                  <th className="py-3 px-4 font-semibold">Level</th>
-                  <th className="py-3 px-4 font-semibold">Spelling Rule Focus</th>
-                  <th className="py-3 px-4 font-semibold">Grammar Topic</th>
-                  <th className="py-3 px-4 font-semibold">Quiz Score</th>
-                  <th className="py-3 px-4 font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E7E0D6] dark:divide-[#2E2924]">
-                {lectures.map((lec) => {
-                  const score = progress.moduleScores[lec.id];
-                  const done = progress.completedUnitIds.includes(lec.id);
+            {/* Badge Category Filter Chips + Legend */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { id: 'all', label: 'All badges', count: editorialBadges.length },
+                    { id: 'earned', label: 'Earned', count: earnedEditorialCount },
+                    { id: 'streak', label: 'Streaks' },
+                    { id: 'learning', label: 'Learning' },
+                    { id: 'practice', label: 'Practice' },
+                    { id: 'mastery', label: 'Mastery' },
+                  ] as const
+                ).map((tab) => {
+                  const active = badgeCategoryFilter === tab.id;
                   return (
-                    <tr key={lec.id}>
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                          {String(lec.lectureNumber).padStart(2, '0')}. {lec.title}
-                        </div>
-                        {isFullNepali && (
-                          <div className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
-                            {lec.nepaliTitle}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-ipa text-xs font-semibold">{lec.level}</td>
-                      <td className="py-3.5 px-4 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        {lec.moduleC_spelling.ruleTitle}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-[#57534E] dark:text-[#A8A29E]">
-                        {lec.moduleD_grammar.topicTitle}
-                      </td>
-                      <td className="py-3.5 px-4 font-ipa text-xs font-semibold">
-                        {score ? (
-                          <span className="text-[#15803D] dark:text-emerald-400">
-                            {score.spellingScore + score.grammarScore + (score.dialogueScore || 0)}/
-                            {score.spellingTotal + score.grammarTotal + (score.dialogueTotal || 0)} Correct
-                          </span>
-                        ) : done ? (
-                          <span className="text-[#15803D]">Completed</span>
-                        ) : (
-                          <span className="text-[#57534E]">Not started</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <button
-                          onClick={() => onOpenLecture(lec.id)}
-                          className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] hover:border-[#B91C1C] whitespace-nowrap"
-                        >
-                          {done ? 'Review' : 'Start'}
-                        </button>
-                      </td>
-                    </tr>
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setBadgeCategoryFilter(tab.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        active
+                          ? 'bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B] font-semibold'
+                          : 'bg-[#F0ECE5] dark:bg-[#34312D] text-[#6C665E] dark:text-[#BDB6AB] hover:text-[#282522]'
+                      }`}
+                    >
+                      {tab.label}
+                      {'count' in tab && tab.count !== undefined && (
+                        <span className="opacity-65 ml-1">{tab.count}</span>
+                      )}
+                    </button>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-          </>
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#79736D] dark:text-[#A69F96]">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="w-2 h-2 rounded-full bg-[#C6944D] inline-block" />
+                  <span>Earned</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="w-2 h-2 rounded-full bg-[#C9C3B9] inline-block" />
+                  <span>Still to come</span>
+                </span>
+              </div>
+            </div>
+
+            {/* 4-Column Badge Cards Grid (Matching HTML #achievement-grid) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {visibleEditorialBadges.map((badge) => {
+                const tierColor =
+                  badge.tier === 'bronze'
+                    ? 'text-[#9C704D]'
+                    : badge.tier === 'silver'
+                    ? 'text-[#778090]'
+                    : badge.tier === 'gold'
+                    ? 'text-[#A77B36]'
+                    : 'text-[#758593]';
+
+                return (
+                  <article
+                    key={badge.id}
+                    className={`relative flex items-center gap-3.5 p-4 rounded-xl border transition-all hover:-translate-y-0.5 ${
+                      badge.earned
+                        ? 'bg-gradient-to-br from-[#FFFEFA] to-[#FBF6EC] dark:from-[#2E2B26] dark:to-[#292725] border-[#EADCC4] dark:border-[#4B4233]'
+                        : 'bg-[#F8F6F1] dark:bg-[#272624] border-[#EBE7DF] dark:border-[#383531]'
+                    }`}
+                  >
+                    {/* Circular Radial Badge Art */}
+                    <div
+                      className={`w-13 h-13 rounded-full shrink-0 flex flex-col items-center justify-center relative shadow-[inset_0_0_0_3px_rgba(255,255,255,0.4),0_2px_5px_rgba(70,54,32,0.12)] ${
+                        badge.earned
+                          ? `bg-radial ${badge.artClass}`
+                          : 'bg-gradient-to-br from-[#E8E4DC] to-[#CFC9BE] text-[#8F897F] saturate-35'
+                      }`}
+                    >
+                      {renderBadgeIcon(badge.icon)}
+                      <span className="absolute -right-0.5 bottom-0 min-w-[18px] h-[18px] px-1 rounded-full grid place-items-center bg-[#FFFDF7] text-[#75552E] font-serif text-[9px] font-semibold shadow-xs">
+                        {badge.cornerLabel}
+                      </span>
+                    </div>
+
+                    {/* Badge Copy */}
+                    <div className="min-w-0 pr-4">
+                      <h3
+                        className={`text-xs font-semibold leading-snug ${
+                          badge.earned
+                            ? 'text-[#282522] dark:text-[#F1ECE4]'
+                            : 'text-[#69645D] dark:text-[#C5BEB4]'
+                        }`}
+                      >
+                        {badge.title}
+                      </h3>
+                      <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] mt-1 leading-snug">
+                        {badge.desc}
+                      </p>
+                      <span
+                        className={`inline-block mt-2 text-[9px] font-bold tracking-wider uppercase ${tierColor}`}
+                      >
+                        {badge.statusText}
+                      </span>
+                    </div>
+
+                    {/* Top-Right Status Icon */}
+                    {badge.earned ? (
+                      <CheckCircle2 className="w-4 h-4 text-[#679074] absolute top-2.5 right-2.5" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-[#AAA398] absolute top-2.5 right-2.5" />
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* Expand / Collapse All 16 Achievements Button */}
+            <button
+              type="button"
+              onClick={() => setShowAll16Badges((prev) => !prev)}
+              className="w-full py-3 rounded-xl border border-dashed border-[#D9D1C6] dark:border-[#4B4640] text-xs font-medium text-[#736B62] dark:text-[#C2B9AE] hover:border-[#B7332C] hover:text-[#B7332C] flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <span>
+                {showAll16Badges
+                  ? 'Show fewer achievements'
+                  : `See all ${editorialBadges.length} achievements`}
+              </span>
+              {showAll16Badges ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+          </section>
         )}
       </div>
     );
@@ -2637,8 +3228,14 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       ? 'Clear'
       : 'Natural';
 
+  const formattedDialogueRate = `${Number(dialogueCalibration.dialogueRate.toFixed(2))}×`;
+  const normalizedWordRate =
+    [0.5, 0.75, 0.85, 1.0, 1.15].find(
+      (r) => Math.abs((progress.preferredSpeechRate || 1.0) - r) < 0.06
+    ) ?? 1.0;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-24 space-y-6 sm:space-y-8">
       {/* Hidden JSON Restore Input */}
       <input
         ref={fileInputRef}
@@ -2648,17 +3245,11 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         className="hidden"
       />
 
-      {/* Editorial Header matching Screenshot 3 */}
+      {/* Minimal Clean Title Only: Settings & preferences */}
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-2">
-          MAKE BHASHASETU YOURS
-        </div>
-        <h1 className="font-serif text-3xl sm:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+        <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
           Settings &amp; preferences
         </h1>
-        <p className="text-sm sm:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1.5">
-          Your learning space should feel comfortable and personal.
-        </p>
       </div>
 
       {/* Backup / Restore Toast Notification if present */}
@@ -2681,182 +3272,230 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </div>
       )}
 
-      {/* 2x2 Editorial Settings Grid (Exact match to Screenshot 3) */}
+      {/* 2x2 Editorial Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CARD 1: Profile & Learning Preferences */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          {/* Avatar + Name + Edit button */}
-          <div className="pb-6 border-b border-[#EFEAE0] dark:border-[#2E2924]">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0">
+        {/* CARD 1: User Info Card (Username, Email, Signout/Signin, Sync) + Learning Preferences */}
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          {/* Users Info Card Block */}
+          <div className="pb-5 border-b border-[#EFEAE0] dark:border-[#2E2924] space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3.5 min-w-0">
                 {firebaseUser?.photoURL ? (
                   <img
                     src={firebaseUser.photoURL}
                     alt={displayUserName}
                     referrerPolicy="no-referrer"
-                    className="w-12 h-12 rounded-full object-cover border border-[#E6E0D4]"
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-[#E6E0D4] shrink-0"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-[#E5DEC9] dark:bg-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-center font-semibold text-sm shrink-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#E5DEC9] dark:bg-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-center font-semibold text-xs sm:text-sm shrink-0">
                     {userInitials}
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                  <div className="text-sm sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
                     {displayUserName}
                   </div>
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate">
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate mt-0.5">
                     {firebaseUser?.email
-                      ? `Synced with ${firebaseUser.email}`
-                      : 'Learning at your own pace'}
+                      ? firebaseUser.email
+                      : 'Local profile · Not signed in'}
                   </div>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => {
                   setDraftProfileName(displayUserName);
                   setIsEditingProfileName((prev) => !prev);
                 }}
-                className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
+                className="px-3 py-1.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
               >
-                {isEditingProfileName ? 'Close' : 'Edit'}
+                {isEditingProfileName ? 'Close' : 'Edit name'}
               </button>
             </div>
 
             {isEditingProfileName && (
-              <div className="mt-4 pt-4 border-t border-[#EFEAE0] dark:border-[#2E2924] space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1">
-                    Your Display Name (Used on Certificates &amp; Greeting)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={draftProfileName}
-                      onChange={(e) => setDraftProfileName(e.target.value)}
-                      placeholder="Enter your name"
-                      className="flex-1 px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-[#FAF8F4] dark:bg-[#141210] text-sm text-[#1C1917] dark:text-[#F5F2EB]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onUpdateUserName && draftProfileName.trim()) {
-                          onUpdateUserName(draftProfileName.trim());
-                        }
-                        setIsEditingProfileName(false);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-[#A82020] text-white text-xs font-semibold"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Google Account Cloud Login inside Profile Edit */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                  <span className="text-xs text-[#78716C]">
-                    {firebaseUser
-                      ? `Signed in as ${firebaseUser.email}`
-                      : 'Sign in with Google to back up your progress across devices'}
-                  </span>
-                  {firebaseUser ? (
-                    <button
-                      type="button"
-                      onClick={onGoogleSignOut}
-                      className="px-3 py-1.5 rounded-lg border border-[#E6E0D4] text-xs font-semibold text-[#57534E] hover:text-[#1C1917]"
-                    >
-                      Sign out
-                    </button>
-                  ) : (
-                    onGoogleSignIn && (
-                      <button
-                        type="button"
-                        onClick={onGoogleSignIn}
-                        className="px-3.5 py-1.5 rounded-lg bg-[#1C1917] text-white text-xs font-semibold inline-flex items-center gap-1.5"
-                      >
-                        <LogIn className="w-3.5 h-3.5" />
-                        <span>Sign in with Google</span>
-                      </button>
-                    )
-                  )}
+              <div className="p-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2">
+                <label className="block text-[11px] font-medium text-[#57534E] dark:text-[#A8A29E]">
+                  Display Name (used on greetings &amp; certificates)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={draftProfileName}
+                    onChange={(e) => setDraftProfileName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="flex-1 h-9 px-3 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1A1714] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#A82020]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onUpdateUserName && draftProfileName.trim()) {
+                        onUpdateUserName(draftProfileName.trim());
+                      }
+                      setIsEditingProfileName(false);
+                    }}
+                    className="h-9 px-3.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold"
+                  >
+                    Save
+                  </button>
                 </div>
               </div>
             )}
+
+            {/* Direct Sync Option + Sign Out / Sign In Option */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isCloudSyncing || isSyncing}
+                onClick={() =>
+                  firebaseUser && onPullFromCloud ? onPullFromCloud() : handleSyncClick()
+                }
+                className="px-3.5 py-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#2E6F4E] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 text-[#2E6F4E] ${
+                    isCloudSyncing || isSyncing ? 'animate-spin' : ''
+                  }`}
+                />
+                <span>
+                  {isCloudSyncing || isSyncing
+                    ? 'Syncing...'
+                    : firebaseUser
+                    ? 'Sync cloud data'
+                    : 'Sync local data'}
+                </span>
+              </button>
+
+              {firebaseUser ? (
+                <button
+                  type="button"
+                  onClick={onGoogleSignOut}
+                  className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#A82020] dark:hover:text-[#F87171] inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign out</span>
+                </button>
+              ) : (
+                onGoogleSignIn && (
+                  <button
+                    type="button"
+                    onClick={onGoogleSignIn}
+                    className="px-3.5 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] hover:bg-[#A82020] dark:hover:bg-[#A82020] dark:hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Sign in with Google</span>
+                  </button>
+                )
+              )}
+            </div>
           </div>
 
           {/* Row 1: Learning level */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Learning level
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Choose the right challenge
               </div>
             </div>
-            <select
-              aria-label="Learning level"
-              value={progress.currentLevel}
-              onChange={(e) => onUpdateLevel(e.target.value as CEFRLevel)}
-              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
-            >
-              <option value="B1">B1 · Foundation</option>
-              <option value="B2">B2 · Workplace</option>
-              <option value="C1">C1 · Advanced</option>
-            </select>
+            <EditorialSelectDropdown<CEFRLevel>
+              ariaLabel="Learning level"
+              value={(progress.currentLevel || progress.selectedLevel || 'B1') as CEFRLevel}
+              onChange={(lvl) => onUpdateLevel(lvl)}
+              options={[
+                {
+                  value: 'B1',
+                  label: 'B1 · Foundation',
+                  sub: 'Everyday confidence & core silent letters',
+                  badge: 'Lessons 01–04',
+                },
+                {
+                  value: 'B2',
+                  label: 'B2 · Workplace',
+                  sub: 'Clear workplace & media communication',
+                  badge: 'Lessons 05–08',
+                },
+                {
+                  value: 'C1',
+                  label: 'C1 · Advanced',
+                  sub: 'Academic & executive fluency',
+                  badge: 'Lessons 09–12',
+                },
+              ]}
+            />
           </div>
 
           {/* Row 2: Daily study goal */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Daily study goal
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 A small, achievable habit
               </div>
             </div>
-            <select
-              aria-label="Daily study goal"
-              value={progress.dailyGoalMinutes || 15}
-              onChange={(e) =>
-                onUpdateDailyGoal &&
-                onUpdateDailyGoal(Number(e.target.value) as 5 | 10 | 15 | 30)
-              }
-              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
-            >
-              <option value={5}>5 minutes</option>
-              <option value={10}>10 minutes</option>
-              <option value={15}>15 minutes</option>
-              <option value={30}>30 minutes</option>
-            </select>
+            <EditorialSelectDropdown<5 | 10 | 15 | 30>
+              ariaLabel="Daily study goal"
+              value={(progress.dailyGoalMinutes || 15) as 5 | 10 | 15 | 30}
+              onChange={(mins) => onUpdateDailyGoal && onUpdateDailyGoal(mins)}
+              options={[
+                { value: 5, label: '5 minutes', sub: 'Quick daily warm-up' },
+                { value: 10, label: '10 minutes', sub: 'Steady daily practice' },
+                {
+                  value: 15,
+                  label: '15 minutes',
+                  sub: 'Balanced daily study pace',
+                  badge: 'Default',
+                },
+                { value: 30, label: '30 minutes', sub: 'Deep intensive session' },
+              ]}
+            />
           </div>
 
           {/* Row 3: Display language */}
-          <div className="pt-4 flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+          <div className="pt-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Display language
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Explanations and navigation
               </div>
             </div>
-            <select
-              aria-label="Display language"
+            <EditorialSelectDropdown<LanguageMode>
+              ariaLabel="Display language"
               value={progress.languageMode}
-              onChange={(e) => onUpdateLanguageMode(e.target.value as LanguageMode)}
-              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
-            >
-              <option value="full-nepali">English + नेपाली</option>
-              <option value="english-only">English Only</option>
-            </select>
+              onChange={(lang) => onUpdateLanguageMode(lang)}
+              options={[
+                {
+                  value: 'full-nepali',
+                  label: 'English + नेपाली',
+                  sub: 'Full bilingual explanations & Devanagari cues',
+                  badge: 'Default',
+                },
+                {
+                  value: 'english-meanings',
+                  label: 'English + Meanings',
+                  sub: 'English UI with Nepali word meanings',
+                },
+                {
+                  value: 'english-only',
+                  label: 'English Only',
+                  sub: '100% English interface & explanations',
+                },
+              ]}
+            />
           </div>
         </section>
 
         {/* CARD 2: Your study environment */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
           <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
             YOUR STUDY ENVIRONMENT
           </div>
@@ -2864,10 +3503,10 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* Row 1: Daily reminder */}
           <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Daily reminder
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 A gentle nudge to practise
               </div>
             </div>
@@ -2876,7 +3515,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               role="switch"
               aria-checked={progress.dailyReminderEnabled !== false}
               onClick={() => onToggleDailyReminder && onToggleDailyReminder()}
-              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center shrink-0 ${
                 progress.dailyReminderEnabled !== false
                   ? 'bg-[#2E6F4E] justify-end'
                   : 'bg-[#A8A29E]/50 justify-start'
@@ -2889,10 +3528,10 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* Row 2: Dark appearance */}
           <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Dark appearance
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Easy on the eyes
               </div>
             </div>
@@ -2901,7 +3540,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               role="switch"
               aria-checked={progress.darkMode}
               onClick={onToggleDarkMode}
-              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center shrink-0 ${
                 progress.darkMode
                   ? 'bg-[#2E6F4E] justify-end'
                   : 'bg-[#9CA3AF] justify-start'
@@ -2914,17 +3553,17 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* Row 3: Offline mode */}
           <div className="pt-4 flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Offline mode
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Lessons available without internet
               </div>
             </div>
             <button
               type="button"
               onClick={handleSyncClick}
-              className="px-3.5 py-1.5 rounded-full bg-[#E2EFE7] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium"
+              className="px-3.5 py-1.5 rounded-full bg-[#E2EFE7] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium shrink-0"
             >
               {isSyncing ? 'Checking...' : 'Ready'}
             </button>
@@ -2932,52 +3571,145 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </section>
 
         {/* CARD 3: Audio & pronunciation lab */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
           <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
             AUDIO &amp; PRONUNCIATION LAB
           </div>
 
-          {/* Row 1: Dialogue playback speed */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                Dialogue playback speed
+          {/* Row 1: Dialogue playback speed (Interactive Slider) */}
+          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Dialogue playback speed
+                </div>
+                <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                  Slide to adjust conversation pace
+                </div>
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-                Listen at your comfortable pace
+              <button
+                type="button"
+                onClick={() =>
+                  speechService.speak(
+                    'Good morning! Did you receive the updated Wednesday schedule?',
+                    {
+                      rate: dialogueCalibration.dialogueRate,
+                      pitch: dialogueCalibration.speakerAPitch,
+                    }
+                  )
+                }
+                title="Click to preview dialogue speed"
+                className="px-2.5 py-1 rounded-lg bg-[#F8E9E5] dark:bg-red-950/50 text-[#A82020] dark:text-red-300 font-ipa text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-[#F2DCD6] transition-colors shrink-0"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{formattedDialogueRate}</span>
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <input
+                type="range"
+                aria-label="Dialogue playback speed slider"
+                min={0.5}
+                max={1.25}
+                step={0.05}
+                value={dialogueCalibration.dialogueRate}
+                onChange={(e) => {
+                  const r = Number(parseFloat(e.target.value).toFixed(2));
+                  handleUpdateCalibration({ dialogueRate: r });
+                }}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[#EAE4D8] dark:bg-[#2E2924] accent-[#A82020]"
+              />
+              <div className="flex items-center justify-between text-[10px] text-[#78716C] dark:text-[#A8A29E]">
+                {[
+                  { rate: 0.5, label: '0.5× Slow' },
+                  { rate: 0.75, label: '0.75× Careful' },
+                  { rate: 1.0, label: '1.0× Default' },
+                  { rate: 1.25, label: '1.25× Fast' },
+                ].map((tick) => {
+                  const isTickActive =
+                    Math.abs(dialogueCalibration.dialogueRate - tick.rate) < 0.03;
+                  return (
+                    <button
+                      key={tick.rate}
+                      type="button"
+                      onClick={() => handleUpdateCalibration({ dialogueRate: tick.rate })}
+                      className={`transition-colors ${
+                        isTickActive
+                          ? 'font-bold text-[#A82020] dark:text-[#F87171]'
+                          : 'hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
+                      }`}
+                    >
+                      {tick.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <select
-              aria-label="Dialogue playback speed"
-              value={dialogueCalibration.dialogueRate}
-              onChange={(e) => {
-                const r = Number(e.target.value) as 0.5 | 0.75 | 1.0;
-                handleUpdateCalibration({ dialogueRate: r });
-                onUpdateSpeechRate(r);
-              }}
-              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
-            >
-              <option value={0.5}>0.5×</option>
-              <option value={0.75}>0.75×</option>
-              <option value={1.0}>1.0×</option>
-            </select>
           </div>
 
-          {/* Row 2: Voice pitch */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+          {/* Row 2: Word playback speed (Default 1.0x first, then options) */}
+          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                Word playback speed
+              </div>
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Single vocabulary &amp; dictionary words
+              </div>
+            </div>
+            <EditorialSelectDropdown<number>
+              ariaLabel="Word playback speed"
+              value={normalizedWordRate}
+              onChange={(rate) => {
+                onUpdateSpeechRate(rate);
+                speechService.speak('Knowledge, subtle, receipt.', { rate });
+              }}
+              options={[
+                {
+                  value: 1.0,
+                  label: '1.0× (Default)',
+                  sub: 'Natural everyday word pronunciation',
+                  badge: 'Default',
+                },
+                {
+                  value: 0.85,
+                  label: '0.85× Clear',
+                  sub: 'Slightly slower for crisp silent letters',
+                },
+                {
+                  value: 0.75,
+                  label: '0.75× Careful',
+                  sub: 'Slow pace for new phonics patterns',
+                },
+                {
+                  value: 0.5,
+                  label: '0.5× Extra Slow',
+                  sub: 'Syllable-by-syllable listening',
+                },
+                {
+                  value: 1.15,
+                  label: '1.15× Brisk',
+                  sub: 'Quick review speed for mastered words',
+                },
+              ]}
+            />
+          </div>
+
+          {/* Row 3: Voice pitch */}
+          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Voice pitch
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Find a sound that feels clear
               </div>
             </div>
-            <select
-              aria-label="Voice pitch"
-              value={currentVoicePitchPreset}
-              onChange={(e) => {
-                const val = e.target.value;
+            <EditorialSelectDropdown<'Natural' | 'Warm' | 'Clear'>
+              ariaLabel="Voice pitch"
+              value={currentVoicePitchPreset as 'Natural' | 'Warm' | 'Clear'}
+              onChange={(val) => {
                 if (val === 'Warm') {
                   handleUpdateCalibration({ speakerAPitch: 0.92, speakerBPitch: 1.0 });
                 } else if (val === 'Clear') {
@@ -2986,21 +3718,34 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   handleUpdateCalibration({ speakerAPitch: 1.0, speakerBPitch: 1.06 });
                 }
               }}
-              className="bg-transparent text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none cursor-pointer pr-1 text-right"
-            >
-              <option value="Natural">Natural</option>
-              <option value="Warm">Warm</option>
-              <option value="Clear">Clear</option>
-            </select>
+              options={[
+                {
+                  value: 'Natural',
+                  label: 'Natural',
+                  sub: 'Balanced conversational pitch',
+                  badge: 'Default',
+                },
+                {
+                  value: 'Warm',
+                  label: 'Warm',
+                  sub: 'Deeper, softer voice tone',
+                },
+                {
+                  value: 'Clear',
+                  label: 'Clear',
+                  sub: 'Brighter consonant articulation',
+                },
+              ]}
+            />
           </div>
 
-          {/* Row 3: Test your pronunciation */}
-          <div className="pt-4 flex items-center justify-between gap-4">
+          {/* Row 4: Test your pronunciation */}
+          <div className="pt-3.5 flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Test your pronunciation
               </div>
-              <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
                 Try the live voice practice
               </div>
             </div>
@@ -3012,7 +3757,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   audioLabSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
                 }, 100);
               }}
-              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
             >
               {showFullAudioLab ? 'Hide lab' : 'Open lab'}
             </button>
@@ -4123,22 +4868,28 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Preferred English Voice Selector */}
-          <div>
-            <label className="block text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <label className="block text-xs font-semibold text-[#57534E] dark:text-[#A8A29E]">
               Preferred English Voice Profile:
             </label>
-            <select
+            <EditorialSelectDropdown<string>
+              ariaLabel="Preferred English Voice Profile"
               value={selectedVoiceURI}
-              onChange={(e) => handleVoiceChange(e.target.value)}
-              className="w-full min-h-[44px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB]"
-            >
-              <option value="">Automatic Best English Voice (Recommended)</option>
-              {availableVoices.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
-                  {v.name} ({v.lang})
-                </option>
-              ))}
-            </select>
+              onChange={(uri) => handleVoiceChange(uri)}
+              options={[
+                {
+                  value: '',
+                  label: 'Automatic Best Voice',
+                  sub: 'Recommended system English voice',
+                  badge: 'Default',
+                },
+                ...availableVoices.map((v) => ({
+                  value: v.voiceURI,
+                  label: v.name,
+                  sub: v.lang,
+                })),
+              ]}
+            />
           </div>
 
           {/* Live Voice & Two-Speaker Conversation Test Buttons */}
