@@ -51,6 +51,8 @@ import {
 } from '../utils/englishExplanations';
 import { getMassiveLexicon } from '../data/massiveLexicon';
 import { CORE_SYLLABUS } from '../data/syllabus';
+import { WordPhoneticsPopover } from './ui/ResponsivePrimitives';
+import { toast } from 'sonner';
 
 interface LecturePlayerProps {
   lecture: LectureUnit;
@@ -387,6 +389,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     const cleanTarget = currentDictationWord.word.trim().toLowerCase();
     const isExact = cleanTyped === cleanTarget;
 
+    if (isExact) {
+      speechService.playCorrectTone();
+    } else {
+      speechService.playWrongTone();
+    }
+
     setDictationChecked(true);
     setDictationResultsByWordId((prev) => ({
       ...prev,
@@ -547,6 +555,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       const result = await speechService.evaluatePronunciation(englishSentence, (listening) => {
         setListeningDialogueLineIdx(listening ? lineIdx : null);
       });
+      if (result.passed) {
+        speechService.playCorrectTone();
+      } else {
+        speechService.playWrongTone();
+      }
       setDialogueMicResults((prev) => ({ ...prev, [lineIdx]: result }));
     } catch (err: unknown) {
       setListeningDialogueLineIdx(null);
@@ -567,6 +580,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       const result = await speechService.evaluatePronunciation(item.word, (listening) => {
         setListeningWordId(listening ? item.id : null);
       });
+      if (result.passed) {
+        speechService.playCorrectTone();
+      } else {
+        speechService.playWrongTone();
+      }
       setMicResults((prev) => ({ ...prev, [item.id]: result }));
       if (onUpdateWordSRS) {
         onUpdateWordSRS(item.id, result.passed);
@@ -593,6 +611,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   ) => {
     setSpellingAnswers((prev) => ({ ...prev, [quiz.id]: selectedOption }));
     const isCorrect = selectedOption === quiz.correctAnswer;
+    if (isCorrect) {
+      speechService.playCorrectTone();
+    } else {
+      speechService.playWrongTone();
+    }
     if (!isCorrect && onRecordMistake) {
       const englishExpl = ENGLISH_QUIZ_EXPLANATIONS[quiz.id];
       onRecordMistake({
@@ -616,6 +639,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   ) => {
     setGrammarAnswers((prev) => ({ ...prev, [ex.id]: selectedOption }));
     const isCorrect = selectedOption === ex.correctAnswer;
+    if (isCorrect) {
+      speechService.playCorrectTone();
+    } else {
+      speechService.playWrongTone();
+    }
     if (!isCorrect && onRecordMistake) {
       const englishExpl = ENGLISH_GRAMMAR_CONTENT[lecture.id]?.exerciseExplanationsEnglish[ex.id];
       onRecordMistake({
@@ -666,6 +694,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   ) => {
     setDialogueAnswers((prev) => ({ ...prev, [q.id]: selectedOption }));
     const isCorrect = selectedOption === q.correctAnswer;
+    if (isCorrect) {
+      speechService.playCorrectTone();
+    } else {
+      speechService.playWrongTone();
+    }
     if (!isCorrect && onRecordMistake) {
       onRecordMistake({
         lectureId: lecture.id,
@@ -947,10 +980,15 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         const ok =
                           drillAttempt.trim().toLowerCase() ===
                           item.correctAnswer.trim().toLowerCase();
+                        if (ok) {
+                          speechService.playCorrectTone();
+                        } else {
+                          speechService.playWrongTone();
+                        }
                         onPracticeMistake(item.id, ok);
                         setMistakeDrillInputs((prev) => ({ ...prev, [item.id]: '' }));
                       }}
-                      className="min-h-[36px] px-3 py-1 rounded-lg bg-[#15803D] text-white text-xs font-semibold"
+                      className="min-h-[2.25rem] px-[0.75rem] py-[0.25rem] rounded-lg bg-[#15803D] text-white text-xs font-semibold"
                     >
                       Verify Re-Drill
                     </button>
@@ -1140,7 +1178,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <p className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-2">
             Lecture {String(lecture.lectureNumber).padStart(2, '0')} Completed
           </p>
-          <h2 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
             {lecture.title}
           </h2>
           <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mb-8">
@@ -1208,9 +1246,9 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
+    <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24">
       {/* Top Action Bar: Back to All Lectures (Left) + Lecture Progress % Bar & Responsive Mistake Notes / Cheat Sheet (Right) */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-5">
         <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <button
             onClick={onBackToDashboard}
@@ -1418,47 +1456,51 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 </>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+            <h1 className="fluid-title-xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
               {lecture.title}
             </h1>
             {isFullNepali ? (
-              <p className="font-nepali text-base sm:text-lg text-[#57534E] dark:text-[#A8A29E] mt-1">
+              <p className="font-nepali text-[0.875rem] sm:text-[1.0625rem] leading-snug text-[#57534E] dark:text-[#A8A29E] mt-1">
                 {lecture.nepaliTitle}
               </p>
             ) : (
-              <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] mt-1">
+              <p className="text-[0.8125rem] sm:text-[0.9375rem] leading-snug text-[#57534E] dark:text-[#A8A29E] mt-1">
                 {lecture.subtitle}
               </p>
             )}
           </div>
 
-          {/* 5-Step Module Segmented Stepper with Per-Module Checkmarks */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 p-1.5 bg-[#F2ECE1] dark:bg-[#1F1C18] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] shrink-0">
+          {/* 5-Step Module Segmented Stepper with Compact Mobile Labels & Single First-Step Tick */}
+          <div className="grid grid-cols-5 gap-[0.2rem] sm:gap-[0.375rem] p-[0.25rem] sm:p-[0.375rem] bg-[#F2ECE1] dark:bg-[#1F1C18] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] shrink-0">
             {MODULE_TABS.map((tab) => {
               const isActive = activeModule === tab.step;
               const isStepDone = isCompleted || completedSteps.includes(tab.step);
               return (
                 <button
                   key={tab.step}
-                  onClick={() => goToModule(tab.step)}
-                  className={`min-h-[44px] px-3 py-2 rounded-lg text-left transition-all ${
+                  onClick={() => {
+                    speechService.triggerHaptic('light');
+                    goToModule(tab.step);
+                  }}
+                  className={`min-h-[2.75rem] px-[0.25rem] sm:px-[0.75rem] py-[0.35rem] sm:py-[0.5rem] rounded-lg text-center sm:text-left transition-all ${
                     isActive
                       ? 'bg-[#B91C1C] text-white shadow-xs'
                       : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-1 text-[11px] font-ipa opacity-85">
-                    <span>Step {tab.number}</span>
-                    {isStepDone && (
+                  <div className="flex items-center justify-center sm:justify-between gap-[0.15rem] text-[0.625rem] sm:text-[0.6875rem] font-ipa opacity-85">
+                    <span>{tab.number}</span>
+                    {tab.step === 0 && isStepDone && (
                       <Check
-                        className={`w-3.5 h-3.5 ${
+                        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${
                           isActive ? 'text-white' : 'text-[#15803D] dark:text-emerald-400'
                         }`}
                       />
                     )}
                   </div>
-                  <div className="text-xs font-semibold whitespace-nowrap truncate">
-                    {tab.label}
+                  <div className="text-[0.65rem] sm:text-[0.75rem] font-semibold tracking-tight leading-tight">
+                    <span className="sm:hidden">{tab.shortLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
                   </div>
                 </button>
               );
@@ -1471,10 +1513,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* MODULE A: VOCABULARY & SILENT-LETTER PHONICS (10 WORDS PER BATCH)     */}
       {/* ===================================================================== */}
       {activeModule === 0 && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5">
+        <div className="space-y-6 animate-fade-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.25rem]">
             <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+              <h2 className="fluid-title-lg font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                 01. Vocabulary & Silent-Letter Phonics
               </h2>
               <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-0.5">
@@ -1589,23 +1631,40 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             Tap to Reveal Word
                           </button>
                         ) : (
-                          <h3 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EB]">
-                            {item.segments && item.segments.length > 0
-                              ? item.segments.map((seg, idx) =>
-                                  seg.silent ? (
-                                    <span
-                                      key={idx}
-                                      title="Silent letter (not pronounced)"
-                                      className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 dark:bg-[#B91C1C]/25 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
-                                    >
-                                      {seg.text}
-                                    </span>
-                                  ) : (
-                                    <span key={idx}>{seg.text}</span>
+                          <WordPhoneticsPopover
+                            word={item.word}
+                            ipa={item.ipa}
+                            partOfSpeech={item.partOfSpeech}
+                            nepaliMeaning={item.nepaliMeaning}
+                            silentLettersSummary={item.silentLettersSummary}
+                            englishExample={item.englishExample}
+                            segments={item.segments}
+                            isSaved={isSaved}
+                            preferredSpeechRate={preferredSpeechRate}
+                            onToggleSave={() => onToggleSaveWord(item.id)}
+                          >
+                            <button
+                              type="button"
+                              title="Tap for instant phonetics & silent-letter card"
+                              className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1C1917] dark:text-[#F5F2EB] text-left hover:opacity-85 transition-opacity"
+                            >
+                              {item.segments && item.segments.length > 0
+                                ? item.segments.map((seg, idx) =>
+                                    seg.silent ? (
+                                      <span
+                                        key={idx}
+                                        title="Silent letter (not pronounced)"
+                                        className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 dark:bg-[#B91C1C]/25 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
+                                      >
+                                        {seg.text}
+                                      </span>
+                                    ) : (
+                                      <span key={idx}>{seg.text}</span>
+                                    )
                                   )
-                                )
-                              : item.word}
-                          </h3>
+                                : item.word}
+                            </button>
+                          </WordPhoneticsPopover>
                         )}
                         <span className="font-ipa text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
                           {item.ipa}
@@ -1708,8 +1767,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     </div>
                   </div>
 
-                  {/* Most Important Takeaway: Prominent Phonics Tip Box */}
-                  <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border-l-4 border-l-[#B91C1C] border border-[#E7E0D6] dark:border-[#2E2924]">
+                  {/* Most Important Takeaway: Prominent Phonics Tip Box (Hairline Border) */}
+                  <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
                     {englishTip && !isFullNepali ? (
                       <p className="text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] leading-relaxed">
                         <strong className="text-[#B91C1C] dark:text-[#F87171]">Phonics Tip: </strong>
@@ -1900,15 +1959,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             )}
           </div>
 
-          <div className="flex justify-end pt-4">
-            <button
-              onClick={() => goToModule(1, true)}
-              className="min-h-[48px] px-6 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <span>Complete Step 01 & Continue to Pronunciation</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Step 01 navigation is handled by the unified Sticky Bottom Action Bar */}
         </div>
       )}
 
@@ -1916,12 +1967,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* MODULE B: PRONUNCIATION GUIDE & LIVE MICROPHONE PRACTICE              */}
       {/* ===================================================================== */}
       {activeModule === 1 && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5">
-            <h2 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+        <div className="space-y-6 animate-fade-up">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.25rem]">
+            <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
               02. Syllable Breakdown, Simplified Phonetics & Voice Check ({lecture.moduleB_pronunciation.length} Words)
             </h2>
-            <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
+            <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
               Tap the syllable blocks to hear how each word breaks down. Capitalized blocks show <strong>primary stress</strong>. Use the microphone button to practice speaking aloud.
             </p>
             {micError && (
@@ -2097,22 +2148,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             })}
           </div>
 
-          <div className="flex items-center justify-between pt-4">
-            <button
-              onClick={() => goToModule(0)}
-              className="min-h-[48px] px-5 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:bg-white dark:hover:bg-[#1F1C18] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Step 01: Vocabulary</span>
-            </button>
-            <button
-              onClick={() => goToModule(2, true)}
-              className="min-h-[48px] px-6 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <span>Complete Step 02 & Continue to Spelling & Dictation</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Step 02 navigation is handled by the unified Sticky Bottom Action Bar */}
         </div>
       )}
 
@@ -2120,17 +2156,17 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* MODULE C: SPELLING RULES, AUDIO DICTATION BEE & QUIZZES               */}
       {/* ===================================================================== */}
       {activeModule === 2 && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Spelling Rule Master Card */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-1">
               03. Core Orthographic Rule
             </div>
-            <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+            <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
               {lecture.moduleC_spelling.ruleTitle}
             </h2>
             {isFullNepali && (
-              <p className="font-nepali text-base font-medium text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+              <p className="font-nepali text-[0.875rem] sm:text-[1rem] leading-snug font-medium text-[#57534E] dark:text-[#A8A29E] mt-1">
                 {lecture.moduleC_spelling.nepaliRuleTitle}
               </p>
             )}
@@ -2213,14 +2249,14 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* INTERACTIVE AUDIO DICTATION & SPELLING BEE LAB (IN LECTUREPLAYER) */}
           {/* ================================================================= */}
           {currentDictationWord && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
                     <Headphones className="w-4 h-4" />
                     <span>Interactive Audio Dictation & Spelling Bee</span>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                  <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
                     Listen to the Word Audio & Type the Exact Spelling
                   </h3>
                   <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -2419,8 +2455,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     className={`p-4 rounded-xl border space-y-3 ${
                       dictationInput.trim().toLowerCase() ===
                       currentDictationWord.word.trim().toLowerCase()
-                        ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800'
-                        : 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
+                        ? 'animate-correct-pop bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800'
+                        : 'animate-wrong-shake bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2522,10 +2558,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           )}
 
           {/* Interactive Spelling Mini-Quizzes */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
               <div>
-                <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   Interactive Spelling Drills
                 </h3>
                 <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -2546,13 +2582,13 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 return (
                   <div
                     key={quiz.id}
-                    className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
+                    className="p-[1rem] sm:p-[1.25rem] rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
                   >
                     <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-1">
                       Question 0{qIdx + 1} ·{' '}
                       {quiz.type === 'fill-blank' ? 'Fill in the Blank' : 'Spot the Correct Spelling'}
                     </div>
-                    <p className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
+                    <p className="text-[0.9375rem] sm:text-[1rem] font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
                       {quiz.promptEnglish}
                     </p>
                     {isFullNepali && (
@@ -2571,11 +2607,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                         if (selected) {
                           if (isThisRight) {
-                            btnStyle =
-                              'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                              isThisSelected ? 'animate-correct-pop' : ''
+                            }`;
                           } else if (isThisSelected && !isThisRight) {
                             btnStyle =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through';
+                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
                           }
                         }
 
@@ -2583,7 +2620,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           <button
                             key={opt}
                             onClick={() => handleSelectSpellingAnswer(quiz, opt)}
-                            className={`min-h-[44px] px-4 py-2.5 rounded-xl border text-left font-ipa text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                            className={`min-h-[2.75rem] px-[1rem] py-[0.625rem] rounded-xl border text-left font-ipa text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
                           >
                             <span>{opt}</span>
                             {selected && isThisRight && (
@@ -2598,7 +2635,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                     {selected && (
                       <div
-                        className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm ${
+                        className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm animate-fade-up ${
                           isCorrect
                             ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
                             : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
@@ -2625,22 +2662,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* Embedded Lecture Mistake Notes Section in Step 03 */}
           {renderMistakeNotesSection()}
 
-          <div className="flex items-center justify-between pt-4">
-            <button
-              onClick={() => goToModule(1)}
-              className="min-h-[48px] px-5 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:bg-white dark:hover:bg-[#1F1C18] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Step 02: Pronunciation</span>
-            </button>
-            <button
-              onClick={() => goToModule(3, true)}
-              className="min-h-[48px] px-6 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <span>Complete Step 03 & Continue to Grammar</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Step 03 navigation is handled by the unified Sticky Bottom Action Bar */}
         </div>
       )}
 
@@ -2648,17 +2670,17 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* MODULE D: GRAMMAR CAPSTONE & INTERACTIVE SENTENCE BUILDER             */}
       {/* ===================================================================== */}
       {activeModule === 3 && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+        <div className="space-y-6 animate-fade-up">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex items-center gap-2 text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-1">
               <Languages className="w-4 h-4" />
               <span>04. Practical Grammar Capstone & Sentence Builder</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
+            <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
               {lecture.moduleD_grammar.topicTitle}
             </h2>
             {isFullNepali && (
-              <p className="font-nepali text-base font-medium text-[#57534E] dark:text-[#A8A29E] mb-3">
+              <p className="font-nepali text-[0.875rem] sm:text-[1rem] font-medium text-[#57534E] dark:text-[#A8A29E] mb-3">
                 {lecture.moduleD_grammar.nepaliTopicTitle}
               </p>
             )}
@@ -2697,10 +2719,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           </div>
 
           {/* Interactive Sentence Structure Mapper */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
-                <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   Interactive Sentence Structure Breakdown
                 </h3>
                 <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -2847,13 +2869,13 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* INTERACTIVE SENTENCE BUILDER (REORDER PHRASE TILES)               */}
           {/* ================================================================= */}
           {scrambledBuilders.length > 0 && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
                   <Puzzle className="w-4 h-4" />
                   <span>Interactive English Sentence Builder (SVO Word-Order Lab)</span>
                 </div>
-                <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
                   Tap the Scrambled Phrase Tiles to Construct the English Sentence
                 </h3>
                 <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -2873,7 +2895,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   return (
                     <div
                       key={exercise.id}
-                      className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4"
+                      className="p-[1rem] sm:p-[1.25rem] rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -2889,7 +2911,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           onClick={() =>
                             handleSpeak(targetSentence, `${exercise.id}-listen`, preferredSpeechRate)
                           }
-                          className="min-h-[36px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-medium inline-flex items-center gap-1.5"
+                          className="min-h-[2.25rem] px-[0.75rem] py-[0.25rem] rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-medium inline-flex items-center gap-1.5"
                         >
                           <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
                           <span>Hear Target Audio</span>
@@ -2901,7 +2923,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       </div>
 
                       {/* Target Construction Tray */}
-                      <div className="min-h-[64px] p-3.5 rounded-xl bg-white dark:bg-[#1F1C18] border-2 border-dashed border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center gap-2">
+                      <div className="min-h-[4rem] p-3.5 rounded-xl bg-white dark:bg-[#1F1C18] border-2 border-dashed border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center gap-2">
                         {placed.length === 0 ? (
                           <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                             Tap phrase blocks below in English SVO order to build your sentence here...
@@ -2921,7 +2943,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 <div className={`text-xs sm:text-sm font-semibold ${style.text}`}>
                                   {tile.text}
                                 </div>
-                                <div className="text-[10px] text-[#57534E] dark:text-[#A8A29E]">
+                                <div className="text-[0.625rem] text-[#57534E] dark:text-[#A8A29E]">
                                   {tile.role}
                                 </div>
                               </button>
@@ -2949,7 +2971,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                               <div className={`text-xs sm:text-sm font-semibold ${style.text}`}>
                                 {tile.text}
                               </div>
-                              <div className="text-[10px] text-[#57534E] dark:text-[#A8A29E]">
+                              <div className="text-[0.625rem] text-[#57534E] dark:text-[#A8A29E]">
                                 {tile.role}
                               </div>
                             </button>
@@ -2961,18 +2983,23 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                         <button
                           onClick={() => handleResetBuilder(exercise.id)}
-                          className="min-h-[38px] px-3.5 py-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5"
+                          className="min-h-[2.375rem] px-3.5 py-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           <span>Reset Tiles</span>
                         </button>
 
                         <button
-                          onClick={() =>
-                            setBuilderChecked((prev) => ({ ...prev, [exercise.id]: true }))
-                          }
+                          onClick={() => {
+                            if (isExactMatch) {
+                              speechService.playCorrectTone();
+                            } else {
+                              speechService.playWrongTone();
+                            }
+                            setBuilderChecked((prev) => ({ ...prev, [exercise.id]: true }));
+                          }}
                           disabled={placed.length === 0}
-                          className="min-h-[40px] px-5 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold disabled:opacity-40"
+                          className="min-h-[2.5rem] px-5 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold disabled:opacity-40"
                         >
                           Check Sentence Order
                         </button>
@@ -2982,8 +3009,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         <div
                           className={`p-3.5 rounded-xl border text-xs sm:text-sm ${
                             isExactMatch
-                              ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
-                              : 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
+                              ? 'animate-correct-pop bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
+                              : 'animate-wrong-shake bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
                           }`}
                         >
                           <div className="font-semibold mb-1">
@@ -3002,10 +3029,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           )}
 
           {/* Capstone Synthesis Exercises */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
               <div>
-                <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   Capstone Synthesis Exercises
                 </h3>
                 <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -3026,12 +3053,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 return (
                   <div
                     key={ex.id}
-                    className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
+                    className="p-[1rem] sm:p-[1.25rem] rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
                   >
                     <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-1">
                       Capstone Challenge 0{idx + 1}
                     </div>
-                    <p className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
+                    <p className="text-[0.9375rem] sm:text-[1rem] font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-3">
                       {ex.questionPrompt}
                     </p>
                     {isFullNepali && (
@@ -3050,11 +3077,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                         if (selected) {
                           if (isThisRight) {
-                            btnStyle =
-                              'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                              isThisSelected ? 'animate-correct-pop' : ''
+                            }`;
                           } else if (isThisSelected && !isThisRight) {
                             btnStyle =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through';
+                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
                           }
                         }
 
@@ -3062,7 +3090,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           <button
                             key={opt}
                             onClick={() => handleSelectGrammarAnswer(ex, opt)}
-                            className={`min-h-[44px] px-4 py-2.5 rounded-xl border text-left text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                            className={`min-h-[2.75rem] px-[1rem] py-[0.625rem] rounded-xl border text-left text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
                           >
                             <span>{opt}</span>
                             {selected && isThisRight && (
@@ -3077,7 +3105,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                     {selected && (
                       <div
-                        className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm ${
+                        className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm animate-fade-up ${
                           isCorrect
                             ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
                             : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
@@ -3099,22 +3127,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-            <button
-              onClick={() => goToModule(2)}
-              className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:bg-white dark:hover:bg-[#1F1C18] transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Step 03: Spelling & Dictation</span>
-            </button>
-            <button
-              onClick={() => goToModule(4, true)}
-              className="w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <span>Complete Step 04 & Continue to Real-Life Dialogue</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Step 04 navigation is handled by the unified Sticky Bottom Action Bar */}
         </div>
       )}
 
@@ -3122,16 +3135,16 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* MODULE E (STEP 05): REAL-LIFE CONVERSATION DIALOGUE LAB               */}
       {/* ===================================================================== */}
       {activeModule === 4 && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Dialogue Header + "Listen to Dialogue" Audio Bar */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
               <div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
                   <MessageSquare className="w-4 h-4" />
                   <span>05. Real-Life Conversation Dialogue & Comprehension</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   {lecture.moduleE_dialogue?.title || `Real-Life Conversation: ${lecture.title}`}
                 </h2>
                 {showDialogueNepali && lecture.moduleE_dialogue?.nepaliTitle && (
@@ -3415,12 +3428,40 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       {line.highlightedWords.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-[#E7E0D6]/60 dark:border-[#2E2924]">
                           <span className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
-                            Tap Key Words to Hear:
+                            Tap Key Words for Phonetics:
                           </span>
                           {line.highlightedWords.map((hw, hIdx) => {
                             const matchedVocab = lecture.moduleA_vocabulary.find(
                               (v) => v.word.toLowerCase() === hw.toLowerCase()
                             );
+                            if (matchedVocab) {
+                              return (
+                                <WordPhoneticsPopover
+                                  key={hIdx}
+                                  word={matchedVocab.word}
+                                  ipa={matchedVocab.ipa}
+                                  partOfSpeech={matchedVocab.partOfSpeech}
+                                  nepaliMeaning={matchedVocab.nepaliMeaning}
+                                  silentLettersSummary={matchedVocab.silentLettersSummary}
+                                  englishExample={matchedVocab.englishExample}
+                                  segments={matchedVocab.segments}
+                                  isSaved={savedWordIds.includes(matchedVocab.id)}
+                                  preferredSpeechRate={preferredSpeechRate}
+                                  onToggleSave={() => onToggleSaveWord(matchedVocab.id)}
+                                >
+                                  <button
+                                    type="button"
+                                    className="text-[11px] font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 hover:bg-[#B91C1C]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
+                                  >
+                                    <Volume2 className="w-3 h-3" />
+                                    <span>{hw}</span>
+                                    <span className="opacity-75 font-normal">
+                                      ({matchedVocab.ipa})
+                                    </span>
+                                  </button>
+                                </WordPhoneticsPopover>
+                              );
+                            }
                             return (
                               <button
                                 key={hIdx}
@@ -3428,20 +3469,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 onClick={() =>
                                   handleSpeak(hw, `${lineId}-hw-${hIdx}`, preferredSpeechRate)
                                 }
-                                title={
-                                  matchedVocab
-                                    ? `${matchedVocab.word} (${matchedVocab.ipa}) — ${matchedVocab.nepaliMeaning}`
-                                    : `Listen to "${hw}"`
-                                }
                                 className="text-[11px] font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 hover:bg-[#B91C1C]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
                               >
                                 <Volume2 className="w-3 h-3" />
                                 <span>{hw}</span>
-                                {matchedVocab && (
-                                  <span className="opacity-75 font-normal">
-                                    ({matchedVocab.ipa})
-                                  </span>
-                                )}
                               </button>
                             );
                           })}
@@ -3462,13 +3493,13 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* DIALOGUE COMPREHENSION QUESTIONS SECTION                          */}
           {/* ================================================================= */}
           {dialogueQuestions.length > 0 && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
                   <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-0.5">
                     Reading & Listening Comprehension Check
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                     Dialogue Comprehension Questions
                   </h3>
                   <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
@@ -3484,7 +3515,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     <button
                       type="button"
                       onClick={() => setDialogueAnswers({})}
-                      className="min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] inline-flex items-center gap-1.5"
+                      className="min-h-[2.375rem] px-3 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] inline-flex items-center gap-1.5"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>Reset Quiz</span>
@@ -3501,7 +3532,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   return (
                     <div
                       key={q.id}
-                      className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
+                      className="p-[1rem] sm:p-[1.25rem] rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
@@ -3512,14 +3543,14 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           onClick={() =>
                             handleSpeak(q.question, `${q.id}-speak`, preferredSpeechRate)
                           }
-                          className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[11px] font-medium inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]"
+                          className="min-h-[2rem] px-2.5 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[0.6875rem] font-medium inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]"
                         >
                           <Volume2 className="w-3 h-3 text-[#B91C1C]" />
                           <span>Listen Question</span>
                         </button>
                       </div>
 
-                      <p className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-1.5">
+                      <p className="text-[0.9375rem] sm:text-[1rem] font-semibold text-[#1C1917] dark:text-[#F5F2EB] mb-1.5">
                         {q.question}
                       </p>
 
@@ -3539,11 +3570,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                           if (selected) {
                             if (isThisRight) {
-                              btnStyle =
-                                'bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                              btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                                isThisSelected ? 'animate-correct-pop' : ''
+                              }`;
                             } else if (isThisSelected && !isThisRight) {
                               btnStyle =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through';
+                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
                             }
                           }
 
@@ -3552,7 +3584,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                               key={opt}
                               type="button"
                               onClick={() => handleSelectDialogueAnswer(q, opt)}
-                              className={`min-h-[46px] px-4 py-2.5 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                              className={`min-h-[2.875rem] px-[1rem] py-[0.625rem] rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnStyle}`}
                             >
                               <span>{opt}</span>
                               {selected && isThisRight && (
@@ -3567,7 +3599,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                       {selected && (
                         <div
-                          className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm space-y-1 ${
+                          className={`mt-4 p-3.5 rounded-xl border text-xs sm:text-sm space-y-1 animate-fade-up ${
                             isCorrect
                               ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
                               : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
@@ -3593,24 +3625,92 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-            <button
-              onClick={() => goToModule(3)}
-              className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:bg-white dark:hover:bg-[#1F1C18] transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Step 04: Grammar & Sentence Builder</span>
-            </button>
-            <button
-              onClick={handleFinishLecture}
-              className="w-full sm:w-auto min-h-[48px] px-7 py-3 rounded-xl bg-[#15803D] text-white text-sm font-semibold hover:bg-emerald-800 transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Complete Lecture & Save Progress</span>
-            </button>
-          </div>
+          {/* Step 05 navigation is handled by the unified Sticky Bottom Action Bar */}
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* UNIFIED STICKY BOTTOM ACTION BAR (Mobile & Desktop Safe-Area Footer)  */}
+      {/* ===================================================================== */}
+      <div className="sticky bottom-16 md:bottom-0 z-30 -mx-[0.625rem] sm:-mx-[1rem] px-[0.625rem] sm:px-[1rem] py-[0.625rem] bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E7E0D6] dark:border-[#2E2924]">
+        <div className="w-full max-w-[82rem] mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+          {/* Left: Previous Step Button */}
+          {activeModule > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                speechService.triggerHaptic('light');
+                goToModule((activeModule - 1) as ModuleStep);
+              }}
+              className="min-h-[2.75rem] px-[0.75rem] sm:px-[1rem] py-[0.5rem] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] transition-colors inline-flex items-center gap-1.5 shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">
+                Step {MODULE_TABS[activeModule - 1]?.number}: {MODULE_TABS[activeModule - 1]?.shortLabel}
+              </span>
+              <span className="sm:hidden">Prev</span>
+            </button>
+          ) : (
+            <div className="text-xs font-ipa text-[#57534E] dark:text-[#A8A29E]">
+              Start of lesson
+            </div>
+          )}
+
+          {/* Center: Compact Step Progress Indicator */}
+          <div className="text-center min-w-0">
+            <div className="font-ipa text-[0.6875rem] sm:text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
+              Step {MODULE_TABS[activeModule].number} of 05 ·{' '}
+              <span className="text-[#9E2A2B] dark:text-[#F87171]">
+                {MODULE_TABS[activeModule].shortLabel}
+              </span>
+            </div>
+            <div className="w-24 sm:w-36 h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] mx-auto mt-1 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#9E2A2B] transition-all duration-300"
+                style={{ width: `${((activeModule + 1) / 5) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Right: Responsive Continue / Finish Lecture Button */}
+          {activeModule < 4 ? (
+            <button
+              type="button"
+              onClick={() => {
+                speechService.triggerHaptic('light');
+                toast.success(`Step ${MODULE_TABS[activeModule].number} completed`, {
+                  duration: 2000,
+                });
+                goToModule((activeModule + 1) as ModuleStep, true);
+              }}
+              className="min-h-[2.75rem] px-[1rem] sm:px-[1.25rem] py-[0.625rem] rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+            >
+              <span className="sm:hidden">Continue</span>
+              <span className="hidden sm:inline">
+                Continue to {MODULE_TABS[activeModule + 1]?.shortLabel}
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                speechService.playCelebrationChime();
+                toast.success(`Lecture ${String(lecture.lectureNumber).padStart(2, '0')} Completed!`, {
+                  description: 'Your progress and quiz scores have been saved.',
+                });
+                handleFinishLecture();
+              }}
+              className="min-h-[2.75rem] px-[1rem] sm:px-[1.5rem] py-[0.625rem] rounded-xl bg-[#15803D] hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span className="sm:hidden">Finish</span>
+              <span className="hidden sm:inline">Complete Lecture</span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
+

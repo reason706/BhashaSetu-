@@ -56,6 +56,11 @@ import {
   exportSavedWordsToCSV,
   exportMistakeNotebookToCSV,
 } from '../services/studySheetExport';
+import {
+  ResponsiveSelectSheet,
+  WordPhoneticsPopover,
+  SelectSheetOption,
+} from './ui/ResponsivePrimitives';
 
 interface DictionaryViewProps {
   lectures: LectureUnit[];
@@ -75,7 +80,17 @@ interface DictionaryViewProps {
   onOpenLecture: (lectureId: string) => void;
 }
 
-type FilterMode = 'all' | 'core' | 'srs' | 'saved' | 'mastered' | 'silent' | 'B1' | 'B2' | 'C1';
+type FilterMode =
+  | 'all'
+  | 'core'
+  | 'srs'
+  | 'saved'
+  | 'mistakes-pool'
+  | 'mastered'
+  | 'silent'
+  | 'B1'
+  | 'B2'
+  | 'C1';
 type ViewMode = 'list' | 'table' | 'flashcards' | 'match' | 'dictation' | 'quiz' | 'mistakes';
 type SilentPatternFilter =
   | 'ALL'
@@ -173,6 +188,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [quizTimerDuration, setQuizTimerDuration] = useState<0 | 30 | 60>(0);
   const [quizSecondsLeft, setQuizSecondsLeft] = useState(60);
   const [quizTimerFinished, setQuizTimerFinished] = useState(false);
+  const [quizMissedWords, setQuizMissedWords] = useState<EnrichedLexiconItem[]>([]);
+  const [quizPracticeMissedOnly, setQuizPracticeMissedOnly] = useState<
+    EnrichedLexiconItem[] | null
+  >(null);
 
   // Audio Dictation & Spelling Bee state (+ 4-Option Multiple Choice vs Typing + 60s Timer)
   const [dictationMode, setDictationMode] = useState<'options' | 'type'>('options');
@@ -182,6 +201,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [dictationStats, setDictationStats] = useState({ correct: 0, total: 0, streak: 0 });
   const [dictationTimerRunning, setDictationTimerRunning] = useState(false);
   const [dictationSecondsLeft, setDictationSecondsLeft] = useState(60);
+  const [dictationMissedWords, setDictationMissedWords] = useState<EnrichedLexiconItem[]>([]);
 
   // Mistake Notebook Drill state
   const [mistakeAnswers, setMistakeAnswers] = useState<Record<string, string>>({});
@@ -318,6 +338,12 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         if (!rec && !w.isCoreLessonWord) return false;
       }
       if (filterMode === 'saved' && !savedWordIds.includes(w.id)) return false;
+      if (filterMode === 'mistakes-pool') {
+        const mistakeWords = new Set(
+          mistakeNotebook.map((m) => m.correctAnswer.trim().toLowerCase())
+        );
+        if (!mistakeWords.has(w.word.toLowerCase())) return false;
+      }
       if (filterMode === 'mastered') {
         const rec = wordSRS[w.id];
         const isMast = masteredWordIds.includes(w.id) || rec?.stage === 'mastered' || (rec?.intervalDays ?? 0) >= 7;
@@ -474,12 +500,15 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   // Shuffled pool of practice words for Flashcards, Dictation, Match, and Quiz
   const shuffledPracticePool = useMemo(() => {
+    if (quizPracticeMissedOnly && quizPracticeMissedOnly.length > 0 && viewMode === 'quiz') {
+      return quizPracticeMissedOnly;
+    }
     const base =
       filteredWords.length > 0
         ? filteredWords.slice(0, 240)
         : allWords.filter((w) => w.isCoreLessonWord).slice(0, 120);
     return shuffleWithSeed(base, dictShuffleSeed);
-  }, [filteredWords, allWords, dictShuffleSeed]);
+  }, [filteredWords, allWords, dictShuffleSeed, quizPracticeMissedOnly, viewMode]);
 
   const currentFlashcard =
     shuffledPracticePool[cardIndex % Math.max(1, shuffledPracticePool.length)] || null;
@@ -687,6 +716,8 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   const handleStartQuizTimedChallenge = (durationSec: 30 | 60) => {
     setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setQuizPracticeMissedOnly(null);
+    setQuizMissedWords([]);
     setQuizIndex(0);
     setQuizSelectedOption(null);
     setQuizScore({ correct: 0, total: 0, streak: 0 });
@@ -698,6 +729,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
   const handleStartDictationTimed = (durationSec: 60) => {
     setDictShuffleSeed(Math.floor(Math.random() * 1000000) + (Date.now() % 100000));
+    setDictationMissedWords([]);
     setDictationIndex(0);
     setDictationInput('');
     setDictationSubmitted(false);
@@ -800,6 +832,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setSelectedMatchWordId(wordId);
     if (selectedMatchMeaningId) {
       if (selectedMatchMeaningId === wordId) {
+        speechService.playCorrectTone();
         const nextMatched = [...matchedPairIds, wordId];
         setMatchedPairIds(nextMatched);
         setSelectedMatchWordId(null);
@@ -816,6 +849,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
           streak: prev.streak + 1,
         }));
       } else {
+        speechService.playWrongTone();
         setWrongMatchFlash(true);
         setMatchGameStats((prev) => ({
           ...prev,
@@ -836,6 +870,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setSelectedMatchMeaningId(wordId);
     if (selectedMatchWordId) {
       if (selectedMatchWordId === wordId) {
+        speechService.playCorrectTone();
         const nextMatched = [...matchedPairIds, wordId];
         setMatchedPairIds(nextMatched);
         setSelectedMatchWordId(null);
@@ -852,6 +887,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
           streak: prev.streak + 1,
         }));
       } else {
+        speechService.playWrongTone();
         setWrongMatchFlash(true);
         setMatchGameStats((prev) => ({
           ...prev,
@@ -880,7 +916,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setQuizSelectedOption(option);
     const isCorrect = option === currentQuizQuestion.correctAnswer;
     if (isCorrect) {
+      speechService.playCorrectTone();
       speechService.speak(currentQuizQuestion.target.word, { rate: preferredSpeechRate });
+    } else {
+      speechService.playWrongTone();
     }
     setQuizScore((prev) => ({
       correct: prev.correct + (isCorrect ? 1 : 0),
@@ -890,24 +929,31 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     if (onUpdateWordSRS) {
       onUpdateWordSRS(currentQuizQuestion.target.id, isCorrect);
     }
-    if (!isCorrect && onRecordMistake) {
-      onRecordMistake({
-        lectureId: currentQuizQuestion.target.lectureId,
-        lectureNumber: currentQuizQuestion.target.lectureNumber,
-        sourceType: 'vocab-quiz',
-        prompt: `${currentQuizQuestion.promptTitle} "${currentQuizQuestion.promptMain}"`,
-        nepaliHint: currentQuizQuestion.target.englishExample,
-        userWrongAnswer: option,
-        correctAnswer: currentQuizQuestion.correctAnswer,
-        options: currentQuizQuestion.options,
-        explanation: `"${currentQuizQuestion.target.word}" means "${currentQuizQuestion.target.nepaliMeaning}". Phonics: ${currentQuizQuestion.target.silentLettersSummary}.`,
-      });
+    if (!isCorrect) {
+      setQuizMissedWords((prev) =>
+        prev.some((w) => w.id === currentQuizQuestion.target.id)
+          ? prev
+          : [...prev, currentQuizQuestion.target]
+      );
+      if (onRecordMistake) {
+        onRecordMistake({
+          lectureId: currentQuizQuestion.target.lectureId,
+          lectureNumber: currentQuizQuestion.target.lectureNumber,
+          sourceType: 'vocab-quiz',
+          prompt: `${currentQuizQuestion.promptTitle} "${currentQuizQuestion.promptMain}"`,
+          nepaliHint: currentQuizQuestion.target.englishExample,
+          userWrongAnswer: option,
+          correctAnswer: currentQuizQuestion.correctAnswer,
+          options: currentQuizQuestion.options,
+          explanation: `"${currentQuizQuestion.target.word}" means "${currentQuizQuestion.target.nepaliMeaning}". Phonics: ${currentQuizQuestion.target.silentLettersSummary}.`,
+        });
+      }
     }
     if (quizTimerRunning) {
       window.setTimeout(() => {
         setQuizSelectedOption(null);
         setQuizIndex((prev) => prev + 1);
-      }, 480);
+      }, 450);
     }
   };
 
@@ -925,7 +971,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     const isExact = cleanUser === cleanTarget;
 
     if (isExact) {
+      speechService.playCorrectTone();
       speechService.speak(currentDictationWord.word, { rate: preferredSpeechRate });
+    } else {
+      speechService.playWrongTone();
     }
 
     setDictationStats((prev) => ({
@@ -938,17 +987,22 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       onUpdateWordSRS(currentDictationWord.id, isExact);
     }
 
-    if (!isExact && onRecordMistake) {
-      onRecordMistake({
-        lectureId: currentDictationWord.lectureId,
-        lectureNumber: currentDictationWord.lectureNumber,
-        sourceType: 'dictation',
-        prompt: `Spell the English word meaning "${currentDictationWord.nepaliMeaning}" (${currentDictationWord.ipa}):`,
-        nepaliHint: currentDictationWord.englishExample,
-        userWrongAnswer: answerText.trim(),
-        correctAnswer: currentDictationWord.word,
-        explanation: `Correct spelling: "${currentDictationWord.word}". Silent-letter rule: ${currentDictationWord.silentLettersSummary}.`,
-      });
+    if (!isExact) {
+      setDictationMissedWords((prev) =>
+        prev.some((w) => w.id === currentDictationWord.id) ? prev : [...prev, currentDictationWord]
+      );
+      if (onRecordMistake) {
+        onRecordMistake({
+          lectureId: currentDictationWord.lectureId,
+          lectureNumber: currentDictationWord.lectureNumber,
+          sourceType: 'dictation',
+          prompt: `Spell the English word meaning "${currentDictationWord.nepaliMeaning}" (${currentDictationWord.ipa}):`,
+          nepaliHint: currentDictationWord.englishExample,
+          userWrongAnswer: answerText.trim(),
+          correctAnswer: currentDictationWord.word,
+          explanation: `Correct spelling: "${currentDictationWord.word}". Silent-letter rule: ${currentDictationWord.silentLettersSummary}.`,
+        });
+      }
     }
 
     if (dictationTimerRunning) {
@@ -956,9 +1010,44 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         setDictationSubmitted(false);
         setDictationInput('');
         setDictationIndex((prev) => prev + 1);
-      }, 520);
+      }, 480);
     }
   };
+
+  // Keyboard shortcuts (1-4) for Speed Quiz and 4-Option Dictation on desktop
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (viewMode === 'quiz' && currentQuizQuestion && !quizSelectedOption) {
+        if (['1', '2', '3', '4'].includes(e.key)) {
+          const idx = Number(e.key) - 1;
+          const opt = currentQuizQuestion.options[idx];
+          if (opt) {
+            e.preventDefault();
+            handleAnswerQuiz(opt);
+          }
+        }
+      } else if (
+        viewMode === 'dictation' &&
+        dictationMode === 'options' &&
+        !dictationSubmitted &&
+        dictationSpellingOptions.length > 0
+      ) {
+        if (['1', '2', '3', '4'].includes(e.key)) {
+          const idx = Number(e.key) - 1;
+          const opt = dictationSpellingOptions[idx];
+          if (opt) {
+            e.preventDefault();
+            handleSubmitDictationAnswer(opt);
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   const handleCheckDictation = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1010,6 +1099,28 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     [lectures, selectedLectureNum]
   );
 
+  // Build options for ResponsiveSelectSheet (12 Managed Lecture Banks)
+  const sectionSheetOptions: SelectSheetOption[] = useMemo(() => {
+    const base: SelectSheetOption[] = [
+      {
+        value: 'ALL',
+        label: 'All 12 Curriculum Sections',
+        sublabel: `Complete lexicon (${allWords.length.toLocaleString()} words)`,
+        badge: '12 banks',
+      },
+    ];
+    for (const lec of lectures.slice(0, 12)) {
+      const count = lectureWordCounts[lec.lectureNumber] || 0;
+      base.push({
+        value: String(lec.lectureNumber),
+        label: `L${String(lec.lectureNumber).padStart(2, '0')} · ${lec.category}`,
+        sublabel: lec.title,
+        badge: `${lec.level} · ${count}w`,
+      });
+    }
+    return base;
+  }, [lectures, allWords.length, lectureWordCounts]);
+
   const isSecondaryFilterActive =
     filterMode === 'mastered' ||
     filterMode === 'B1' ||
@@ -1045,16 +1156,16 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   }
 
   return (
-    <div className="max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24">
+    <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24">
       {/* ===================================================================== */}
       {/* 1. CLEAN EDITORIAL HEADER + COMPACT UTILITY ACTIONS                   */}
       {/* ===================================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-[#E8E0D2] dark:border-[#2C2621] mb-5">
         <div>
-          <div className="text-[11px] font-bold tracking-[0.14em] uppercase text-[#9E2A2B] dark:text-[#F87171] mb-1.5">
+          <div className="text-[0.6875rem] font-bold tracking-[0.14em] uppercase text-[#9E2A2B] dark:text-[#F87171] mb-1.5">
             YOUR VOCABULARY · {allWords.length.toLocaleString()} WORDS
           </div>
-          <h1 className="font-serif text-2xl sm:text-4xl font-normal tracking-tight text-[#1E1B18] dark:text-[#F5F2EB] leading-tight">
+          <h1 className="font-serif fluid-title-xl font-bold tracking-tight text-[#1E1B18] dark:text-[#F5F2EB]">
             Dictionary &amp; lexicon
           </h1>
           <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] mt-1">
@@ -1269,107 +1380,19 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               )}
             </div>
 
-            {/* Curriculum Section Dropdown (12 Managed Lecture Banks) — Right After Search Bar */}
-            <div ref={sectionDropdownRef} className="relative w-full md:w-[310px] shrink-0">
-              <button
-                type="button"
-                onClick={() => setSectionDropdownOpen((prev) => !prev)}
-                className={`w-full min-h-[42px] px-3.5 py-2 rounded-xl border text-left flex items-center justify-between gap-2 transition-all ${
-                  selectedLectureNum !== null
-                    ? 'bg-[#F9E6E6]/60 dark:bg-[#9E2A2B]/20 border-[#9E2A2B]/40 text-[#9E2A2B] dark:text-[#F87171]'
-                    : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB] hover:border-[#9E2A2B]/50'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Filter className="w-3.5 h-3.5 text-[#9E2A2B] shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium truncate">
-                    {selectedLectureObj
-                      ? `L${String(selectedLectureObj.lectureNumber).padStart(2, '0')} · ${selectedLectureObj.category}`
-                      : 'All 12 Curriculum Sections'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[11px] font-ipa px-1.5 py-0.5 rounded-md bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]">
-                    {selectedLectureNum !== null
-                      ? `${lectureWordCounts[selectedLectureNum] || 0}w`
-                      : '12 banks'}
-                  </span>
-                  <ChevronDown
-                    className={`w-4 h-4 text-[#8E877E] transition-transform duration-200 ${
-                      sectionDropdownOpen ? 'rotate-180 text-[#9E2A2B]' : ''
-                    }`}
-                  />
-                </div>
-              </button>
-
-              {sectionDropdownOpen && (
-                <div className="absolute right-0 left-0 md:left-auto md:w-[360px] z-40 mt-2 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E8E0D2] dark:border-[#2C2621] shadow-xl p-1.5 max-h-[340px] overflow-y-auto space-y-1">
-                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8E877E]">
-                    Filter by Curriculum Section (12 Lecture Banks)
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLectureNum(null);
-                      setCurrentPage(1);
-                      setCardIndex(0);
-                      setSectionDropdownOpen(false);
-                    }}
-                    className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between gap-2 transition-colors ${
-                      selectedLectureNum === null
-                        ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 text-[#9E2A2B] dark:text-[#F87171] font-semibold'
-                        : 'hover:bg-[#F3EFE6] dark:hover:bg-[#141210] text-[#1E1B18] dark:text-[#F5F2EB]'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-semibold">All 12 Curriculum Sections</div>
-                      <div className="text-[11px] text-[#8E877E]">
-                        Complete lexicon ({allWords.length.toLocaleString()} words)
-                      </div>
-                    </div>
-                    {selectedLectureNum === null && <Check className="w-4 h-4 text-[#9E2A2B]" />}
-                  </button>
-
-                  {lectures.slice(0, 12).map((lec) => {
-                    const count = lectureWordCounts[lec.lectureNumber] || 0;
-                    const isSelected = selectedLectureNum === lec.lectureNumber;
-                    return (
-                      <button
-                        key={lec.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedLectureNum(isSelected ? null : lec.lectureNumber);
-                          setCurrentPage(1);
-                          setCardIndex(0);
-                          setSectionDropdownOpen(false);
-                        }}
-                        className={`w-full px-3 py-2 rounded-xl text-left flex items-center justify-between gap-2 transition-colors ${
-                          isSelected
-                            ? 'bg-[#F9E6E6]/70 dark:bg-[#9E2A2B]/25 text-[#9E2A2B] dark:text-[#F87171]'
-                            : 'hover:bg-[#F3EFE6] dark:hover:bg-[#141210] text-[#1E1B18] dark:text-[#F5F2EB]'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold truncate">
-                            <span className="font-ipa text-[#9E2A2B] dark:text-[#F87171]">
-                              L{String(lec.lectureNumber).padStart(2, '0')}
-                            </span>
-                            <span>·</span>
-                            <span className="truncate">{lec.category}</span>
-                          </div>
-                          <div className="text-[11px] text-[#8E877E] truncate">{lec.title}</div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] font-ipa px-1.5 py-0.5 rounded bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-[#5E5850] dark:text-[#A8A29E]">
-                            {lec.level} · {count}w
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#9E2A2B]" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+            {/* Curriculum Section Selector (Mobile Bottom Sheet / Desktop Popover) */}
+            <div className="w-full md:w-[310px] shrink-0">
+              <ResponsiveSelectSheet
+                value={selectedLectureNum !== null ? String(selectedLectureNum) : 'ALL'}
+                onChange={(val) => {
+                  setSelectedLectureNum(val === 'ALL' ? null : Number(val));
+                  setCurrentPage(1);
+                  setCardIndex(0);
+                }}
+                options={sectionSheetOptions}
+                title="Filter by Curriculum Section (12 Lecture Banks)"
+                icon={<Filter className="w-3.5 h-3.5 text-[#9E2A2B] shrink-0" />}
+              />
             </div>
           </div>
 
@@ -1386,7 +1409,12 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     label: 'SRS Deck',
                     count: String(Math.max(coreWordsCount, srsTrackedCount)),
                   },
-                  { id: 'saved', label: 'Saved', count: String(savedWordIds.length) },
+                  { id: 'saved', label: 'Saved Words', count: String(savedWordIds.length) },
+                  {
+                    id: 'mistakes-pool',
+                    label: 'My Mistake Notebook',
+                    count: String(mistakeNotebook.length),
+                  },
                   { id: 'silent', label: 'Silent Letters' },
                 ] as { id: FilterMode; label: string; count?: string }[]
               ).map((pill) => {
@@ -1793,10 +1821,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           if (selectedAns) {
                             if (isThisRight) {
                               style =
-                                'bg-[#E3EFE8] dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] font-semibold';
+                                'bg-[#E3EFE8] dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] font-semibold animate-correct-pop';
                             } else if (isThisSelected) {
                               style =
-                                'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] text-[#9E2A2B] line-through';
+                                'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                             }
                           }
                           return (
@@ -1804,11 +1832,17 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               key={opt}
                               onClick={() => {
                                 setMistakeAnswers((prev) => ({ ...prev, [item.id]: opt }));
+                                const right = opt === item.correctAnswer;
+                                if (right) {
+                                  speechService.playCorrectTone();
+                                } else {
+                                  speechService.playWrongTone();
+                                }
                                 if (onPracticeMistake) {
-                                  onPracticeMistake(item.id, opt === item.correctAnswer);
+                                  onPracticeMistake(item.id, right);
                                 }
                               }}
-                              className={`min-h-[40px] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${style}`}
+                              className={`min-h-[2.5rem] px-3.5 py-2 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${style}`}
                             >
                               <span>{opt}</span>
                               {selectedAns && isThisRight && <Check className="w-4 h-4" />}
@@ -1822,7 +1856,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           onClick={() =>
                             speechService.speak(item.correctAnswer, { rate: preferredSpeechRate })
                           }
-                          className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-xs font-semibold inline-flex items-center justify-center gap-1.5"
+                          className="min-h-[2.5rem] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-xs font-semibold inline-flex items-center justify-center gap-1.5"
                         >
                           <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                           <span>Hear Word</span>
@@ -1834,15 +1868,22 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                             setMistakeAnswers((prev) => ({ ...prev, [item.id]: e.target.value }))
                           }
                           placeholder="Type exact spelling..."
-                          className="flex-1 min-h-[40px] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-sm font-ipa"
+                          className="flex-1 min-h-[2.5rem] px-3.5 py-2 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] text-sm font-ipa"
                         />
                         <button
                           onClick={() => {
-                            if (onPracticeMistake && mistakeAnswers[item.id]) {
-                              onPracticeMistake(item.id, isCorrect);
+                            if (mistakeAnswers[item.id]) {
+                              if (isCorrect) {
+                                speechService.playCorrectTone();
+                              } else {
+                                speechService.playWrongTone();
+                              }
+                              if (onPracticeMistake) {
+                                onPracticeMistake(item.id, isCorrect);
+                              }
                             }
                           }}
-                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold"
+                          className="min-h-[2.5rem] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold"
                         >
                           Verify
                         </button>
@@ -2029,10 +2070,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     if (dictationSubmitted) {
                       if (isCorrect) {
                         optClass =
-                          'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold';
+                          'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold animate-correct-pop';
                       } else if (isSelected) {
                         optClass =
-                          'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300';
+                          'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300 animate-wrong-shake';
                       }
                     }
                     return (
@@ -2043,7 +2084,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         onClick={() => {
                           handleSubmitDictationAnswer(opt);
                         }}
-                        className={`min-h-[46px] px-4 py-2.5 rounded-xl border font-ipa text-sm sm:text-base flex items-center justify-between gap-2 transition-all ${optClass}`}
+                        className={`min-h-[2.875rem] px-4 py-2.5 rounded-xl border font-ipa text-sm sm:text-base flex items-center justify-between gap-2 transition-all ${optClass}`}
                       >
                         <span>{opt}</span>
                         {dictationSubmitted && isCorrect && (
@@ -2323,10 +2364,10 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 if (quizSelectedOption) {
                   if (isAnswer) {
                     btnStyle =
-                      'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold';
+                      'border-[#2D6A4F] bg-[#E3EFE8] dark:bg-emerald-950/40 text-[#2D6A4F] dark:text-emerald-300 font-semibold animate-correct-pop';
                   } else if (isSelected) {
                     btnStyle =
-                      'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300';
+                      'border-[#9E2A2B] bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300 animate-wrong-shake';
                   }
                 }
                 return (
@@ -2334,9 +2375,14 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     key={`${opt}-${idx}`}
                     onClick={() => handleAnswerQuiz(opt)}
                     disabled={Boolean(quizSelectedOption)}
-                    className={`min-h-[46px] px-4 py-2.5 rounded-xl border text-left font-nepali text-sm sm:text-base flex items-center justify-between gap-3 transition-all ${btnStyle}`}
+                    className={`min-h-[3rem] px-4 py-2.5 rounded-xl border text-left font-nepali text-sm sm:text-base flex items-center justify-between gap-3 transition-all ${btnStyle}`}
                   >
-                    <span>{opt}</span>
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span className="hidden sm:inline-flex w-5 h-5 rounded-md bg-black/5 dark:bg-white/10 text-[10px] font-ipa font-semibold items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span>{opt}</span>
+                    </span>
                     {quizSelectedOption && isAnswer && (
                       <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                     )}
@@ -2366,6 +2412,79 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   <span>Next Question</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
+              </div>
+            )}
+
+            {/* End-of-Round Mistake Review when Timed Challenge Finishes */}
+            {quizTimerFinished && !quizTimerRunning && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#9E2A2B]/30 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#9E2A2B]">
+                      {quizTimerDuration}s Timed Challenge Complete
+                    </div>
+                    <h4 className="font-serif text-lg text-[#1E1B18] dark:text-[#F5F2EB]">
+                      Final Score: {quizScore.correct} / {quizScore.total}
+                    </h4>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {quizMissedWords.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuizPracticeMissedOnly(quizMissedWords);
+                          setQuizIndex(0);
+                          setQuizSelectedOption(null);
+                          setQuizTimerFinished(false);
+                        }}
+                        className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Practice Missed Words Only ({quizMissedWords.length})</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleStartQuizTimedChallenge(quizTimerDuration || 60)}
+                      className="min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold"
+                    >
+                      Play Again
+                    </button>
+                  </div>
+                </div>
+
+                {quizMissedWords.length > 0 && (
+                  <div className="pt-2 border-t border-[#E8E0D2] dark:border-[#2C2621] space-y-1.5">
+                    <div className="text-xs font-semibold text-[#5E5850] dark:text-[#A8A29E]">
+                      Words missed in this round:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {quizMissedWords.map((mw) => (
+                        <WordPhoneticsPopover
+                          key={mw.id}
+                          word={mw.word}
+                          ipa={mw.ipa}
+                          partOfSpeech={mw.partOfSpeech}
+                          nepaliMeaning={mw.nepaliMeaning}
+                          silentLettersSummary={mw.silentLettersSummary}
+                          englishExample={mw.englishExample}
+                          segments={mw.segments}
+                          isSaved={savedWordIds.includes(mw.id)}
+                          preferredSpeechRate={preferredSpeechRate}
+                          onToggleSave={() => onToggleSaveWord(mw.id)}
+                        >
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] text-xs inline-flex items-center gap-1.5 hover:border-[#9E2A2B]"
+                          >
+                            <span className="font-semibold text-[#9E2A2B]">{mw.word}</span>
+                            <span className="font-nepali text-[#2D6A4F]">{mw.nepaliMeaning}</span>
+                          </button>
+                        </WordPhoneticsPopover>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2451,7 +2570,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 onClick={() => setIsFlipped((prev) => !prev)}
                 className="cursor-pointer select-none inline-block px-5 py-2.5 rounded-2xl hover:bg-[#FAF8F5] dark:hover:bg-[#141210] transition-colors"
               >
-                <div className="font-serif text-3xl sm:text-5xl text-[#1E1B18] dark:text-[#F5F2EB] mb-1.5">
+                <div className="font-serif font-bold text-3xl sm:text-5xl text-[#1E1B18] dark:text-[#F5F2EB] mb-1.5">
                   {currentFlashcard.segments?.map((seg, i) =>
                     seg.silent ? (
                       <span
@@ -2534,14 +2653,19 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           key={`${opt}-${idx}`}
                           type="button"
                           onClick={() => {
+                            if (isRight) {
+                              speechService.playCorrectTone();
+                            } else {
+                              speechService.playWrongTone();
+                            }
                             setFlashcardQuizPicked(opt);
                             setIsFlipped(true);
                           }}
-                          className={`min-h-[40px] px-3 py-2 rounded-xl border text-left font-nepali text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${
+                          className={`min-h-[2.5rem] px-3 py-2 rounded-xl border text-left font-nepali text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${
                             isChosen
                               ? isRight
-                                ? 'border-[#2D6A4F] bg-[#E3EFE8] text-[#2D6A4F] font-semibold'
-                                : 'border-[#9E2A2B] bg-[#F9E6E6] text-[#9E2A2B]'
+                                ? 'border-[#2D6A4F] bg-[#E3EFE8] text-[#2D6A4F] font-semibold animate-correct-pop'
+                                : 'border-[#9E2A2B] bg-[#F9E6E6] text-[#9E2A2B] animate-wrong-shake'
                               : 'border-[#E8E0D2] dark:border-[#2C2621] bg-[#FAF8F5] dark:bg-[#141210] hover:border-[#9E2A2B]'
                           }`}
                         >
@@ -2652,7 +2776,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[#9E2A2B] mb-0.5">
                   Word Pairing · Shuffled Set #{matchBoardRound + 1}
                 </div>
-                <h2 className="font-serif text-lg sm:text-xl text-[#1E1B18] dark:text-[#F5F2EB]">
+                <h2 className="font-serif font-bold text-lg sm:text-xl text-[#1E1B18] dark:text-[#F5F2EB]">
                   Match silent-letter words with Nepali meanings
                 </h2>
               </div>
@@ -2731,16 +2855,16 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         onClick={() => handleSelectMatchWord(item.id)}
                         className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
                           isMatched
-                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default'
+                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default animate-correct-pop'
                             : isSelected
                             ? wrongMatchFlash
-                              ? 'bg-red-100 border-red-500 text-red-900'
+                              ? 'bg-red-100 border-red-500 text-red-900 animate-wrong-shake'
                               : 'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] ring-1 ring-[#9E2A2B]/30'
                             : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]'
                         }`}
                       >
                         <div>
-                          <div className="text-sm sm:text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                          <div className="text-sm sm:text-base font-bold text-[#1E1B18] dark:text-[#F5F2EB]">
                             {item.segments?.map((seg, idx) =>
                               seg.silent ? (
                                 <span
@@ -2754,7 +2878,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               )
                             )}
                           </div>
-                          <div className="text-[11px] font-ipa text-[#8E877E]">
+                          <div className="text-[0.6875rem] font-ipa text-[#8E877E]">
                             {item.ipa} · {item.silentLettersSummary}
                           </div>
                         </div>
@@ -2770,7 +2894,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
 
                 {/* Right Column: Nepali Meanings */}
                 <div className="space-y-2">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#8E877E] mb-1">
+                  <div className="text-[0.6875rem] font-bold uppercase tracking-wider text-[#8E877E] mb-1">
                     2. Match Nepali Meaning
                   </div>
                   {matchBoardData.shuffledMeanings.map((item) => {
@@ -2781,12 +2905,12 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         key={`meaning-${item.id}`}
                         disabled={isMatched}
                         onClick={() => handleSelectMatchMeaning(item.id)}
-                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between min-h-[60px] ${
+                        className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between min-h-[3.75rem] ${
                           isMatched
-                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default'
+                            ? 'bg-[#E3EFE8]/60 dark:bg-emerald-950/20 border-[#2D6A4F]/30 opacity-60 cursor-default animate-correct-pop'
                             : isSelected
                             ? wrongMatchFlash
-                              ? 'bg-red-100 border-red-500 text-red-900'
+                              ? 'bg-red-100 border-red-500 text-red-900 animate-wrong-shake'
                               : 'bg-[#F9E6E6] dark:bg-red-950/40 border-[#9E2A2B] ring-1 ring-[#9E2A2B]/30'
                             : 'bg-[#FAF8F5] dark:bg-[#141210] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]'
                         }`}
@@ -2865,7 +2989,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     <div key={item.id} className="p-3.5 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="font-serif text-base font-semibold text-[#1E1B18] dark:text-[#F5F2EB]">
+                          <span className="font-serif text-base font-bold text-[#1E1B18] dark:text-[#F5F2EB]">
                             {item.segments?.map((seg, idx) =>
                               seg.silent ? (
                                 <span
@@ -2958,7 +3082,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                           key={item.id}
                           className="hover:bg-[#FAF8F5]/70 dark:hover:bg-[#141210]/40 transition-colors"
                         >
-                          <td className="py-3 px-4 font-serif font-medium text-base text-[#1E1B18] dark:text-[#F5F2EB]">
+                          <td className="py-3 px-4 font-serif font-bold text-base text-[#1E1B18] dark:text-[#F5F2EB]">
                             {item.segments?.map((seg, idx) =>
                               seg.silent ? (
                                 <span
@@ -3141,20 +3265,37 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                       {/* Word Heading + IPA + Meaning */}
                       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1.5">
                         <div className="flex items-baseline gap-2.5 flex-wrap">
-                          <h3 className="font-serif text-xl sm:text-2xl font-medium text-[#1E1B18] dark:text-[#F5F2EB]">
-                            {item.segments?.map((seg, idx) =>
-                              seg.silent ? (
-                                <span
-                                  key={idx}
-                                  className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
-                                >
-                                  {seg.text}
-                                </span>
-                              ) : (
-                                <span key={idx}>{seg.text}</span>
-                              )
-                            )}
-                          </h3>
+                          <WordPhoneticsPopover
+                            word={item.word}
+                            ipa={item.ipa}
+                            partOfSpeech={item.partOfSpeech}
+                            nepaliMeaning={item.nepaliMeaning}
+                            silentLettersSummary={item.silentLettersSummary}
+                            englishExample={item.englishExample}
+                            segments={item.segments}
+                            isSaved={isSaved}
+                            preferredSpeechRate={preferredSpeechRate}
+                            onToggleSave={() => onToggleSaveWord(item.id)}
+                          >
+                            <button
+                              type="button"
+                              title="Tap for instant phonetics card"
+                              className="font-serif text-xl sm:text-2xl font-bold text-[#1E1B18] dark:text-[#F5F2EB] text-left hover:opacity-85 transition-opacity"
+                            >
+                              {item.segments?.map((seg, idx) =>
+                                seg.silent ? (
+                                  <span
+                                    key={idx}
+                                    className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
+                                  >
+                                    {seg.text}
+                                  </span>
+                                ) : (
+                                  <span key={idx}>{seg.text}</span>
+                                )
+                              )}
+                            </button>
+                          </WordPhoneticsPopover>
                           <span className="font-ipa text-xs sm:text-sm text-[#8E877E]">
                             {item.ipa}
                           </span>

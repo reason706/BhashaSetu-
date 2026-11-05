@@ -1,4 +1,5 @@
 // Web Speech API Service for Text-to-Speech (TTS) & Live Microphone Speech Recognition
+import confetti from 'canvas-confetti';
 
 export interface PronunciationResult {
   transcript: string;
@@ -191,7 +192,93 @@ class SpeechService {
     return !!this.synth;
   }
 
-  public playCelebrationChime(): void {
+  private hapticEnabled: boolean =
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem('bhashasetu_haptic_enabled_v1') !== 'false'
+      : true;
+
+  public getHapticFeedbackEnabled(): boolean {
+    return this.hapticEnabled;
+  }
+
+  public setHapticFeedbackEnabled(enabled: boolean): void {
+    this.hapticEnabled = enabled;
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('bhashasetu_haptic_enabled_v1', enabled ? 'true' : 'false');
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    if (enabled) {
+      this.triggerHaptic('light');
+    }
+  }
+
+  /**
+   * Triggers device vibration / haptic pulse when enabled in Settings.
+   */
+  public triggerHaptic(type: 'light' | 'success' | 'error' | 'celebration' = 'light'): void {
+    if (!this.hapticEnabled || typeof window === 'undefined') return;
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        if (type === 'light') {
+          navigator.vibrate(10);
+        } else if (type === 'success') {
+          navigator.vibrate([15, 35, 25]);
+        } else if (type === 'error') {
+          navigator.vibrate([40, 45, 40]);
+        } else if (type === 'celebration') {
+          navigator.vibrate([20, 40, 20, 40, 55]);
+        }
+      }
+    } catch {
+      // Ignore if vibration API is blocked
+    }
+  }
+
+  /**
+   * Launches a celebratory canvas-confetti burst in BhashaSetu brand colors
+   * when unlocking achievements or completing course track milestones.
+   */
+  public triggerConfetti(mode: 'achievement' | 'milestone' = 'achievement'): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const brandColors = ['#9E2A2B', '#2E6F4E', '#D97706', '#1F5C3D', '#E5DEC9'];
+      if (mode === 'milestone') {
+        confetti({
+          particleCount: 95,
+          spread: 80,
+          origin: { x: 0.25, y: 0.62 },
+          colors: brandColors,
+          disableForReducedMotion: true,
+        });
+        window.setTimeout(() => {
+          confetti({
+            particleCount: 95,
+            spread: 80,
+            origin: { x: 0.75, y: 0.62 },
+            colors: brandColors,
+            disableForReducedMotion: true,
+          });
+        }, 180);
+      } else {
+        confetti({
+          particleCount: 75,
+          spread: 70,
+          origin: { y: 0.65 },
+          colors: brandColors,
+          disableForReducedMotion: true,
+        });
+      }
+    } catch {
+      // Ignore if canvas-confetti cannot run in current context
+    }
+  }
+
+  public playCelebrationChime(mode: 'achievement' | 'milestone' = 'achievement'): void {
+    this.triggerHaptic('celebration');
+    this.triggerConfetti(mode);
     if (typeof window === 'undefined') return;
     try {
       const AudioCtx =
@@ -211,6 +298,68 @@ class SpeechService {
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime + idx * 0.09);
         osc.stop(ctx.currentTime + idx * 0.09 + 0.3);
+      });
+    } catch {
+      // Ignore if AudioContext is blocked
+    }
+  }
+
+  /**
+   * Pleasant ascending two-note chime when a user answers a question or drill correctly.
+   */
+  public playCorrectTone(): void {
+    this.triggerHaptic('success');
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const notes = [587.33, 880.0]; // D5 -> A5 crisp fifth
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        const startTime = ctx.currentTime + idx * 0.075;
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.09, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.24);
+      });
+    } catch {
+      // Ignore if AudioContext is blocked
+    }
+  }
+
+  /**
+   * Gentle descending two-note tone when a user selects an incorrect answer.
+   */
+  public playWrongTone(): void {
+    this.triggerHaptic('error');
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const notes = [311.13, 233.08]; // D#4 -> A#3 soft low alert
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        const startTime = ctx.currentTime + idx * 0.095;
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.085, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.24);
       });
     } catch {
       // Ignore if AudioContext is blocked

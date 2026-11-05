@@ -77,6 +77,7 @@ import {
   DialogueCalibrationSettings,
   PronunciationResult,
 } from '../services/speech';
+import { ResponsiveSelectSheet } from './ui/ResponsivePrimitives';
 
 interface ProgressSettingsViewProps {
   mode: 'progress' | 'settings';
@@ -106,6 +107,7 @@ interface ProgressSettingsViewProps {
   onPullFromCloud?: () => Promise<void>;
   onUpdateUserName?: (name: string) => void;
   onToggleDailyReminder?: () => void;
+  onToggleHapticFeedback?: () => void;
   onResetAllProgress?: (includeCloud: boolean) => Promise<void>;
 }
 
@@ -367,122 +369,22 @@ function EditorialSelectDropdown<T extends string | number>({
   align = 'right',
   compact = false,
 }: EditorialSelectDropdownProps<T>) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [open]);
-
-  const selectedOption =
-    options.find((opt) => String(opt.value) === String(value)) || options[0];
-
   return (
-    <div ref={containerRef} className="relative inline-block text-left shrink-0">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-        className={`inline-flex items-center justify-between gap-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border transition-all ${
-          open
-            ? 'border-[#A82020] dark:border-[#F87171] ring-2 ring-[#A82020]/15'
-            : 'border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/60'
-        } ${
-          compact
-            ? 'h-9 px-3 text-xs'
-            : 'min-h-[38px] px-3.5 py-2 text-xs sm:text-sm'
-        } font-medium text-[#1C1917] dark:text-[#F5F2EB]`}
-      >
-        <span className="truncate max-w-[165px] sm:max-w-[210px]">
-          {selectedOption?.label}
-        </span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-[#78716C] dark:text-[#A8A29E] transition-transform duration-200 shrink-0 ${
-            open ? 'rotate-180 text-[#A82020] dark:text-[#F87171]' : ''
-          }`}
-        />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          aria-label={ariaLabel}
-          className={`absolute ${
-            align === 'right' ? 'right-0' : 'left-0'
-          } mt-1.5 w-60 sm:w-68 max-h-72 overflow-y-auto rounded-2xl bg-[#FFFDF9] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-[0_14px_34px_rgba(28,25,23,0.16)] p-1.5 z-40 space-y-1`}
-        >
-          {options.map((opt) => {
-            const isSelected = String(opt.value) === String(value);
-            return (
-              <button
-                key={String(opt.value)}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className={`w-full px-3 py-2.5 rounded-xl text-left flex items-start justify-between gap-2.5 transition-colors ${
-                  isSelected
-                    ? 'bg-[#F8E9E5] dark:bg-red-950/50 text-[#A82020] dark:text-red-300'
-                    : 'text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#F5F2EB] dark:hover:bg-[#292521]'
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs sm:text-[13px] font-semibold leading-snug">
-                      {opt.label}
-                    </span>
-                    {opt.badge && (
-                      <span
-                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${
-                          isSelected
-                            ? 'bg-[#A82020] text-white'
-                            : 'bg-[#EDE8DC] dark:bg-[#2E2924] text-[#6E685F] dark:text-[#A8A29E]'
-                        }`}
-                      >
-                        {opt.badge}
-                      </span>
-                    )}
-                  </div>
-                  {opt.sub && (
-                    <p
-                      className={`text-[11px] mt-0.5 leading-snug ${
-                        isSelected
-                          ? 'text-[#8C2D2D] dark:text-red-200/80'
-                          : 'text-[#78716C] dark:text-[#A8A29E]'
-                      }`}
-                    >
-                      {opt.sub}
-                    </p>
-                  )}
-                </div>
-                {isSelected && (
-                  <Check className="w-4 h-4 text-[#A82020] dark:text-red-300 shrink-0 mt-0.5" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <ResponsiveSelectSheet<T>
+      ariaLabel={ariaLabel}
+      sheetTitle={ariaLabel}
+      sheetDescription="Tap an option below to update your preference."
+      value={value}
+      options={options.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+        sub: opt.sub,
+        badge: opt.badge,
+      }))}
+      onChange={onChange}
+      align={align}
+      compact={compact}
+    />
   );
 }
 
@@ -512,6 +414,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   onPullFromCloud,
   onUpdateUserName,
   onToggleDailyReminder,
+  onToggleHapticFeedback,
   onResetAllProgress,
 }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
@@ -2172,14 +2075,14 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     const c1Track = trackStats.find((t) => t.level === 'C1') || { done: 0, total: 4, pct: 0 };
 
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-6">
+      <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
         {/* Top Eyebrow + Title + Progress / Achievements Toggle + Period Filter */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
               YOUR LEARNING STORY
             </div>
-            <h1 className="font-serif text-3xl sm:text-[34px] font-normal text-[#282522] dark:text-[#F1ECE4] tracking-tight mt-1">
+            <h1 className="font-serif text-3xl sm:text-[34px] font-bold text-[#282522] dark:text-[#F1ECE4] tracking-tight mt-1">
               Progress &amp; achievements
             </h1>
             <p className="text-xs sm:text-sm text-[#79736D] dark:text-[#A69F96] mt-1">
@@ -2245,7 +2148,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
               <span>LOOK AT YOU GO</span>
             </div>
-            <h2 className="font-serif text-2xl sm:text-[30px] leading-[1.2] font-normal tracking-tight">
+            <h2 className="font-serif text-2xl sm:text-[30px] leading-[1.2] font-bold tracking-tight">
               {streakDays} {streakDays === 1 ? 'day' : 'days'} of showing up.
               <br />
               <em className="font-normal text-[#E8BD86] italic">
@@ -2658,9 +2561,24 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 {/* 3-Node Connected Stepper */}
                 <div className="flex items-center my-6 px-2">
                   {/* Node B1 */}
-                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (b1Track.done >= b1Track.total) {
+                        speechService.playCelebrationChime('milestone');
+                      } else if (nextUnfinishedLecture) {
+                        onOpenLecture(nextUnfinishedLecture.id);
+                      }
+                    }}
+                    title={
+                      b1Track.done >= b1Track.total
+                        ? 'B1 Foundation Track Completed — Tap to celebrate!'
+                        : 'Continue B1 Foundation Track'
+                    }
+                    className="w-16 flex flex-col items-center gap-1 shrink-0 focus:outline-none group"
+                  >
                     <span
-                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold transition-transform group-hover:scale-105 ${
                         b1Track.done >= b1Track.total
                           ? 'bg-[#E6EFE7] text-[#52765B]'
                           : 'bg-[#B7332C] text-white shadow-[0_0_0_5px_#F8E9E5] dark:shadow-none'
@@ -2674,7 +2592,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     </span>
                     <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">B1</b>
                     <small className="text-[10px] text-[#79736D]">Foundation</small>
-                  </div>
+                  </button>
 
                   {/* Segment B1 -> B2 */}
                   <div className="h-1 flex-1 bg-[#ECE7DF] dark:bg-[#403C37] -mx-1 mb-7 rounded-full overflow-hidden">
@@ -2685,9 +2603,24 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   </div>
 
                   {/* Node B2 */}
-                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (b2Track.done >= b2Track.total) {
+                        speechService.playCelebrationChime('milestone');
+                      } else if (b1Track.done >= b1Track.total && nextUnfinishedLecture) {
+                        onOpenLecture(nextUnfinishedLecture.id);
+                      }
+                    }}
+                    title={
+                      b2Track.done >= b2Track.total
+                        ? 'B2 Workplace Track Completed — Tap to celebrate!'
+                        : 'B2 Workplace Track'
+                    }
+                    className="w-16 flex flex-col items-center gap-1 shrink-0 focus:outline-none group"
+                  >
                     <span
-                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold transition-transform group-hover:scale-105 ${
                         b2Track.done >= b2Track.total
                           ? 'bg-[#E6EFE7] text-[#52765B]'
                           : b1Track.done >= b1Track.total
@@ -2705,7 +2638,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     </span>
                     <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">B2</b>
                     <small className="text-[10px] text-[#79736D]">Workplace</small>
-                  </div>
+                  </button>
 
                   {/* Segment B2 -> C1 */}
                   <div className="h-1 flex-1 bg-[#ECE7DF] dark:bg-[#403C37] -mx-1 mb-7 rounded-full overflow-hidden">
@@ -2716,9 +2649,24 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   </div>
 
                   {/* Node C1 */}
-                  <div className="w-16 flex flex-col items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (c1Track.done >= c1Track.total) {
+                        speechService.playCelebrationChime('milestone');
+                      } else if (b2Track.done >= b2Track.total && nextUnfinishedLecture) {
+                        onOpenLecture(nextUnfinishedLecture.id);
+                      }
+                    }}
+                    title={
+                      c1Track.done >= c1Track.total
+                        ? 'C1 Advanced Track Completed — Tap to celebrate!'
+                        : 'C1 Advanced Track'
+                    }
+                    className="w-16 flex flex-col items-center gap-1 shrink-0 focus:outline-none group"
+                  >
                     <span
-                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${
+                      className={`w-9 h-9 rounded-full grid place-items-center text-xs font-bold transition-transform group-hover:scale-105 ${
                         c1Track.done >= c1Track.total
                           ? 'bg-[#E6EFE7] text-[#52765B]'
                           : b2Track.done >= b2Track.total
@@ -2734,7 +2682,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     </span>
                     <b className="text-xs text-[#282522] dark:text-[#F1ECE4]">C1</b>
                     <small className="text-[10px] text-[#79736D]">Advanced</small>
-                  </div>
+                  </button>
                 </div>
 
                 {/* Bottom Callout */}
@@ -3134,9 +3082,25 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 return (
                   <article
                     key={badge.id}
+                    onClick={() => {
+                      if (badge.earned) {
+                        speechService.playCelebrationChime(
+                          badge.tier === 'gold' ||
+                            badge.tier === 'platinum' ||
+                            badge.category === 'mastery'
+                            ? 'milestone'
+                            : 'achievement'
+                        );
+                      }
+                    }}
+                    title={
+                      badge.earned
+                        ? `${badge.title} — Tap to celebrate with confetti!`
+                        : badge.title
+                    }
                     className={`relative flex items-center gap-3.5 p-4 rounded-xl border transition-all hover:-translate-y-0.5 ${
                       badge.earned
-                        ? 'bg-gradient-to-br from-[#FFFEFA] to-[#FBF6EC] dark:from-[#2E2B26] dark:to-[#292725] border-[#EADCC4] dark:border-[#4B4233]'
+                        ? 'cursor-pointer bg-gradient-to-br from-[#FFFEFA] to-[#FBF6EC] dark:from-[#2E2B26] dark:to-[#292725] border-[#EADCC4] dark:border-[#4B4233]'
                         : 'bg-[#F8F6F1] dark:bg-[#272624] border-[#EBE7DF] dark:border-[#383531]'
                     }`}
                   >
@@ -3235,7 +3199,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     ) ?? 1.0;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-24 space-y-6 sm:space-y-8">
+    <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
       {/* Hidden JSON Restore Input */}
       <input
         ref={fileInputRef}
@@ -3247,7 +3211,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
       {/* Minimal Clean Title Only: Settings & preferences */}
       <div>
-        <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+        <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
           Settings &amp; preferences
         </h1>
       </div>
@@ -3539,7 +3503,10 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               type="button"
               role="switch"
               aria-checked={progress.darkMode}
-              onClick={onToggleDarkMode}
+              onClick={() => {
+                speechService.triggerHaptic('light');
+                onToggleDarkMode();
+              }}
               className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center shrink-0 ${
                 progress.darkMode
                   ? 'bg-[#2E6F4E] justify-end'
@@ -3550,7 +3517,51 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </button>
           </div>
 
-          {/* Row 3: Offline mode */}
+          {/* Row 3: Haptic feedback */}
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
+                  Haptic feedback
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    progress.hapticFeedbackEnabled !== false
+                      ? 'bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300'
+                      : 'bg-[#F2EFE9] dark:bg-[#26221E] text-[#78716C] dark:text-[#A8A29E]'
+                  }`}
+                >
+                  {progress.hapticFeedbackEnabled !== false ? 'On' : 'Off'}
+                </span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                Gentle vibration on answers, quiz feedback &amp; achievement celebrations
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Toggle haptic feedback"
+              aria-checked={progress.hapticFeedbackEnabled !== false}
+              onClick={() => {
+                if (onToggleHapticFeedback) {
+                  onToggleHapticFeedback();
+                } else {
+                  const next = progress.hapticFeedbackEnabled === false;
+                  speechService.setHapticFeedbackEnabled(next);
+                }
+              }}
+              className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center shrink-0 ${
+                progress.hapticFeedbackEnabled !== false
+                  ? 'bg-[#2E6F4E] justify-end'
+                  : 'bg-[#9CA3AF] justify-start'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+            </button>
+          </div>
+
+          {/* Row 4: Offline mode */}
           <div className="pt-4 flex items-center justify-between gap-4">
             <div>
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">

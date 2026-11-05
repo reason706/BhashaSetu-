@@ -278,6 +278,12 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
     const isCorrect =
       cleanUser.toLowerCase() === currentQuestion.correctAnswer.trim().toLowerCase();
 
+    if (isCorrect) {
+      speechService.playCorrectTone();
+    } else {
+      speechService.playWrongTone();
+    }
+
     onUpdateWordSRS(currentQuestion.targetWord.id, isCorrect);
 
     if (!isCorrect) {
@@ -354,7 +360,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
             </div>
             <h2
               id="daily-challenge-title"
-              className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5"
+              className="font-serif fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5"
             >
               Daily 3-Question Vocabulary Challenge
             </h2>
@@ -489,10 +495,10 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                     if (selectedOption) {
                       if (isRight) {
                         btnClass =
-                          'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                          'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold animate-correct-pop';
                       } else if (isSelected) {
                         btnClass =
-                          'bg-red-50 dark:bg-red-950/40 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through';
+                          'bg-red-50 dark:bg-red-950/40 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
                       }
                     }
 
@@ -502,7 +508,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                         type="button"
                         disabled={Boolean(selectedOption)}
                         onClick={() => handleSelectAnswer(opt)}
-                        className={`min-h-[46px] px-4 py-2.5 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnClass}`}
+                        className={`min-h-[2.875rem] px-4 py-2.5 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${btnClass}`}
                       >
                         <span className="font-nepali">{opt}</span>
                         {selectedOption && isRight && (
@@ -519,7 +525,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
 
               {/* Instant Explanation Banner */}
               {selectedOption && (
-                <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-up">
                   <div className="space-y-1 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-base font-bold text-[#1C1917] dark:text-[#F5F2EB]">

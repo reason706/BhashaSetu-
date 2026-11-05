@@ -85,6 +85,7 @@ import {
 import { speechService } from './services/speech';
 import { useOnlineStatus } from './hooks/usePWA';
 import { LecturePlayer, ModuleStep } from './components/LecturePlayer';
+import { LessonProgressCard } from './components/LessonProgressCard';
 import { DictionaryView } from './components/DictionaryView';
 import { AILessonModal } from './components/AILessonModal';
 import { AIRoleplayModal } from './components/AIRoleplayModal';
@@ -104,6 +105,8 @@ import {
   pullAndMergeCloudProgress,
   resetCloudProgress,
 } from './services/firebase';
+import { Toaster, toast } from 'sonner';
+import { WordPhoneticsPopover } from './components/ui/ResponsivePrimitives';
 
 type NavTab = 'home' | 'lessons' | 'dictionary' | 'arena' | 'progress' | 'settings' | 'about';
 
@@ -118,13 +121,6 @@ export default function App() {
   const [levelFilter, setLevelFilter] = useState<'ALL' | CEFRLevel>('ALL');
   const [lessonTopicSearch, setLessonTopicSearch] = useState('');
   const [expandedLessonPreviewId, setExpandedLessonPreviewId] = useState<string | null>(null);
-  const [lockedLectureNotice, setLockedLectureNotice] = useState<{
-    lectureNumber: number;
-    title: string;
-    prevId: string;
-    prevLectureNumber: number;
-    prevTitle: string;
-  } | null>(null);
 
   // Global Top Search Bar State
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -147,12 +143,6 @@ export default function App() {
   const [progressSubViewTarget, setProgressSubViewTarget] = useState<'overview' | 'achievements'>(
     'overview'
   );
-  const [liveAchievementToast, setLiveAchievementToast] = useState<{
-    id: string;
-    title: string;
-    nepaliTitle: string;
-    desc: string;
-  } | null>(null);
   const [dashboardStudySheetMode, setDashboardStudySheetMode] =
     useState<StudySheetFocusMode | null>(null);
   const hasSeededInitialBadgesRef = useRef(false);
@@ -215,6 +205,45 @@ export default function App() {
     extraExampleNepali: string;
   } | null>(null);
   const [isSpotlightAILoading, setIsSpotlightAILoading] = useState(false);
+
+  // Skeleton loader states for Word of the Day & dynamic sections
+  const [isInitialHydrating, setIsInitialHydrating] = useState(true);
+  const [isWordOfTheDayLoading, setIsWordOfTheDayLoading] = useState(false);
+  const [isSpotlightTransitioning, setIsSpotlightTransitioning] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setIsInitialHydrating(false);
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    speechService.setHapticFeedbackEnabled(progress.hapticFeedbackEnabled !== false);
+  }, [progress.hapticFeedbackEnabled]);
+
+  const handleCycleWordOfTheDay = () => {
+    speechService.triggerHaptic('light');
+    setIsWordOfTheDayLoading(true);
+    window.setTimeout(() => {
+      setWordOfTheDayOffset((n) => n + 1);
+      setIsWordOfTheDayLoading(false);
+    }, 240);
+  };
+
+  const handleCycleSpotlightWord = (markMasteredId?: string) => {
+    speechService.triggerHaptic('light');
+    setIsSpotlightTransitioning(true);
+    window.setTimeout(() => {
+      if (markMasteredId) {
+        handleToggleMasteredWord(markMasteredId);
+      }
+      setSrsQuickFlipped(false);
+      setSpotlightAIExplanation(null);
+      setSrsQuickIdx((i) => i + 1);
+      setIsSpotlightTransitioning(false);
+    }, 220);
+  };
 
   const handleRunSentenceCoach = async (customText?: string) => {
     const text = (customText ?? sentenceCoachInput).trim();
@@ -487,7 +516,43 @@ export default function App() {
   };
 
   const handleCompleteLecture = (scoreRecord: ModuleScoreRecord) => {
-    setProgress((prev) => recordLectureCompletion(prev, scoreRecord));
+    const completedUnit = allLectures.find((l) => l.id === scoreRecord.unitId);
+    const wasAlreadyCompleted = progress.completedUnitIds.includes(scoreRecord.unitId);
+
+    setProgress((prev) => {
+      const next = recordLectureCompletion(prev, scoreRecord);
+
+      if (completedUnit && !wasAlreadyCompleted) {
+        const trackLevel = completedUnit.level;
+        const trackLectures = CORE_SYLLABUS.filter((l) => l.level === trackLevel);
+        const allTrackDone =
+          trackLectures.length > 0 &&
+          trackLectures.every((l) => next.completedUnitIds.includes(l.id));
+
+        if (allTrackDone) {
+          speechService.playCelebrationChime('milestone');
+          toast.success(
+            `🎉 ${trackLevel} Track Milestone Completed!`,
+            {
+              description: `You finished all ${trackLectures.length} lectures in the ${
+                trackLevel === 'B1'
+                  ? 'B1 Foundation'
+                  : trackLevel === 'B2'
+                  ? 'B2 Workplace'
+                  : 'C1 Advanced'
+              } curriculum track!`,
+              duration: 6000,
+            }
+          );
+        } else {
+          speechService.playCelebrationChime('achievement');
+        }
+      } else {
+        speechService.playCelebrationChime('achievement');
+      }
+
+      return next;
+    });
   };
 
   const handleCompleteStep = (lectureId: string, stepIndex: number) => {
@@ -546,6 +611,31 @@ export default function App() {
         dailyReminderEnabled: prev.dailyReminderEnabled === false ? true : false,
       };
       saveUserProgress(next);
+      return next;
+    });
+  };
+
+  const handleToggleHapticFeedback = () => {
+    setProgress((prev) => {
+      const nextEnabled = prev.hapticFeedbackEnabled === false ? true : false;
+      const next = {
+        ...prev,
+        hapticFeedbackEnabled: nextEnabled,
+      };
+      speechService.setHapticFeedbackEnabled(nextEnabled);
+      if (nextEnabled) {
+        speechService.triggerHaptic('light');
+      }
+      saveUserProgress(next);
+      toast.success(
+        nextEnabled ? 'Haptic feedback enabled' : 'Haptic feedback turned off',
+        {
+          description: nextEnabled
+            ? 'Gentle vibration is active on answers and interactions.'
+            : 'Vibration feedback is now muted across all exercises.',
+          duration: 2400,
+        }
+      );
       return next;
     });
   };
@@ -692,7 +782,6 @@ export default function App() {
         setProgress(freshLocal);
         setCloudSyncStatusMsg('Local progress reset to 0');
       }
-      setLiveAchievementToast(null);
     } catch (err) {
       console.error('Reset progress error:', err);
       setCloudSyncStatusMsg('Local progress reset to 0 (cloud sync skipped)');
@@ -897,12 +986,21 @@ export default function App() {
     );
 
     if (newlyUnlocked) {
-      speechService.playCelebrationChime();
-      setLiveAchievementToast({
-        id: newlyUnlocked.id,
-        title: newlyUnlocked.title,
-        nepaliTitle: newlyUnlocked.nepaliTitle,
-        desc: newlyUnlocked.desc,
+      const isMajorMilestone =
+        newlyUnlocked.id.includes('graduate') ||
+        newlyUnlocked.id.includes('master-linguist') ||
+        newlyUnlocked.id === 'first-lecture-finished' ||
+        newlyUnlocked.id === 'ten-day-streak' ||
+        newlyUnlocked.id === 'fifty-words-mastered';
+      speechService.playCelebrationChime(isMajorMilestone ? 'milestone' : 'achievement');
+
+      toast.success(`🏆 ${newlyUnlocked.title} · ${newlyUnlocked.nepaliTitle}`, {
+        description: newlyUnlocked.desc,
+        duration: 6000,
+        action: {
+          label: 'View Badge',
+          onClick: () => openProgressSubView('achievements'),
+        },
       });
 
       const updatedIds = Array.from(new Set([...knownUnlockedIds, ...currentlyUnlockedIds]));
@@ -1177,8 +1275,85 @@ export default function App() {
     };
   };
 
+  // Weak-Spot Mistake Radar computed from Mistake Notebook & SRS
+  const mistakeRadarSummary = useMemo(() => {
+    const mistakes = progress.mistakeNotebook || [];
+    const spellingMistakes = mistakes.filter((m) => m.category === 'spelling');
+    const grammarMistakes = mistakes.filter((m) => m.category === 'grammar');
+
+    // Analyze most common silent-letter pattern in mistakes or due SRS words
+    const patternCounts: Record<string, { count: number; sampleWords: string[]; rule: string }> = {
+      'Silent K / W (kn-, wr-)': {
+        count: 0,
+        sampleWords: ['Knowledge', 'Wrinkle', 'Wrapper'],
+        rule: 'Drop K before N and W before R at the start of words.',
+      },
+      'Silent B / T (-mb, -bt, -stle)': {
+        count: 0,
+        sampleWords: ['Subtle', 'Doubt', 'Castle', 'Listen'],
+        rule: 'B is silent in -mb/-bt; T is silent in -sten/-stle.',
+      },
+      'Silent P / G / H (ps-, -gn, h-)': {
+        count: 0,
+        sampleWords: ['Psychology', 'Receipt', 'Campaign', 'Honest'],
+        rule: 'Greek ps-/pn- drops P; -gn drops G before final nasal.',
+      },
+      'SVO Word Order & Prepositions': {
+        count: grammarMistakes.length,
+        sampleWords: ['Discuss about → Discuss', 'Married with → Married to'],
+        rule: 'English uses Subject-Verb-Object order and direct transitive verbs.',
+      },
+    };
+
+    for (const m of spellingMistakes) {
+      const text = `${m.prompt} ${m.correctAnswer} ${m.explanation}`.toLowerCase();
+      if (text.includes('silent k') || text.includes('silent w') || /\b(kn|wr)/.test(text)) {
+        patternCounts['Silent K / W (kn-, wr-)'].count += 2;
+      } else if (
+        text.includes('silent b') ||
+        text.includes('silent t') ||
+        /\b(doubt|subtle|plumber|castle|listen|fasten)/.test(text)
+      ) {
+        patternCounts['Silent B / T (-mb, -bt, -stle)'].count += 2;
+      } else {
+        patternCounts['Silent P / G / H (ps-, -gn, h-)'].count += 2;
+      }
+    }
+
+    for (const w of dueSRSWords) {
+      const rule = (w.silentLettersSummary || '').toLowerCase();
+      if (rule.includes('silent k') || rule.includes('silent w')) {
+        patternCounts['Silent K / W (kn-, wr-)'].count += 1;
+      } else if (rule.includes('silent b') || rule.includes('silent t')) {
+        patternCounts['Silent B / T (-mb, -bt, -stle)'].count += 1;
+      } else if (rule.includes('silent p') || rule.includes('silent g') || rule.includes('silent h')) {
+        patternCounts['Silent P / G / H (ps-, -gn, h-)'].count += 1;
+      }
+    }
+
+    const sorted = Object.entries(patternCounts).sort((a, b) => b[1].count - a[1].count);
+    const [topTitle, topData] = sorted[0];
+
+    return {
+      totalMistakes: mistakes.length,
+      dueCount: dueSRSWords.length,
+      topWeakArea: topTitle,
+      sampleWords: topData.sampleWords,
+      ruleSummary: topData.rule,
+      isGrammarTop: topTitle.includes('SVO'),
+    };
+  }, [progress.mistakeNotebook, dueSRSWords]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F4] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB]">
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        toastOptions={{
+          className: 'mb-16 md:mb-0 font-sans',
+        }}
+      />
       {/* =================================================================== */}
       {/* TOP HEADER BAR: [भ BhashaSetu] — [Global Search] — [Streak + Avatar] */}
       {/* =================================================================== */}
@@ -1590,49 +1765,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Celebratory Live Achievement Unlock Toast Banner */}
-      {liveAchievementToast && (
-        <div className="sticky top-16 z-40 bg-[#1F5C3D] text-white border-b border-emerald-700 px-4 py-3 shadow-lg">
-          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-400 text-[#1C1917] flex items-center justify-center shrink-0">
-                <Trophy className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] font-ipa uppercase tracking-wider text-amber-200 font-semibold">
-                  Achievement Unlocked! · {liveAchievementToast.nepaliTitle}
-                </div>
-                <div className="text-sm font-bold">
-                  {liveAchievementToast.title} —{' '}
-                  <span className="font-normal text-emerald-100 text-xs">
-                    {liveAchievementToast.desc}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setLiveAchievementToast(null);
-                  openProgressSubView('achievements');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-amber-400 text-[#1C1917] text-xs font-semibold hover:bg-amber-300"
-              >
-                View Badge
-              </button>
-              <button
-                type="button"
-                onClick={() => setLiveAchievementToast(null)}
-                aria-label="Dismiss achievement notification"
-                className="p-1 rounded-lg hover:bg-emerald-800 text-emerald-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Achievement & Lock notifications are handled via floating auto-dismissing Sonner toasts */}
 
       {/* =================================================================== */}
       {/* BODY LAYOUT: PERSISTENT LEFT SIDEBAR + MAIN CONTENT WORKSPACE       */}
@@ -1672,6 +1805,7 @@ export default function App() {
                     label: 'Dictionary',
                     icon: BookMarked,
                     isActive: activeTab === 'dictionary',
+                    badgeCount: dueSRSWords.length,
                   },
                   {
                     id: 'arena' as NavTab,
@@ -1691,15 +1825,25 @@ export default function App() {
                       className={`group relative w-full flex items-center rounded-xl text-sm transition-colors ${
                         isSidebarCollapsed
                           ? 'justify-center h-11 w-11 mx-auto'
-                          : 'gap-3 px-3 py-2.5'
+                          : 'justify-between px-3 py-2.5'
                       } ${
                         item.isActive
                           ? 'font-semibold text-[#A82020] dark:text-[#F87171] bg-[#F2EDE4] dark:bg-[#1F1C18]'
                           : 'font-normal text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EDE4]/60'
                       }`}
                     >
-                      <IconComponent className="w-4 h-4 shrink-0" />
-                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      <span className="flex items-center gap-3 min-w-0">
+                        <IconComponent className="w-4 h-4 shrink-0" />
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </span>
+                      {!isSidebarCollapsed && 'badgeCount' in item && item.badgeCount ? (
+                        <span
+                          title={`${item.badgeCount} words due for SRS review`}
+                          className="px-1.5 py-0.5 rounded-full bg-[#9E2A2B]/12 text-[#9E2A2B] dark:text-[#F87171] text-[10px] font-ipa font-semibold shrink-0"
+                        >
+                          {item.badgeCount} due
+                        </span>
+                      ) : null}
                       {isSidebarCollapsed && (
                         <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#1C1917] text-[#FAF8F4] text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-md">
                           {item.label}
@@ -1951,6 +2095,7 @@ export default function App() {
               onPullFromCloud={handlePullFromCloud}
               onUpdateUserName={handleUpdateUserName}
               onToggleDailyReminder={handleToggleDailyReminder}
+              onToggleHapticFeedback={handleToggleHapticFeedback}
               onResetAllProgress={handleResetAllProgress}
             />
           ) : activeTab === 'settings' ? (
@@ -1979,6 +2124,7 @@ export default function App() {
               onPullFromCloud={handlePullFromCloud}
               onUpdateUserName={handleUpdateUserName}
               onToggleDailyReminder={handleToggleDailyReminder}
+              onToggleHapticFeedback={handleToggleHapticFeedback}
               onResetAllProgress={handleResetAllProgress}
             />
           ) : activeTab === 'about' ? (
@@ -2002,13 +2148,13 @@ export default function App() {
             /* =============================================================== */
             /* LESSONS VIEW (Exact Editorial Match to Screenshot 2)            */
             /* =============================================================== */
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-8">
+            <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
               {/* Top Heading */}
               <div>
                 <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.12em] text-[#A82020] dark:text-[#F87171] mb-1.5">
                   YOUR CURRICULUM
                 </div>
-                <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
+                <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
                   Lessons for your next step
                 </h1>
                 <p className="text-xs sm:text-sm md:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1">
@@ -2074,60 +2220,22 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsAIModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors shadow-xs shrink-0 self-start lg:self-auto"
+                  className="px-4 py-2 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] active:scale-[0.98] text-white text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 self-start lg:self-auto"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>Create AI lesson</span>
                 </button>
               </div>
 
-              {/* Locked Lecture Notice Popup / Callout when user clicks a Lock icon */}
-              {lockedLectureNotice && (
-                <div
-                  role="alert"
-                  className="rounded-2xl bg-[#FFFBEB] dark:bg-amber-950/40 border-[1.5px] border-[#D97706] dark:border-amber-500/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-                >
-                  <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-[#FEF3C7] dark:bg-amber-900/60 text-[#B45309] dark:text-amber-300 flex items-center justify-center shrink-0">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                        Lecture {String(lockedLectureNotice.lectureNumber).padStart(2, '0')} is locked
-                      </p>
-                      <p className="text-xs text-[#6E685F] dark:text-[#D6D3CD] mt-0.5">
-                        This lecture is locked — you must finish{' '}
-                        <span className="font-semibold text-[#1C1917] dark:text-white">
-                          Lecture {String(lockedLectureNotice.prevLectureNumber).padStart(2, '0')} (
-                          {lockedLectureNotice.prevTitle})
-                        </span>{' '}
-                        first to unlock it.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const targetPrevId = lockedLectureNotice.prevId;
-                        setLockedLectureNotice(null);
-                        openLecture(targetPrevId, 0);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs font-medium transition-colors"
-                    >
-                      Go to Lecture {String(lockedLectureNotice.prevLectureNumber).padStart(2, '0')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLockedLectureNotice(null)}
-                      aria-label="Dismiss locked message"
-                      className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-white"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Lesson & Track Progress Card (Step Completion + Track Quiz Accuracy) */}
+              <LessonProgressCard
+                lectures={CORE_SYLLABUS}
+                progress={progress}
+                recommendedLecture={recommendedLecture}
+                activeLevelFilter={levelFilter}
+                onSelectLevelFilter={(lvl) => setLevelFilter(lvl)}
+                onOpenLecture={(lectureId, step = 0) => openLecture(lectureId, step)}
+              />
 
               {/* Level Group Containers (B1, B2, C1) */}
               <div className="space-y-6">
@@ -2248,15 +2356,24 @@ export default function App() {
 
                             const triggerLockedMessage = (e?: React.MouseEvent) => {
                               if (e) e.stopPropagation();
+                              speechService.playWrongTone();
                               const fallbackPrev = prevLesson || lesson;
                               const prevPres = getEditorialLessonPresentation(fallbackPrev);
-                              setLockedLectureNotice({
-                                lectureNumber: lesson.lectureNumber,
-                                title: displayTitle,
-                                prevId: fallbackPrev.id,
-                                prevLectureNumber: fallbackPrev.lectureNumber,
-                                prevTitle: prevPres.displayTitle,
-                              });
+                              toast.warning(
+                                `Lecture ${String(lesson.lectureNumber).padStart(2, '0')} is locked`,
+                                {
+                                  description: `Finish Lecture ${String(
+                                    fallbackPrev.lectureNumber
+                                  ).padStart(2, '0')} (${prevPres.displayTitle}) first to unlock it.`,
+                                  duration: 5000,
+                                  action: {
+                                    label: `Open Lecture ${String(
+                                      fallbackPrev.lectureNumber
+                                    ).padStart(2, '0')}`,
+                                    onClick: () => openLecture(fallbackPrev.id, 0),
+                                  },
+                                }
+                              );
                             };
 
                             return (
@@ -2282,13 +2399,13 @@ export default function App() {
                                     </div>
 
                                     <div className="min-w-0 flex-1">
-                                      <h3 className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
+                                      <h3 className="text-[0.8125rem] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
                                         {displayTitle}
                                       </h3>
-                                      <p className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
+                                      <p className="text-[0.6875rem] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
                                         {displaySub}
                                       </p>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1 md:hidden text-[10px] text-[#78716C] dark:text-[#A8A29E]">
+                                      <div className="flex flex-wrap items-center gap-2 mt-1 md:hidden text-[0.625rem] text-[#78716C] dark:text-[#A8A29E]">
                                         <span>
                                           {isInProgress
                                             ? `Step ${Math.max(1, stepsDone + 1)}/5 · ${duration}m left`
@@ -2475,28 +2592,36 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    {/* Key Words Preview */}
+                                    {/* Key Words Preview with Instant Phonetics Popover */}
                                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                       <span className="text-[#78716C] mr-1">
-                                        Key Words (tap to hear):
+                                        Key Words (tap for phonetics):
                                       </span>
                                       {lesson.moduleA_vocabulary.slice(0, 6).map((vocab) => (
-                                        <button
+                                        <WordPhoneticsPopover
                                           key={vocab.id}
-                                          type="button"
-                                          onClick={() =>
-                                            speechService.speak(vocab.word, {
-                                              rate: progress.preferredSpeechRate,
-                                            })
-                                          }
-                                          className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs inline-flex items-center gap-1 hover:border-[#A82020]"
+                                          word={vocab.word}
+                                          ipa={vocab.ipa}
+                                          partOfSpeech={vocab.partOfSpeech}
+                                          nepaliMeaning={vocab.nepaliMeaning}
+                                          silentLettersSummary={vocab.silentLettersSummary}
+                                          englishExample={vocab.englishExample}
+                                          segments={vocab.segments}
+                                          isSaved={progress.savedWordIds.includes(vocab.id)}
+                                          preferredSpeechRate={progress.preferredSpeechRate}
+                                          onToggleSave={() => handleToggleSaveWord(vocab.id)}
                                         >
-                                          <Volume2 className="w-3 h-3 text-[#A82020]" />
-                                          <span className="font-medium">{vocab.word}</span>
-                                          <span className="font-nepali text-[#1F5C3D] text-[11px]">
-                                            ({vocab.nepaliMeaning})
-                                          </span>
-                                        </button>
+                                          <button
+                                            type="button"
+                                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs inline-flex items-center gap-1 hover:border-[#A82020]"
+                                          >
+                                            <Volume2 className="w-3 h-3 text-[#A82020]" />
+                                            <span className="font-bold">{vocab.word}</span>
+                                            <span className="font-nepali text-[#1F5C3D] text-[11px]">
+                                              ({vocab.nepaliMeaning})
+                                            </span>
+                                          </button>
+                                        </WordPhoneticsPopover>
                                       ))}
                                     </div>
                                   </div>
@@ -2544,7 +2669,7 @@ export default function App() {
               {/* Bottom Section: Your custom lessons (Exact match to Screenshot 2) */}
               <section className="pt-2 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-serif text-xl sm:text-2xl font-normal text-[#1C1917] dark:text-[#F5F2EB]">
+                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                     Your custom lessons
                   </h2>
                   <button
@@ -2597,7 +2722,7 @@ export default function App() {
             /* =============================================================== */
             /* HOME VIEW: EXACT EDITORIAL LAYOUT + AI COACH & WORD SPOTLIGHT   */
             /* =============================================================== */
-            <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-24 space-y-6">
+            <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
               {/* Top Greeting Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -2607,7 +2732,7 @@ export default function App() {
                       .toUpperCase()}{' '}
                     · YOUR LEARNING SPACE
                   </div>
-                  <h1 className="font-serif text-3xl sm:text-[38px] leading-tight font-normal text-[#1C1917] dark:text-[#F5F2EB] tracking-tight mt-1">
+                  <h1 className="font-serif text-3xl sm:text-[38px] leading-tight font-bold text-[#1C1917] dark:text-[#F5F2EB] tracking-tight mt-1">
                     Namaste, {firstName}
                   </h1>
                   <p className="text-sm text-[#6E685F] dark:text-[#A8A29E] mt-1">
@@ -2631,8 +2756,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* First Hero Banner: CONTINUE YOUR PATH + Tilted Open Book अ | A Illustration */}
-              <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#EFEADE] via-[#EAE1D2] to-[#E2D6C3] dark:from-[#221E1A] dark:via-[#1E1A17] dark:to-[#181512] border border-[#E4DDD0] dark:border-[#2E2924] p-7 sm:p-9">
+              {/* First Hero Banner: CONTINUE YOUR PATH + Tilted Open Book अ | A Underlay on Mobile */}
+              <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#EFEADE] via-[#EAE1D2] to-[#E2D6C3] dark:from-[#221E1A] dark:via-[#1E1A17] dark:to-[#181512] border border-[#E4DDD0] dark:border-[#2E2924] p-6 sm:p-9">
                 {/* Subtle Devanagari Watermark in Bottom Right */}
                 <div
                   aria-hidden="true"
@@ -2641,20 +2766,20 @@ export default function App() {
                   भाषासेतु
                 </div>
 
-                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                  <div className="lg:col-span-7 space-y-3">
+                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+                  <div className="lg:col-span-7 space-y-3 relative z-10 pr-8 sm:pr-20 lg:pr-0">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9E3B2E] dark:text-[#F87171]">
                       CONTINUE YOUR PATH
                     </div>
-                    <h2 className="font-serif text-3xl sm:text-[34px] leading-[1.18] font-normal text-[#1C1917] dark:text-[#F5F2EB] max-w-lg">
+                    <h2 className="font-serif text-2xl sm:text-[34px] leading-[1.18] font-bold text-[#1C1917] dark:text-[#F5F2EB] max-w-lg">
                       Speak with confidence, one lesson at a time.
                     </h2>
-                    <p className="text-sm text-[#655E54] dark:text-[#A8A29E] max-w-md leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[#655E54] dark:text-[#A8A29E] max-w-md leading-relaxed">
                       Pick up where you left off and keep building your English, at your own pace.
                     </p>
 
                     {/* Lesson Duration & Index Metadata Row */}
-                    <div className="pt-1 flex flex-wrap items-center gap-5 text-xs text-[#655E54] dark:text-[#A8A29E]">
+                    <div className="pt-1 flex flex-wrap items-center gap-4 sm:gap-5 text-xs text-[#655E54] dark:text-[#A8A29E]">
                       <span className="inline-flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-[#78716C]" />
                         <span>{getEditorialLessonPresentation(recommendedLecture).duration} min</span>
@@ -2689,8 +2814,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Right Column: Circular Sandstone Backdrop + Tilted Open Book (अ | A) */}
-                  <div className="lg:col-span-5 flex justify-center lg:justify-end">
+                  {/* Right Column on Desktop / Underlay on Mobile (< lg): Circular Sandstone Backdrop + Tilted Open Book (अ | A) */}
+                  <div className="absolute right-3 bottom-3 lg:static lg:col-span-5 flex justify-end opacity-20 sm:opacity-35 lg:opacity-100 pointer-events-none lg:pointer-events-auto z-0 lg:z-10">
                     <button
                       type="button"
                       onClick={() =>
@@ -2699,11 +2824,11 @@ export default function App() {
                         })
                       }
                       title="Click to hear pronunciation"
-                      className="w-44 h-44 sm:w-48 sm:h-48 rounded-full bg-[#D7C6AE]/80 dark:bg-[#2C2620] flex items-center justify-center relative group transition-transform hover:scale-[1.02] focus:outline-none"
+                      className="w-36 h-36 sm:w-44 sm:h-44 lg:w-48 lg:h-48 rounded-full bg-[#D7C6AE]/80 dark:bg-[#2C2620] flex items-center justify-center relative group transition-transform hover:scale-[1.02] focus:outline-none"
                     >
                       <svg
                         viewBox="0 0 220 165"
-                        className="w-44 h-36 -rotate-6 drop-shadow-[0_8px_16px_rgba(28,25,23,0.08)]"
+                        className="w-36 h-28 sm:w-44 sm:h-36 -rotate-6 drop-shadow-[0_8px_16px_rgba(28,25,23,0.08)]"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                       >
@@ -2804,108 +2929,139 @@ export default function App() {
               </section>
 
               {/* 4 KPI Summary Cards Row */}
-              <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* KPI 1: Learning streak */}
-                <button
-                  type="button"
-                  onClick={() => openProgressSubView('overview')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+              {isInitialHydrating ? (
+                <section
+                  aria-label="Loading learning metrics"
+                  className="grid grid-cols-2 lg:grid-cols-4 gap-3.5"
                 >
-                  <div>
-                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      Learning streak
-                    </div>
-                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
-                      {progress.currentStreakDays || 0} days
-                    </div>
-                  </div>
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
-                    Your longest is{' '}
-                    {Math.max(progress.longestStreakDays || 0, progress.currentStreakDays || 0)}{' '}
-                    days
-                  </div>
-                </button>
-
-                {/* KPI 2: Words explored */}
-                <button
-                  type="button"
-                  onClick={() => navigateTab('dictionary')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Words explored</div>
-                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
-                      {wordsLearnedDisplayCount}
-                    </div>
-                  </div>
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
-                    +{progress.savedWordIds.length + (progress.masteredWordIds || []).length} this week
-                  </div>
-                </button>
-
-                {/* KPI 3: Lessons completed */}
-                <button
-                  type="button"
-                  onClick={() => navigateTab('lessons')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      Lessons completed
-                    </div>
-                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
-                      {courseStats.completedCount}{' '}
-                      <span className="text-sm font-sans text-[#78716C]">
-                        / {courseStats.totalUnits}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
-                    You&apos;re building momentum
-                  </div>
-                </button>
-
-                {/* KPI 4: Today's goal */}
-                <button
-                  type="button"
-                  onClick={() => navigateTab('settings')}
-                  className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      Today&apos;s goal
-                    </div>
-                    <div className="font-serif text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
-                      {homeWeekBars.entries[6]?.minutes || 0}{' '}
-                      <span className="text-sm font-sans text-[#78716C]">
-                        / {progress.dailyGoalMinutes || 15} min
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-3.5 overflow-hidden">
+                  {[0, 1, 2, 3].map((idx) => (
                     <div
-                      className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.round(
-                            ((homeWeekBars.entries[6]?.minutes || 0) /
-                              (progress.dailyGoalMinutes || 15)) *
-                              100
-                          )
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </button>
-              </section>
+                      key={idx}
+                      className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 space-y-3"
+                    >
+                      <div className="h-3 w-24 rounded-md skeleton-shimmer" />
+                      <div className="h-7 w-20 rounded-lg skeleton-shimmer" />
+                      <div className="h-3 w-28 rounded-md skeleton-shimmer" />
+                    </div>
+                  ))}
+                </section>
+              ) : (
+                <section className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  {/* KPI 1: Learning streak */}
+                  <button
+                    type="button"
+                    onClick={() => openProgressSubView('overview')}
+                    className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        Learning streak
+                      </div>
+                      <div className="font-serif font-bold text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                        {progress.currentStreakDays || 0} days
+                      </div>
+                    </div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                      Your longest is{' '}
+                      {Math.max(progress.longestStreakDays || 0, progress.currentStreakDays || 0)}{' '}
+                      days
+                    </div>
+                  </button>
+
+                  {/* KPI 2: Words explored */}
+                  <button
+                    type="button"
+                    onClick={() => navigateTab('dictionary')}
+                    className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">Words explored</div>
+                      <div className="font-serif font-bold text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                        {wordsLearnedDisplayCount}
+                      </div>
+                    </div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                      +{progress.savedWordIds.length + (progress.masteredWordIds || []).length} this week
+                    </div>
+                  </button>
+
+                  {/* KPI 3: Lessons completed */}
+                  <button
+                    type="button"
+                    onClick={() => navigateTab('lessons')}
+                    className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        Lessons completed
+                      </div>
+                      <div className="font-serif font-bold text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                        {courseStats.completedCount}{' '}
+                        <span className="text-sm font-sans font-normal text-[#78716C]">
+                          / {courseStats.totalUnits}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-3">
+                      You&apos;re building momentum
+                    </div>
+                  </button>
+
+                  {/* KPI 4: Today's goal */}
+                  <button
+                    type="button"
+                    onClick={() => navigateTab('settings')}
+                    className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 text-left hover:border-[#9E2A2B]/50 transition-colors flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                        Today&apos;s goal
+                      </div>
+                      <div className="font-serif font-bold text-2xl sm:text-[28px] text-[#1C1917] dark:text-[#F5F2EB] mt-2 leading-none">
+                        {homeWeekBars.entries[6]?.minutes || 0}{' '}
+                        <span className="text-sm font-sans font-normal text-[#78716C]">
+                          / {progress.dailyGoalMinutes || 15} min
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-3.5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              ((homeWeekBars.entries[6]?.minutes || 0) /
+                                (progress.dailyGoalMinutes || 15)) *
+                                100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </button>
+                </section>
+              )}
+
+              {/* Home Lesson Progress Card: Individual Step Completion & Track Quiz Accuracy */}
+              <LessonProgressCard
+                lectures={CORE_SYLLABUS}
+                progress={progress}
+                recommendedLecture={recommendedLecture}
+                compact
+                onSelectLevelFilter={(lvl) => {
+                  setLevelFilter(lvl);
+                  navigateTab('lessons');
+                }}
+                onOpenLecture={(lectureId, step = 0) => openLecture(lectureId, step)}
+              />
 
               {/* Two-Column Section: "Pick up where you left off" + "Your week" */}
               <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                 {/* Left Column: Pick up where you left off */}
                 <div className="lg:col-span-7 flex flex-col justify-between space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-serif text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
+                    <h2 className="font-serif font-bold text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
                       Pick up where you left off
                     </h2>
                     <button
@@ -2917,64 +3073,103 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-6 flex flex-col justify-center">
-                    <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
-                      LESSON {String(recommendedLecture.lectureNumber).padStart(2, '0')} ·{' '}
-                      {recommendedLecture.category.toUpperCase()}
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 sm:gap-4 mt-3">
-                      <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
-                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] font-serif text-xs sm:text-base font-semibold flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                          {String(recommendedLecture.lectureNumber).padStart(2, '0')}
+                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-6 flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                          LESSON {String(recommendedLecture.lectureNumber).padStart(2, '0')} ·{' '}
+                          {recommendedLecture.category.toUpperCase()}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
-                            {getEditorialLessonPresentation(recommendedLecture).displayTitle}
-                          </div>
-                          <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
-                            Step{' '}
-                            {Math.min(
-                              5,
-                              (progress.completedStepsByLecture?.[recommendedLecture.id]?.length ||
-                                0) + 1
-                            )}{' '}
-                            of 5 · {getEditorialLessonPresentation(recommendedLecture).displaySub}
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-2.5 sm:mt-3 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
-                              style={{
-                                width: `${Math.max(
-                                  12,
-                                  Math.round(
-                                    ((progress.completedStepsByLecture?.[recommendedLecture.id]
-                                      ?.length || 0) /
-                                      5) *
-                                      100
-                                  )
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
+                        <span className="font-ipa text-[11px] font-bold text-[#1F5C3D] dark:text-emerald-400">
+                          {courseStats.completedCount}/{courseStats.totalUnits} Lessons Done
+                        </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openLecture(
-                            recommendedLecture.id,
-                            Math.min(
-                              4,
-                              progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0
-                            ) as ModuleStep
-                          )
-                        }
-                        className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl border border-[#DFD9CE] dark:border-[#2E2924] text-xs sm:text-sm font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#26221E] transition-colors shrink-0"
-                      >
-                        Resume
-                      </button>
+                      <div className="flex items-center justify-between gap-3 sm:gap-4 mt-3">
+                        <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] font-serif text-xs sm:text-base font-bold flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                            {String(recommendedLecture.lectureNumber).padStart(2, '0')}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] sm:text-base font-bold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
+                              {getEditorialLessonPresentation(recommendedLecture).displayTitle}
+                            </div>
+                            <div className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
+                              Step{' '}
+                              {Math.min(
+                                5,
+                                (progress.completedStepsByLecture?.[recommendedLecture.id]?.length ||
+                                  0) + 1
+                              )}{' '}
+                              of 5 · {getEditorialLessonPresentation(recommendedLecture).displaySub}
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-2.5 sm:mt-3 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-[#3F624D] transition-all duration-300"
+                                style={{
+                                  width: `${Math.max(
+                                    12,
+                                    Math.round(
+                                      ((progress.completedStepsByLecture?.[recommendedLecture.id]
+                                        ?.length || 0) /
+                                        5) *
+                                        100
+                                    )
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openLecture(
+                              recommendedLecture.id,
+                              Math.min(
+                                4,
+                                progress.completedStepsByLecture?.[recommendedLecture.id]?.length || 0
+                              ) as ModuleStep
+                            )
+                          }
+                          className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl border border-[#DFD9CE] dark:border-[#2E2924] text-xs sm:text-sm font-semibold text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#26221E] transition-colors shrink-0"
+                        >
+                          Resume
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Track Progress Summary Strip inside Home Lesson Progress Card */}
+                    <div className="pt-3 border-t border-[#EFEAE0] dark:border-[#2E2924] grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'B1 Foundation', done: courseStats.b1Done, total: courseStats.b1Total, color: 'bg-[#2E6F4E]' },
+                        { label: 'B2 Workplace', done: courseStats.b2Done, total: courseStats.b2Total, color: 'bg-[#284B7A]' },
+                        { label: 'C1 Advanced', done: courseStats.c1Done, total: courseStats.c1Total, color: 'bg-[#9E2A2B]' },
+                      ].map((trk) => {
+                        const pct = trk.total > 0 ? Math.round((trk.done / trk.total) * 100) : 0;
+                        return (
+                          <button
+                            key={trk.label}
+                            type="button"
+                            onClick={() => navigateTab('lessons')}
+                            className="p-2 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-left hover:border-[#9E2A2B]/40 transition-colors"
+                          >
+                            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                              <span className="truncate">{trk.label}</span>
+                              <span className="font-ipa shrink-0 ml-1">
+                                {trk.done}/{trk.total}
+                              </span>
+                            </div>
+                            <div className="w-full h-1 rounded-full bg-[#EAE5DC] dark:bg-[#26221E] mt-1.5 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${trk.color}`}
+                                style={{ width: `${Math.max(8, pct)}%` }}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2982,7 +3177,7 @@ export default function App() {
                 {/* Right Column: Your week */}
                 <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-serif text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
+                    <h2 className="font-serif font-bold text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
                       Your week
                     </h2>
                     <button
@@ -3001,7 +3196,7 @@ export default function App() {
                           ? `${homeWeekBars.entries[selectedWeekDayIdx]?.dayName} studied`
                           : 'Minutes studied'}
                       </span>
-                      <span className="font-serif text-xl sm:text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
+                      <span className="font-serif font-bold text-xl sm:text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
                         {selectedWeekDayIdx !== null
                           ? `${homeWeekBars.entries[selectedWeekDayIdx]?.minutes} min`
                           : `${homeWeekBars.totalMinutes} min`}
@@ -3080,8 +3275,34 @@ export default function App() {
                 </button>
               </section>
 
-              {/* Word of the Day Card */}
-              {wordOfTheDay && (
+              {/* Word of the Day Card (with Skeleton Loader during initial load & word cycle) */}
+              {isInitialHydrating || isWordOfTheDayLoading || !wordOfTheDay ? (
+                <section
+                  aria-label="Loading Word of the Day"
+                  className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                    <div className="space-y-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3.5 w-28 rounded-md skeleton-shimmer" />
+                        <div className="h-5 w-20 rounded-full skeleton-shimmer" />
+                        <div className="h-5 w-32 rounded-full skeleton-shimmer" />
+                      </div>
+                      <div className="flex flex-wrap items-baseline gap-3">
+                        <div className="h-8 w-40 rounded-lg skeleton-shimmer" />
+                        <div className="h-5 w-24 rounded-md skeleton-shimmer" />
+                        <div className="h-6 w-28 rounded-md skeleton-shimmer" />
+                      </div>
+                      <div className="h-4 w-full max-w-xl rounded-md skeleton-shimmer" />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="h-10 w-24 rounded-xl skeleton-shimmer" />
+                      <div className="h-10 w-20 rounded-xl skeleton-shimmer" />
+                      <div className="h-10 w-28 rounded-xl skeleton-shimmer" />
+                    </div>
+                  </div>
+                </section>
+              ) : (
                 <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
                     <div className="space-y-2.5 flex-1 min-w-0">
@@ -3102,7 +3323,7 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-wrap items-baseline gap-3">
-                        <h2 className="font-serif text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB]">
+                        <h2 className="font-serif font-bold text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB]">
                           {wordOfTheDay.segments?.map((seg, idx) =>
                             seg.silent ? (
                               <span
@@ -3137,11 +3358,12 @@ export default function App() {
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          speechService.triggerHaptic('light');
                           speechService.speak(wordOfTheDay.word, {
                             rate: progress.preferredSpeechRate,
-                          })
-                        }
+                          });
+                        }}
                         aria-label={`Play pronunciation for ${wordOfTheDay.word}`}
                         className="px-4 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors shadow-xs"
                       >
@@ -3151,11 +3373,12 @@ export default function App() {
 
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          speechService.triggerHaptic('light');
                           speechService.speak(wordOfTheDay.word, {
                             rate: 0.55,
-                          })
-                        }
+                          });
+                        }}
                         title="Listen slowly at 0.55x speed"
                         className="px-3 py-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] transition-colors"
                       >
@@ -3164,7 +3387,7 @@ export default function App() {
 
                       <button
                         type="button"
-                        onClick={() => setWordOfTheDayOffset((n) => n + 1)}
+                        onClick={handleCycleWordOfTheDay}
                         title="Show another high-frequency word"
                         className="px-3 py-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5 transition-colors"
                       >
@@ -3176,7 +3399,70 @@ export default function App() {
                 </section>
               )}
 
-              {/* ============================================================= */}
+              {/* Weak-Spot Mistake Radar + Daily Challenge Row (with Skeleton Loader) */}
+              {isInitialHydrating ? (
+                <section
+                  aria-label="Loading Weak-Spot Mistake Radar"
+                  className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                >
+                  <div className="space-y-2.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3.5 w-36 rounded-md skeleton-shimmer" />
+                      <div className="h-5 w-24 rounded-full skeleton-shimmer" />
+                    </div>
+                    <div className="h-6 w-64 rounded-lg skeleton-shimmer" />
+                    <div className="h-4 w-80 max-w-full rounded-md skeleton-shimmer" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 w-32 rounded-xl skeleton-shimmer" />
+                    <div className="h-10 w-40 rounded-xl skeleton-shimmer" />
+                  </div>
+                </section>
+              ) : (
+                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                        WEAK-SPOT MISTAKE RADAR
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-[#F8E7E3] dark:bg-red-950/50 text-[11px] font-medium text-[#9E2A2B] dark:text-red-300">
+                        {mistakeRadarSummary.totalMistakes > 0
+                          ? `${mistakeRadarSummary.totalMistakes} logged mistakes`
+                          : `${mistakeRadarSummary.dueCount} SRS words queued`}
+                      </span>
+                    </div>
+                    <h3 className="font-serif font-bold text-lg sm:text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                      Focus area: {mistakeRadarSummary.topWeakArea}
+                    </h3>
+                    <p className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
+                      {mistakeRadarSummary.ruleSummary} · Key targets:{' '}
+                      <span className="font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                        {mistakeRadarSummary.sampleWords.join(', ')}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openArenaTool(mistakeRadarSummary.isGrammarTop ? 'interference' : 'sprint')
+                      }
+                      className="px-4 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Targeted Fix →</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateTab('dictionary')}
+                      className="px-3.5 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors"
+                    >
+                      Review Due Queue ({mistakeRadarSummary.dueCount})
+                    </button>
+                  </div>
+                </section>
+              )}
               {/* AI SENTENCE & GRAMMAR COACH + SILENT-LETTER WORD SPOTLIGHT    */}
               {/* ============================================================= */}
               <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -3189,7 +3475,7 @@ export default function App() {
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>AI SENTENCE & GRAMMAR COACH</span>
                         </div>
-                        <h2 className="font-serif text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                        <h2 className="font-serif font-bold text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
                           Check grammar or translate a thought
                         </h2>
                       </div>
@@ -3260,7 +3546,22 @@ export default function App() {
                       </div>
                     )}
 
-                    {sentenceCoachResult && (
+                    {isSentenceCoachLoading && (
+                      <div
+                        aria-label="Analyzing sentence"
+                        className="p-4 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="h-4 w-24 rounded-md skeleton-shimmer" />
+                          <div className="h-4 w-14 rounded-md skeleton-shimmer" />
+                        </div>
+                        <div className="h-4 w-3/4 rounded-md skeleton-shimmer" />
+                        <div className="h-4 w-2/3 rounded-md skeleton-shimmer" />
+                        <div className="h-10 w-full rounded-lg skeleton-shimmer" />
+                      </div>
+                    )}
+
+                    {!isSentenceCoachLoading && sentenceCoachResult && (
                       <div className="p-4 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2 text-xs">
                         <div className="flex items-center justify-between gap-2">
                           <span className="px-2 py-0.5 rounded-md bg-[#DCECE2] text-[#1F5C3D] font-semibold text-[10px]">
@@ -3314,7 +3615,36 @@ export default function App() {
                 </div>
 
                 {/* Right Card (6 cols): Silent-Letter Word Spotlight + AI Phonetic Explainer */}
-                {activeSRSQuickWord && (
+                {isInitialHydrating || isSpotlightTransitioning || !activeSRSQuickWord ? (
+                  <div
+                    aria-label="Loading Silent-Letter Word Spotlight"
+                    className="lg:col-span-6 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="space-y-2">
+                          <div className="h-3.5 w-44 rounded-md skeleton-shimmer" />
+                          <div className="flex items-baseline gap-2.5">
+                            <div className="h-7 w-32 rounded-lg skeleton-shimmer" />
+                            <div className="h-4 w-20 rounded-md skeleton-shimmer" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-10 h-10 rounded-xl skeleton-shimmer" />
+                          <div className="w-12 h-10 rounded-xl skeleton-shimmer" />
+                        </div>
+                      </div>
+                      <div className="h-4 w-5/6 rounded-md skeleton-shimmer" />
+                    </div>
+                    <div className="pt-3 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-2">
+                      <div className="h-9 w-36 rounded-xl skeleton-shimmer" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-28 rounded-xl skeleton-shimmer" />
+                        <div className="h-9 w-20 rounded-xl skeleton-shimmer" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <div className="lg:col-span-6 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
@@ -3324,7 +3654,7 @@ export default function App() {
                             {dueSRSWords.length})
                           </div>
                           <div className="flex items-baseline gap-2.5 mt-1">
-                            <h2 className="font-serif text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
+                            <h2 className="font-serif font-bold text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
                               {activeSRSQuickWord.segments?.map((seg, idx) =>
                                 seg.silent ? (
                                   <span
@@ -3347,11 +3677,12 @@ export default function App() {
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              speechService.triggerHaptic('light');
                               speechService.speak(activeSRSQuickWord.word, {
                                 rate: progress.preferredSpeechRate,
-                              })
-                            }
+                              });
+                            }}
                             className="w-10 h-10 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-center text-[#9E2A2B] hover:border-[#9E2A2B]"
                             title="Listen at 1.0x speed"
                           >
@@ -3359,11 +3690,12 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              speechService.triggerHaptic('light');
                               speechService.speak(activeSRSQuickWord.word, {
                                 rate: 0.5,
-                              })
-                            }
+                              });
+                            }}
                             className="h-10 px-2.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:border-[#9E2A2B]"
                             title="Listen slowly at 0.5x speed"
                           >
@@ -3386,8 +3718,20 @@ export default function App() {
                         </div>
                       )}
 
+                      {isSpotlightAILoading && (
+                        <div
+                          aria-label="Loading AI Phonetic Breakdown"
+                          className="p-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] space-y-2"
+                        >
+                          <div className="h-3.5 w-40 rounded-md skeleton-shimmer" />
+                          <div className="h-4 w-full rounded-md skeleton-shimmer" />
+                          <div className="h-4 w-5/6 rounded-md skeleton-shimmer" />
+                        </div>
+                      )}
+
                       {/* AI Phonetic & Silent-Letter Breakdown Drawer */}
-                      {spotlightAIExplanation &&
+                      {!isSpotlightAILoading &&
+                        spotlightAIExplanation &&
                         spotlightAIExplanation.word === activeSRSQuickWord.word && (
                           <div className="p-3.5 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs space-y-1.5">
                             <div className="flex items-center justify-between">
@@ -3442,7 +3786,10 @@ export default function App() {
                         {!srsQuickFlipped ? (
                           <button
                             type="button"
-                            onClick={() => setSrsQuickFlipped(true)}
+                            onClick={() => {
+                              speechService.triggerHaptic('light');
+                              setSrsQuickFlipped(true);
+                            }}
                             className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]"
                           >
                             Reveal Nepali
@@ -3450,12 +3797,7 @@ export default function App() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              handleToggleMasteredWord(activeSRSQuickWord.id);
-                              setSrsQuickFlipped(false);
-                              setSpotlightAIExplanation(null);
-                              setSrsQuickIdx((i) => i + 1);
-                            }}
+                            onClick={() => handleCycleSpotlightWord(activeSRSQuickWord.id)}
                             className="px-3.5 py-2 rounded-xl bg-[#3F624D] text-white text-xs font-medium"
                           >
                             Mastered ✓
@@ -3463,11 +3805,7 @@ export default function App() {
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            setSrsQuickFlipped(false);
-                            setSpotlightAIExplanation(null);
-                            setSrsQuickIdx((i) => i + 1);
-                          }}
+                          onClick={() => handleCycleSpotlightWord()}
                           className="px-3 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#78716C] hover:text-[#1C1917]"
                         >
                           Next →
@@ -3515,13 +3853,20 @@ export default function App() {
 
         <button
           onClick={() => navigateTab('dictionary')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
+          className={`relative min-h-[48px] flex flex-col items-center justify-center transition-colors ${
             activeTab === 'dictionary'
               ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
               : 'text-[#57534E] dark:text-[#A8A29E]'
           }`}
         >
-          <BookMarked className="w-5 h-5" />
+          <div className="relative">
+            <BookMarked className="w-5 h-5" />
+            {dueSRSWords.length > 0 && (
+              <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#9E2A2B] text-white text-[9px] font-ipa font-bold flex items-center justify-center">
+                {dueSRSWords.length}
+              </span>
+            )}
+          </div>
           <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Dictionary</span>
         </button>
 

@@ -246,6 +246,7 @@ export interface ExamSimulationRecord {
 export interface UserProgressState {
   userName?: string;
   dailyReminderEnabled?: boolean;
+  hapticFeedbackEnabled?: boolean;
   selectedLevel: CEFRLevel;
   currentLevel?: CEFRLevel;
   dailyGoalMinutes: number;

@@ -23,6 +23,7 @@ function getTodayDateString(): string {
 export const DEFAULT_USER_PROGRESS: UserProgressState = {
   userName: 'Anisha Sharma',
   dailyReminderEnabled: true,
+  hapticFeedbackEnabled: true,
   selectedLevel: 'B1',
   currentLevel: 'B1',
   dailyGoalMinutes: 15,
@@ -182,6 +183,7 @@ export function saveUserProgress(state: UserProgressState): void {
 export function resetAllUserProgress(preservePreferences?: {
   userName?: string;
   darkMode?: boolean;
+  hapticFeedbackEnabled?: boolean;
   languageMode?: UserProgressState['languageMode'];
   selectedLevel?: CEFRLevel;
   dailyGoalMinutes?: 5 | 10 | 15 | 30;
@@ -190,6 +192,8 @@ export function resetAllUserProgress(preservePreferences?: {
     ...DEFAULT_USER_PROGRESS,
     userName: preservePreferences?.userName || DEFAULT_USER_PROGRESS.userName,
     darkMode: preservePreferences?.darkMode ?? DEFAULT_USER_PROGRESS.darkMode,
+    hapticFeedbackEnabled:
+      preservePreferences?.hapticFeedbackEnabled ?? DEFAULT_USER_PROGRESS.hapticFeedbackEnabled,
     languageMode: preservePreferences?.languageMode || DEFAULT_USER_PROGRESS.languageMode,
     selectedLevel: preservePreferences?.selectedLevel || DEFAULT_USER_PROGRESS.selectedLevel,
     currentLevel: preservePreferences?.selectedLevel || DEFAULT_USER_PROGRESS.selectedLevel,
