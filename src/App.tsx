@@ -54,10 +54,13 @@ import {
   LectureUnit,
   MistakeItem,
   ModuleScoreRecord,
+  SRSRating,
   UserProgressState,
 } from './types/curriculum';
 import {
   loadUserProgress,
+  loadFromIndexedDB,
+  getTodayDateString,
   saveUserProgress,
   recordLectureCompletion,
   recordModuleStepCompleted,
@@ -86,6 +89,7 @@ import { speechService } from './services/speech';
 import { useOnlineStatus } from './hooks/usePWA';
 import { LecturePlayer, ModuleStep } from './components/LecturePlayer';
 import { LessonProgressCard } from './components/LessonProgressCard';
+import { LevelUpCelebrationModal } from './components/LevelUpCelebrationModal';
 import { DictionaryView } from './components/DictionaryView';
 import { AILessonModal } from './components/AILessonModal';
 import { AIRoleplayModal } from './components/AIRoleplayModal';
@@ -179,6 +183,12 @@ export default function App() {
 
   // AI Roleplay Conversation Partner Modal State
   const [isAIRoleplayOpen, setIsAIRoleplayOpen] = useState(false);
+
+  // Level Up / Milestone Celebration Modal State (Image 3)
+  const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
+  const [bonusShareXP, setBonusShareXP] = useState(0);
+  const sentenceCoachSectionRef = useRef<HTMLDivElement | null>(null);
+  const sentenceCoachInputRef = useRef<HTMLInputElement | null>(null);
 
   // Home AI Sentence & Grammar Coach State
   const [sentenceCoachInput, setSentenceCoachInput] = useState('');
@@ -343,6 +353,27 @@ export default function App() {
       root.classList.remove('dark');
     }
   }, [progress.darkMode]);
+
+  // Phase 7 Audit Fix: Hydrate from IndexedDB fallback if localStorage was cleared/evicted
+  useEffect(() => {
+    const isFreshDefault =
+      progress.completedUnitIds.length === 0 &&
+      progress.savedWordIds.length === 0 &&
+      !progress.lastStudyDate;
+    if (!isFreshDefault) return;
+
+    void loadFromIndexedDB().then((idbState) => {
+      if (
+        idbState &&
+        (idbState.completedUnitIds?.length > 0 ||
+          idbState.savedWordIds?.length > 0 ||
+          Boolean(idbState.lastStudyDate))
+      ) {
+        setProgress(idbState);
+        saveUserProgress(idbState);
+      }
+    });
+  }, []);
 
   // Sync offline queue when back online
   useEffect(() => {
@@ -553,14 +584,15 @@ export default function App() {
 
       return next;
     });
+    setIsLevelUpModalOpen(true);
   };
 
   const handleCompleteStep = (lectureId: string, stepIndex: number) => {
     setProgress((prev) => recordModuleStepCompleted(prev, lectureId, stepIndex));
   };
 
-  const handleUpdateWordSRS = (wordId: string, wasCorrect: boolean) => {
-    setProgress((prev) => updateWordSRS(prev, wordId, wasCorrect));
+  const handleUpdateWordSRS = (wordId: string, ratingOrCorrect: boolean | SRSRating) => {
+    setProgress((prev) => updateWordSRS(prev, wordId, ratingOrCorrect));
   };
 
   const handleRecordMistake = (
@@ -1124,14 +1156,23 @@ export default function App() {
 
   // 7-Day Weekly Bar Chart Data for Home Screen ("Your week" M T W T F S S)
   const homeWeekBars = useMemo(() => {
+    const dailyGoal = Math.max(5, progress.dailyGoalMinutes || 15);
+    const maxScaleMinutes = Math.max(dailyGoal * 1.5, 25);
+    const goalThresholdPct = Math.min(88, Math.max(28, Math.round((dailyGoal / maxScaleMinutes) * 100)));
+
     const entries = Array.from({ length: 7 }).map((_, idx) => {
       const d = new Date(Date.now() - (6 - idx) * 86400000);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getTodayDateString(d);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
       const letter = d.toLocaleDateString('en-US', { weekday: 'short' })[0] || 'D';
       const loggedCount = progress.studyActivityByDate?.[dateStr] || 0;
       const minutes = loggedCount * 5;
-      const pct = loggedCount > 0 ? Math.min(95, Math.max(22, loggedCount * 20)) : 10;
+      const isGoalMet = minutes >= dailyGoal;
+      const rawPct =
+        minutes > 0
+          ? Math.round((minutes / maxScaleMinutes) * 100)
+          : 10;
+      const pct = minutes > 0 ? Math.min(96, Math.max(22, rawPct)) : 10;
       return {
         idx,
         letter,
@@ -1141,11 +1182,13 @@ export default function App() {
         loggedCount,
         pct,
         isFilled: loggedCount > 0,
+        isGoalMet,
       };
     });
     const totalMinutes = entries.reduce((acc, item) => acc + item.minutes, 0);
-    return { entries, totalMinutes };
-  }, [progress.studyActivityByDate]);
+    const goalsMetCount = entries.filter((item) => item.isGoalMet).length;
+    return { entries, totalMinutes, dailyGoal, goalsMetCount, goalThresholdPct };
+  }, [progress.studyActivityByDate, progress.dailyGoalMinutes]);
 
   // 4-Pillar Language Mastery Data for Home Interactive Chart
   const homeSkillPillars = useMemo(() => {
@@ -3043,6 +3086,283 @@ export default function App() {
                 </section>
               )}
 
+              {/* Image 1 Inspired: "Today Goals" Ring Card + "Quick Tools" 2x2 Grid */}
+              {(() => {
+                const todayMins = homeWeekBars.entries[6]?.minutes || 0;
+                const targetMins = progress.dailyGoalMinutes || 15;
+                const isTodayGoalMet = todayMins >= targetMins;
+                const ringPct = Math.min(100, Math.round((todayMins / targetMins) * 100));
+                const ringRadius = 30;
+                const ringCircumference = 2 * Math.PI * ringRadius;
+                const ringOffset =
+                  ringCircumference - (Math.max(8, ringPct) / 100) * ringCircumference;
+
+                const stepTotalCount = (
+                  Object.values(progress.completedStepsByLecture || {}) as number[][]
+                ).reduce((sum, arr) => sum + arr.length, 0);
+                const totalXPEarned =
+                  courseStats.completedCount * 250 +
+                  stepTotalCount * 35 +
+                  wordsLearnedDisplayCount * 15 +
+                  (progress.sprintHighScore || 0) * 5 +
+                  (progress.dailyChallengeTotalCompleted || 0) * 60 +
+                  bonusShareXP;
+                const learnerLevelNumber = Math.max(1, Math.floor(totalXPEarned / 500) + 1);
+
+                return (
+                  <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    {/* Left (5 cols): "Today Goals" Header + Ring + Streak/XP Card */}
+                    <div className="lg:col-span-5 rounded-2xl overflow-hidden bg-white dark:bg-[#1A1714] border-2 border-[#9E2A2B]/80 dark:border-[#9E2A2B]/70 flex flex-col justify-between shadow-xs">
+                      {/* Header Bar */}
+                      <div
+                        className={`px-5 py-3 flex items-center justify-between text-white ${
+                          isTodayGoalMet
+                            ? 'bg-gradient-to-r from-[#1F5C3D] to-[#2D6A4F]'
+                            : 'bg-gradient-to-r from-[#872223] to-[#9E2A2B]'
+                        }`}
+                      >
+                        <span className="font-serif font-bold text-base tracking-tight">
+                          Today Goals
+                        </span>
+                        <span className="text-xs font-semibold text-white/90 tabular-nums">
+                          {todayMins} / {targetMins} mins
+                        </span>
+                      </div>
+
+                      {/* Body: Left Circular Ring + Right Streak/XP & Completion Pill */}
+                      <div className="p-5 flex-1 flex flex-col justify-between gap-4">
+                        <div className="flex items-center gap-4 sm:gap-5">
+                          {/* Circular Progress Ring */}
+                          <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
+                            <svg className="w-20 h-20 -rotate-90" viewBox="0 0 76 76">
+                              <circle
+                                cx="38"
+                                cy="38"
+                                r={ringRadius}
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="6.5"
+                                className="text-[#EAE5DC] dark:text-[#2C2824]"
+                              />
+                              <circle
+                                cx="38"
+                                cy="38"
+                                r={ringRadius}
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="6.5"
+                                strokeLinecap="round"
+                                strokeDasharray={ringCircumference}
+                                strokeDashoffset={ringOffset}
+                                className={
+                                  isTodayGoalMet
+                                    ? 'text-[#2D6A4F] dark:text-emerald-400 transition-all duration-500'
+                                    : 'text-[#9E2A2B] dark:text-[#F87171] transition-all duration-500'
+                                }
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+                              <span className="font-serif font-bold text-lg text-[#1C1917] dark:text-[#F5F2EB] tabular-nums">
+                                {todayMins}
+                              </span>
+                              <span className="text-[10px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                                min
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Right Side: Streak | XP Earned + Goal Banner */}
+                          <div className="flex-1 min-w-0 space-y-3">
+                            <div className="grid grid-cols-2 divide-x divide-[#EAE5DC] dark:divide-[#2E2924]">
+                              <div className="pr-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Flame className="w-4 h-4 text-[#D97706] shrink-0" />
+                                  <span className="font-serif font-bold text-lg sm:text-xl text-[#1C1917] dark:text-[#F5F2EB] tabular-nums">
+                                    {progress.currentStreakDays || 0}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                                  Day Streak
+                                </div>
+                              </div>
+
+                              <div className="pl-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Sparkles className="w-4 h-4 text-[#E09F3E] shrink-0" />
+                                  <span className="font-serif font-bold text-lg sm:text-xl text-[#1C1917] dark:text-[#F5F2EB] tabular-nums">
+                                    {totalXPEarned.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                                  XP Earned
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span
+                                className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-medium ${
+                                  isTodayGoalMet
+                                    ? 'bg-[#E3EFE8] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300'
+                                    : 'bg-[#F8E7E3]/70 dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-300'
+                                }`}
+                              >
+                                {isTodayGoalMet
+                                  ? "Great job! You've completed your goal."
+                                  : `${Math.max(1, targetMins - todayMins)}m left to hit today's goal.`}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => setIsLevelUpModalOpen(true)}
+                                className="px-2.5 py-1 rounded-lg bg-[#FEF3C7] dark:bg-amber-950/60 border border-[#F59E0B]/40 text-[11px] font-bold text-[#92400E] dark:text-amber-300 hover:border-[#D97706] inline-flex items-center gap-1 transition-colors"
+                              >
+                                <Trophy className="w-3 h-3" />
+                                <span>Lvl {learnerLevelNumber}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right (7 cols): "Quick Tools" 2x2 Tactile Grid */}
+                    <div className="lg:col-span-7 flex flex-col justify-between space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h2 className="font-serif font-bold text-xl sm:text-[22px] text-[#1C1917] dark:text-[#F5F2EB]">
+                          Quick Tools
+                        </h2>
+                        <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                          One-tap practice labs
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+                        {/* Tool 1: Speaking Practice */}
+                        <button
+                          type="button"
+                          onClick={() => openArenaTool('shadowing')}
+                          className="group relative overflow-hidden rounded-2xl bg-[#F4F0E6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#2D6A4F] p-4 text-left flex flex-col justify-between min-h-[118px] transition-all"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 80 80"
+                            className="pointer-events-none absolute -right-3 -top-3 w-20 h-20 text-[#2D6A4F]/10 dark:text-emerald-400/10"
+                          >
+                            <circle cx="52" cy="24" r="18" fill="currentColor" />
+                            <circle cx="64" cy="48" r="14" fill="currentColor" />
+                            <circle cx="34" cy="42" r="12" fill="currentColor" />
+                          </svg>
+                          <div className="w-9 h-9 rounded-xl bg-[#DCECE2] dark:bg-emerald-950/70 text-[#1F5C3D] dark:text-emerald-300 flex items-center justify-center">
+                            <Mic className="w-4 h-4" />
+                          </div>
+                          <div className="mt-3">
+                            <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#1F5C3D] dark:group-hover:text-emerald-300 transition-colors">
+                              Speaking Practice
+                            </div>
+                            <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                              Voice + pitch feedback
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Tool 2: Chat with AI */}
+                        <button
+                          type="button"
+                          onClick={() => setIsAIRoleplayOpen(true)}
+                          className="group relative overflow-hidden rounded-2xl bg-[#F4F0E6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] p-4 text-left flex flex-col justify-between min-h-[118px] transition-all"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 80 80"
+                            className="pointer-events-none absolute -right-3 -top-3 w-20 h-20 text-[#9E2A2B]/10 dark:text-red-400/10"
+                          >
+                            <circle cx="52" cy="24" r="18" fill="currentColor" />
+                            <circle cx="64" cy="48" r="14" fill="currentColor" />
+                            <circle cx="34" cy="42" r="12" fill="currentColor" />
+                          </svg>
+                          <div className="w-9 h-9 rounded-xl bg-[#F8E7E3] dark:bg-red-950/70 text-[#9E2A2B] dark:text-red-300 flex items-center justify-center">
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                          <div className="mt-3">
+                            <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#9E2A2B] dark:group-hover:text-red-300 transition-colors">
+                              Chat with AI
+                            </div>
+                            <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                              Free conversation
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Tool 3: Fix my Grammar */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sentenceCoachSectionRef.current?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center',
+                            });
+                            window.setTimeout(() => {
+                              sentenceCoachInputRef.current?.focus();
+                            }, 350);
+                          }}
+                          className="group relative overflow-hidden rounded-2xl bg-[#F4F0E6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#284B7A] p-4 text-left flex flex-col justify-between min-h-[118px] transition-all"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 80 80"
+                            className="pointer-events-none absolute -right-3 -top-3 w-20 h-20 text-[#284B7A]/10 dark:text-sky-400/10"
+                          >
+                            <circle cx="52" cy="24" r="18" fill="currentColor" />
+                            <circle cx="64" cy="48" r="14" fill="currentColor" />
+                            <circle cx="34" cy="42" r="12" fill="currentColor" />
+                          </svg>
+                          <div className="w-9 h-9 rounded-xl bg-[#DCE6F2] dark:bg-sky-950/70 text-[#284B7A] dark:text-sky-300 flex items-center justify-center">
+                            <Wand2 className="w-4 h-4" />
+                          </div>
+                          <div className="mt-3">
+                            <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#284B7A] dark:group-hover:text-sky-300 transition-colors">
+                              Fix my Grammar
+                            </div>
+                            <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                              Instant correction
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Tool 4: Silent-Letter Sprint */}
+                        <button
+                          type="button"
+                          onClick={() => openArenaTool('sprint')}
+                          className="group relative overflow-hidden rounded-2xl bg-[#F4F0E6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#C88A32] p-4 text-left flex flex-col justify-between min-h-[118px] transition-all"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 80 80"
+                            className="pointer-events-none absolute -right-3 -top-3 w-20 h-20 text-[#C88A32]/12 dark:text-amber-400/10"
+                          >
+                            <circle cx="52" cy="24" r="18" fill="currentColor" />
+                            <circle cx="64" cy="48" r="14" fill="currentColor" />
+                            <circle cx="34" cy="42" r="12" fill="currentColor" />
+                          </svg>
+                          <div className="w-9 h-9 rounded-xl bg-[#F6EEDF] dark:bg-amber-950/70 text-[#8C6527] dark:text-amber-300 flex items-center justify-center">
+                            <Zap className="w-4 h-4" />
+                          </div>
+                          <div className="mt-3">
+                            <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#8C6527] dark:group-hover:text-amber-300 transition-colors">
+                              Silent-Letter Lab
+                            </div>
+                            <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+                              60s phonics sprint
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+
               {/* Home Lesson Progress Card: Individual Step Completion & Track Quiz Accuracy */}
               <LessonProgressCard
                 lectures={CORE_SYLLABUS}
@@ -3189,63 +3509,162 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                        {selectedWeekDayIdx !== null
-                          ? `${homeWeekBars.entries[selectedWeekDayIdx]?.dayName} studied`
-                          : 'Minutes studied'}
-                      </span>
-                      <span className="font-serif font-bold text-xl sm:text-2xl text-[#1C1917] dark:text-[#F5F2EB]">
-                        {selectedWeekDayIdx !== null
-                          ? `${homeWeekBars.entries[selectedWeekDayIdx]?.minutes} min`
-                          : `${homeWeekBars.totalMinutes} min`}
-                      </span>
+                  <div className="flex-1 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                          {selectedWeekDayIdx !== null
+                            ? `${homeWeekBars.entries[selectedWeekDayIdx]?.dayName} studied`
+                            : 'Minutes studied'}
+                        </span>
+                        <span className="font-serif font-bold text-xl sm:text-2xl text-[#1C1917] dark:text-[#F5F2EB] tabular-nums">
+                          {selectedWeekDayIdx !== null
+                            ? `${homeWeekBars.entries[selectedWeekDayIdx]?.minutes} min`
+                            : `${homeWeekBars.totalMinutes} min`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                        {selectedWeekDayIdx !== null ? (
+                          <span>
+                            {homeWeekBars.entries[selectedWeekDayIdx]?.isGoalMet ? (
+                              <strong className="text-[#2D6A4F] dark:text-emerald-400 font-semibold">
+                                Daily goal met ({homeWeekBars.dailyGoal}m target) ✓
+                              </strong>
+                            ) : (
+                              <span>
+                                {homeWeekBars.entries[selectedWeekDayIdx]?.minutes} /{' '}
+                                {homeWeekBars.dailyGoal} min toward daily goal
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span>
+                            <strong className="text-[#2D6A4F] dark:text-emerald-400 font-semibold">
+                              {homeWeekBars.goalsMetCount}/7
+                            </strong>{' '}
+                            daily goals met
+                          </span>
+                        )}
+                        <span>Goal · {homeWeekBars.dailyGoal}m/day</span>
+                      </div>
                     </div>
 
-                    {/* 7 Vertical Capsule Bars M T W T F S S */}
-                    <div className="grid grid-cols-7 gap-2.5 items-end pt-4">
-                      {homeWeekBars.entries.map((bar) => {
-                        const isSelected = selectedWeekDayIdx === bar.idx;
-                        const isTodayBar = bar.idx === 6;
-                        return (
-                          <button
-                            key={bar.idx}
-                            type="button"
-                            onClick={() =>
-                              setSelectedWeekDayIdx((prev) =>
-                                prev === bar.idx ? null : bar.idx
-                              )
-                            }
-                            title={`${bar.dayName}: ${bar.minutes} minutes studied`}
-                            className="flex flex-col items-center gap-2 group focus:outline-none"
-                          >
-                            <div className="w-full max-w-[26px] h-20 rounded-xl bg-[#EAE6DF] dark:bg-[#26221E] flex items-end overflow-hidden">
-                              <div
-                                className={`w-full rounded-xl transition-all duration-300 ${
-                                  isTodayBar
-                                    ? 'bg-[#9E2A2B]'
-                                    : isSelected
-                                    ? 'bg-[#3F624D]'
-                                    : bar.isFilled
-                                    ? 'bg-[#7E9987] group-hover:bg-[#3F624D]'
-                                    : 'bg-[#DFDAD0] dark:bg-[#3A342E]'
-                                }`}
-                                style={{ height: `${bar.pct}%` }}
-                              />
-                            </div>
-                            <span
-                              className={`text-[11px] ${
-                                isSelected
-                                  ? 'font-bold text-[#9E2A2B]'
-                                  : 'text-[#78716C] dark:text-[#A8A29E]'
-                              }`}
+                    {/* 7 Vertical Capsule Bars M T W T F S S with Goal Badges & Threshold Line */}
+                    <div className="relative pt-2">
+                      <div className="grid grid-cols-7 gap-2 sm:gap-2.5 items-end">
+                        {homeWeekBars.entries.map((bar) => {
+                          const isSelected = selectedWeekDayIdx === bar.idx;
+                          const isTodayBar = bar.idx === 6;
+                          return (
+                            <button
+                              key={bar.idx}
+                              type="button"
+                              onClick={() => {
+                                speechService.triggerHaptic('light');
+                                setSelectedWeekDayIdx((prev) =>
+                                  prev === bar.idx ? null : bar.idx
+                                );
+                              }}
+                              title={`${bar.dayName}: ${bar.minutes} min studied (${
+                                bar.isGoalMet
+                                  ? `Daily ${homeWeekBars.dailyGoal}m goal met`
+                                  : `${homeWeekBars.dailyGoal}m daily goal`
+                              })`}
+                              className="flex flex-col items-center gap-1.5 group focus:outline-none"
                             >
-                              {bar.letter}
-                            </span>
-                          </button>
-                        );
-                      })}
+                              {/* Top Goal-Met Badge Indicator */}
+                              <div className="h-4 flex items-center justify-center">
+                                {bar.isGoalMet ? (
+                                  <span
+                                    aria-label="Daily goal met"
+                                    className={`w-4 h-4 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 ${
+                                      isSelected
+                                        ? 'bg-[#1F5C3D] text-white ring-2 ring-[#2D6A4F]/30'
+                                        : 'bg-[#2D6A4F] dark:bg-emerald-500 text-white'
+                                    }`}
+                                  >
+                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                  </span>
+                                ) : bar.isFilled ? (
+                                  <span className="text-[9px] font-medium text-[#8C6527] dark:text-amber-400 tabular-nums">
+                                    {bar.minutes}m
+                                  </span>
+                                ) : (
+                                  <span className="w-1 h-1 rounded-full bg-[#D6D0C4] dark:bg-[#3A342E]" />
+                                )}
+                              </div>
+
+                              {/* Bar Track with Goal Threshold Line & Fill */}
+                              <div
+                                className={`relative w-full max-w-[28px] h-20 rounded-xl bg-[#EAE6DF] dark:bg-[#26221E] flex items-end overflow-hidden transition-all ${
+                                  isSelected
+                                    ? 'ring-2 ring-[#9E2A2B]/60 dark:ring-[#F87171]/60'
+                                    : ''
+                                }`}
+                              >
+                                {/* Subtle Goal Threshold Marker inside Track */}
+                                <div
+                                  aria-hidden="true"
+                                  className="absolute inset-x-0 border-t border-dashed border-[#78716C]/35 dark:border-[#A8A29E]/30 z-10 pointer-events-none"
+                                  style={{ bottom: `${homeWeekBars.goalThresholdPct}%` }}
+                                />
+
+                                <div
+                                  className={`w-full rounded-xl transition-all duration-300 ${
+                                    bar.isGoalMet
+                                      ? isTodayBar
+                                        ? 'bg-gradient-to-t from-[#1F5C3D] to-[#2D6A4F] dark:from-emerald-600 dark:to-emerald-400'
+                                        : 'bg-[#2D6A4F] dark:bg-emerald-500 group-hover:bg-[#1F5C3D]'
+                                      : isTodayBar
+                                      ? 'bg-[#9E2A2B]'
+                                      : bar.isFilled
+                                      ? 'bg-[#C88A32] dark:bg-amber-500/80 group-hover:bg-[#B07625]'
+                                      : 'bg-[#DFDAD0] dark:bg-[#3A342E]'
+                                  }`}
+                                  style={{ height: `${bar.pct}%` }}
+                                />
+                              </div>
+
+                              {/* Weekday Letter + Today Marker */}
+                              <span
+                                className={`text-[11px] leading-none ${
+                                  isSelected
+                                    ? 'font-bold text-[#9E2A2B] dark:text-[#F87171]'
+                                    : bar.isGoalMet
+                                    ? 'font-bold text-[#2D6A4F] dark:text-emerald-400'
+                                    : isTodayBar
+                                    ? 'font-semibold text-[#1C1917] dark:text-[#F5F2EB]'
+                                    : 'text-[#78716C] dark:text-[#A8A29E]'
+                                }`}
+                              >
+                                {bar.letter}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Compact Semantic Legend */}
+                    <div className="pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-2 text-[10px] text-[#78716C] dark:text-[#A8A29E]">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#2D6A4F] dark:bg-emerald-500 inline-flex items-center justify-center text-white">
+                            <Check className="w-1.5 h-1.5 stroke-[3]" />
+                          </span>
+                          <span>Goal met</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-xs bg-[#C88A32] dark:bg-amber-500/80" />
+                          <span>In progress</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-xs bg-[#9E2A2B]" />
+                          <span>Today</span>
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-[#78716C]">Tap bar to inspect</span>
                     </div>
                   </div>
                 </div>
@@ -3419,53 +3838,131 @@ export default function App() {
                   </div>
                 </section>
               ) : (
-                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
-                        WEAK-SPOT MISTAKE RADAR
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#F8E7E3] dark:bg-red-950/50 text-[11px] font-medium text-[#9E2A2B] dark:text-red-300">
-                        {mistakeRadarSummary.totalMistakes > 0
-                          ? `${mistakeRadarSummary.totalMistakes} logged mistakes`
-                          : `${mistakeRadarSummary.dueCount} SRS words queued`}
-                      </span>
+                <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 sm:p-6 space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                          YOUR WEAK SPOTS &amp; MISTAKE RADAR
+                        </span>
+                        <span className="text-xs text-[#78716C]">·</span>
+                        <span className="text-xs font-medium text-[#9E2A2B] dark:text-red-300">
+                          {mistakeRadarSummary.totalMistakes > 0
+                            ? `${mistakeRadarSummary.totalMistakes} logged mistakes`
+                            : `${mistakeRadarSummary.dueCount} SRS words queued`}
+                        </span>
+                      </div>
+                      <h3 className="font-serif font-bold text-lg sm:text-xl text-[#1C1917] dark:text-[#F5F2EB]">
+                        Your Weak Spots: {mistakeRadarSummary.topWeakArea}
+                      </h3>
+                      <p className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
+                        {mistakeRadarSummary.ruleSummary} · Key targets:{' '}
+                        <span className="font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                          {mistakeRadarSummary.sampleWords.join(', ')}
+                        </span>
+                      </p>
                     </div>
-                    <h3 className="font-serif font-bold text-lg sm:text-xl text-[#1C1917] dark:text-[#F5F2EB]">
-                      Focus area: {mistakeRadarSummary.topWeakArea}
-                    </h3>
-                    <p className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
-                      {mistakeRadarSummary.ruleSummary} · Key targets:{' '}
-                      <span className="font-bold text-[#1C1917] dark:text-[#F5F2EB]">
-                        {mistakeRadarSummary.sampleWords.join(', ')}
-                      </span>
-                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openArenaTool(mistakeRadarSummary.isGrammarTop ? 'interference' : 'sprint')
+                        }
+                        className="px-4 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Targeted Fix →</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateTab('dictionary')}
+                        className="px-3.5 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors"
+                      >
+                        Review Due Queue ({mistakeRadarSummary.dueCount})
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Image 1 Inspired: Compact Tappable Weak-Spot Rows */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2 border-t border-[#EFEAE0] dark:border-[#2E2924]">
                     <button
                       type="button"
-                      onClick={() =>
-                        openArenaTool(mistakeRadarSummary.isGrammarTop ? 'interference' : 'sprint')
-                      }
-                      className="px-4 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                      onClick={() => openArenaTool('minimal-pairs')}
+                      className="min-h-[60px] px-3.5 py-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#2D6A4F] flex items-center justify-between gap-3 text-left transition-colors"
                     >
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Targeted Fix →</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-9 h-9 rounded-xl bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 flex items-center justify-center shrink-0">
+                          <Mic className="w-4 h-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                            Pronunciation — Silent Letters
+                          </div>
+                          <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                            Targets: {mistakeRadarSummary.sampleWords.slice(0, 2).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-[#78716C] dark:text-[#A8A29E] shrink-0 tabular-nums">
+                        4 min
+                      </span>
                     </button>
+
                     <button
                       type="button"
-                      onClick={() => navigateTab('dictionary')}
-                      className="px-3.5 py-2.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors"
+                      onClick={() => openArenaTool('interference')}
+                      className="min-h-[60px] px-3.5 py-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] flex items-center justify-between gap-3 text-left transition-colors"
                     >
-                      Review Due Queue ({mistakeRadarSummary.dueCount})
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-9 h-9 rounded-xl bg-[#F8E7E3] dark:bg-red-950/60 text-[#9E2A2B] dark:text-red-300 flex items-center justify-center shrink-0">
+                          <Layers className="w-4 h-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                            Grammar — SVO vs SOV Order
+                          </div>
+                          <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                            Articles, prepositions &amp; tense
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-[#78716C] dark:text-[#A8A29E] shrink-0 tabular-nums">
+                        5 min
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openArenaTool('detective')}
+                      className="min-h-[60px] px-3.5 py-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#C88A32] flex items-center justify-between gap-3 text-left transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-9 h-9 rounded-xl bg-[#F6EEDF] dark:bg-amber-950/60 text-[#8C6527] dark:text-amber-300 flex items-center justify-center shrink-0">
+                          <Search className="w-4 h-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                            Spelling — Silent-Letter Detective
+                          </div>
+                          <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                            Spot unpronounced letters in context
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-[#78716C] dark:text-[#A8A29E] shrink-0 tabular-nums">
+                        3 min
+                      </span>
                     </button>
                   </div>
                 </section>
               )}
               {/* AI SENTENCE & GRAMMAR COACH + SILENT-LETTER WORD SPOTLIGHT    */}
               {/* ============================================================= */}
-              <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              <section
+                ref={sentenceCoachSectionRef}
+                className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
+              >
                 {/* Left Card (6 cols): AI Sentence & Grammar Coach (SVO vs SOV) */}
                 <div className="lg:col-span-6 bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-4">
                   <div className="space-y-3">
@@ -3520,6 +4017,7 @@ export default function App() {
                       className="flex items-center gap-2 pt-1"
                     >
                       <input
+                        ref={sentenceCoachInputRef}
                         type="text"
                         value={sentenceCoachInput}
                         onChange={(e) => setSentenceCoachInput(e.target.value)}
@@ -3608,6 +4106,20 @@ export default function App() {
                             <strong>वाक्य संरचना (SVO vs SOV):</strong>{' '}
                             {sentenceCoachResult.svoComparisonNote}
                           </p>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-2 text-[10px] text-[#78716C] dark:text-[#A8A29E]">
+                          <span>AI-generated coaching · Verify against core curriculum rules</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSentenceCoachResult(null);
+                              setSentenceCoachInput('');
+                            }}
+                            className="text-[#9E2A2B] dark:text-[#F87171] font-semibold hover:underline"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </div>
                     )}
@@ -3821,90 +4333,87 @@ export default function App() {
       </div>
 
       {/* =================================================================== */}
-      {/* MOBILE FIXED BOTTOM NAVIGATION BAR (6 Tabs, >= 44px Hitboxes)       */}
+      {/* IMAGE 1 INSPIRED: FLOATING PILL MOBILE BOTTOM NAVIGATION BAR        */}
       {/* =================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E6E0D4] dark:border-[#2E2924] grid grid-cols-6 items-center"
+        className="md:hidden fixed bottom-2.5 left-2.5 right-2.5 z-40 h-14 rounded-full bg-[#241E1A]/95 dark:bg-[#1E1A17]/95 backdrop-blur-md border border-[#3E352E] px-2 flex items-center justify-between shadow-xl"
       >
-        <button
-          onClick={() => navigateTab('home')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'home' && !activeLectureId
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Home</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('lessons')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'lessons' || Boolean(activeLectureId)
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <BookOpen className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Lessons</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('dictionary')}
-          className={`relative min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'dictionary'
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <div className="relative">
-            <BookMarked className="w-5 h-5" />
-            {dueSRSWords.length > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#9E2A2B] text-white text-[9px] font-ipa font-bold flex items-center justify-center">
-                {dueSRSWords.length}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Dictionary</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('arena')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'arena'
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <Puzzle className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Arena</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('progress')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'progress'
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <BarChart3 className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Progress</span>
-        </button>
-
-        <button
-          onClick={() => navigateTab('settings')}
-          className={`min-h-[48px] flex flex-col items-center justify-center transition-colors ${
-            activeTab === 'settings'
-              ? 'text-[#A82020] dark:text-[#F87171] font-semibold'
-              : 'text-[#57534E] dark:text-[#A8A29E]'
-          }`}
-        >
-          <Sliders className="w-5 h-5" />
-          <span className="text-[10px] tracking-tight mt-1 whitespace-nowrap">Settings</span>
-        </button>
+        {(
+          [
+            {
+              id: 'home' as const,
+              label: 'Home',
+              icon: Home,
+              active: activeTab === 'home' && !activeLectureId,
+              badge: 0,
+            },
+            {
+              id: 'lessons' as const,
+              label: 'Lessons',
+              icon: BookOpen,
+              active: activeTab === 'lessons' || Boolean(activeLectureId),
+              badge: 0,
+            },
+            {
+              id: 'dictionary' as const,
+              label: 'Lexicon',
+              icon: BookMarked,
+              active: activeTab === 'dictionary' && !activeLectureId,
+              badge: dueSRSWords.length,
+            },
+            {
+              id: 'arena' as const,
+              label: 'Arena',
+              icon: Puzzle,
+              active: activeTab === 'arena' && !activeLectureId,
+              badge: 0,
+            },
+            {
+              id: 'progress' as const,
+              label: 'Progress',
+              icon: BarChart3,
+              active: activeTab === 'progress' && !activeLectureId,
+              badge: 0,
+            },
+            {
+              id: 'settings' as const,
+              label: 'Settings',
+              icon: Sliders,
+              active: activeTab === 'settings' && !activeLectureId,
+              badge: 0,
+            },
+          ]
+        ).map((item) => {
+          const IconComponent = item.icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => navigateTab(item.id)}
+              aria-label={item.label}
+              className={`relative min-h-[42px] rounded-full flex items-center justify-center transition-all duration-200 ${
+                item.active
+                  ? 'bg-[#FAF8F4] text-[#9E2A2B] px-3.5 py-1.5 gap-1.5 font-bold shadow-xs'
+                  : 'min-w-[42px] text-[#D6CFC5] hover:text-white'
+              }`}
+            >
+              <div className="relative flex items-center justify-center">
+                <IconComponent className="w-4 h-4 shrink-0" />
+                {item.badge > 0 && !item.active && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 px-1 rounded-full bg-[#9E2A2B] text-white text-[8px] font-ipa font-bold flex items-center justify-center">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+              {item.active && (
+                <span className="text-xs tracking-tight whitespace-nowrap">
+                  {item.label}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* AI Lesson Generation Modal */}
@@ -3945,6 +4454,41 @@ export default function App() {
         onCompleteChallenge={handleCompleteDailyChallenge}
         onUpdateWordSRS={handleUpdateWordSRS}
         onRecordMistake={handleRecordMistake}
+      />
+
+      {/* Image 3 Inspired: Level Up & Milestone Celebration Modal */}
+      <LevelUpCelebrationModal
+        isOpen={isLevelUpModalOpen}
+        levelNumber={Math.max(
+          1,
+          Math.floor(
+            (courseStats.completedCount * 250 +
+              wordsLearnedDisplayCount * 15 +
+              bonusShareXP) /
+              500
+          ) + 1
+        )}
+        cefrLevel={progress.selectedLevel}
+        milestoneTitle={`${progress.selectedLevel} Track · ${courseStats.completedCount}/${courseStats.totalUnits} Lessons & ${wordsLearnedDisplayCount} Words Explored`}
+        xpEarned={
+          courseStats.completedCount * 250 +
+          wordsLearnedDisplayCount * 15 +
+          (progress.sprintHighScore || 0) * 5 +
+          150
+        }
+        masteryPointsEarned={
+          courseStats.completedCount * 50 +
+          (progress.currentStreakDays || 1) * 20 +
+          75
+        }
+        onClose={() => setIsLevelUpModalOpen(false)}
+        onShareBonusClaimed={() => {
+          setBonusShareXP((prev) => prev + 25);
+          toast.success('+25 Bonus XP Earned!', {
+            description: 'Your BhashaSetu milestone summary is ready to share.',
+            duration: 3000,
+          });
+        }}
       />
     </div>
   );

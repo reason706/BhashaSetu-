@@ -6,6 +6,7 @@ import {
   MistakeItem,
   SRSRecord,
   SRSStage,
+  SRSRating,
   CustomVocabItem,
   ExamSimulationRecord,
 } from '../types/curriculum';
@@ -16,8 +17,15 @@ const DB_NAME = 'BhashaSetuOfflineDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'offline_state';
 
-function getTodayDateString(): string {
-  return new Date().toISOString().split('T')[0];
+/**
+ * Timezone-safe local date formatter (YYYY-MM-DD in learner's local timezone).
+ * Fixes UTC day-boundary bugs for learners in Nepal (UTC+5:45) and Australia (AEST/AEDT).
+ */
+export function getTodayDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export const DEFAULT_USER_PROGRESS: UserProgressState = {
@@ -107,6 +115,31 @@ export async function saveToIndexedDB(state: UserProgressState): Promise<void> {
       tx.onerror = () => resolve();
     } catch {
       resolve();
+    }
+  });
+}
+
+/**
+ * Phase 7 Audit Fix: Fallback reader from IndexedDB when localStorage is cleared or evicted.
+ */
+export async function loadFromIndexedDB(): Promise<UserProgressState | null> {
+  const db = await openOfflineDB();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(STORAGE_KEY);
+      req.onsuccess = () => {
+        if (req.result && typeof req.result === 'object') {
+          resolve(req.result as UserProgressState);
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
     }
   });
 }
@@ -218,7 +251,7 @@ export function calculateUpdatedStreak(state: UserProgressState): {
   lastStudyDate: string;
   streakFreezeShields: number;
 } {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayDateString();
   const shields = state.streakFreezeShields ?? 1;
   if (!state.lastStudyDate) {
     return { currentStreakDays: 1, lastStudyDate: today, streakFreezeShields: shields };
@@ -231,8 +264,10 @@ export function calculateUpdatedStreak(state: UserProgressState): {
     };
   }
 
-  const lastDate = new Date(state.lastStudyDate);
-  const currentDate = new Date(today);
+  const [lastY, lastM, lastD] = state.lastStudyDate.split('-').map(Number);
+  const [curY, curM, curD] = today.split('-').map(Number);
+  const lastDate = new Date(lastY, (lastM || 1) - 1, lastD || 1);
+  const currentDate = new Date(curY, (curM || 1) - 1, curD || 1);
   const diffDays = Math.round((currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays === 1) {
@@ -376,36 +411,62 @@ export function toggleMasteredWord(
 export function updateWordSRS(
   state: UserProgressState,
   wordId: string,
-  wasCorrect: boolean
+  ratingOrCorrect: boolean | SRSRating
 ): UserProgressState {
   const existing = state.wordSRS[wordId];
-  const streak = wasCorrect ? (existing ? existing.correctStreak + 1 : 1) : 0;
-  let stage: SRSStage = 'learning';
-  let hoursUntilNext = 4;
+  const rating: SRSRating =
+    typeof ratingOrCorrect === 'boolean'
+      ? ratingOrCorrect
+        ? 'good'
+        : 'again'
+      : ratingOrCorrect;
+  const wasPositive = rating !== 'again';
+  const prevStreak = existing?.correctStreak || 0;
 
-  if (wasCorrect) {
+  let streak = 0;
+  let stage: SRSStage = 'learning';
+  let hoursUntilNext = 1;
+
+  if (rating === 'again') {
+    streak = 0;
+    stage = 'learning';
+    hoursUntilNext = 1; // 1 hour retry
+  } else if (rating === 'hard') {
+    streak = Math.max(1, prevStreak);
+    stage = 'learning';
+    hoursUntilNext = 6; // 6 hours consolidation
+  } else if (rating === 'good') {
+    streak = prevStreak + 1;
     if (streak >= 3) {
       stage = 'mastered';
-      hoursUntilNext = 72;
+      hoursUntilNext = 72; // 3 days
     } else if (streak === 2) {
       stage = 'review';
-      hoursUntilNext = 24;
+      hoursUntilNext = 24; // 1 day
     } else {
       stage = 'learning';
-      hoursUntilNext = 8;
+      hoursUntilNext = 12; // 12 hours
     }
   } else {
-    stage = 'learning';
-    hoursUntilNext = 1;
+    // 'easy'
+    streak = prevStreak + 2;
+    stage = streak >= 3 ? 'mastered' : 'review';
+    hoursUntilNext = streak >= 3 ? 96 : 48; // 4 days or 2 days
   }
 
   const now = new Date();
   const nextDue = new Date(now.getTime() + hoursUntilNext * 3600 * 1000);
+  const today = getTodayDateString(now);
+  const existingMap = state.studyActivityByDate || {};
 
   const record: SRSRecord = {
     wordId,
     stage,
     correctStreak: streak,
+    intervalHours: hoursUntilNext,
+    intervalDays: Math.max(1, Math.round(hoursUntilNext / 24)),
+    lastRating: rating,
+    repetitions: (existing?.repetitions || 0) + 1,
     lastReviewedAt: now.toISOString(),
     nextReviewDue: nextDue.toISOString(),
   };
@@ -414,7 +475,7 @@ export function updateWordSRS(
   const nextMasteredIds =
     stage === 'mastered'
       ? Array.from(new Set([...currentMastered, wordId]))
-      : wasCorrect
+      : wasPositive
       ? currentMastered
       : currentMastered.filter((id) => id !== wordId);
 
@@ -424,6 +485,10 @@ export function updateWordSRS(
     wordSRS: {
       ...state.wordSRS,
       [wordId]: record,
+    },
+    studyActivityByDate: {
+      ...existingMap,
+      [today]: (existingMap[today] || 0) + 1,
     },
   };
   saveUserProgress(nextState);
@@ -759,9 +824,16 @@ export async function flushPendingSyncQueue(
     });
     if (!response.ok) return state;
     const data = await response.json();
+    const ackSet = new Set<string>(
+      Array.isArray(data.acknowledgedEventIds) ? data.acknowledgedEventIds : []
+    );
+    const remainingQueue =
+      ackSet.size > 0
+        ? state.pendingSyncQueue.filter((evt) => !ackSet.has(evt.id))
+        : [];
     const updated: UserProgressState = {
       ...state,
-      pendingSyncQueue: [],
+      pendingSyncQueue: remainingQueue,
       lastSyncedAt: data.syncedAt || new Date().toISOString(),
     };
     saveUserProgress(updated);

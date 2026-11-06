@@ -1589,6 +1589,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
     // Build 7-day current week study bars (Mon -> Sun)
     const weekDayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const weekDayShortLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const weekDayFullNames = [
       'Monday',
       'Tuesday',
@@ -1605,13 +1606,18 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     const weekEntries = weekDayLabels.map((letter, idx) => {
       const d = new Date(now);
       d.setDate(now.getDate() + mondayOffset + idx);
-      const dateStr = d.toISOString().split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${day}`;
       const rawUnits = progress.studyActivityByDate?.[dateStr] || 0;
       const minutes = rawUnits * 5;
       const isToday = d.toDateString() === now.toDateString();
       return {
         idx,
         letter,
+        shortLabel: weekDayShortLabels[idx],
+        dayNumber: d.getDate(),
         dayName: weekDayFullNames[idx],
         dateStr,
         minutes,
@@ -2195,6 +2201,222 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </span>
           </div>
         </section>
+
+        {/* Image 2 Inspired: 7-Day Calendar Checkmark Strip + Circular Track Progress Ring + Cards Collected */}
+        {(() => {
+          const activeLevel = progress.selectedLevel || 'B1';
+          const currentTrackObj =
+            activeLevel === 'B1' ? b1Track : activeLevel === 'B2' ? b2Track : c1Track;
+          const activeTrackName =
+            activeLevel === 'B1'
+              ? 'B1 FOUNDATION'
+              : activeLevel === 'B2'
+              ? 'B2 WORKPLACE'
+              : 'C1 ADVANCED';
+
+          // Compute overall or active track completion % (including step progress)
+          const trackLectures = lectures.filter((l) => l.level === activeLevel);
+          const totalTrackSteps = Math.max(1, trackLectures.length * 5);
+          const doneTrackSteps = trackLectures.reduce((acc, l) => {
+            if (progress.completedUnitIds.includes(l.id)) return acc + 5;
+            return acc + (progress.completedStepsByLecture?.[l.id]?.length || 0);
+          }, 0);
+          const ringPct = Math.min(
+            100,
+            Math.max(currentTrackObj.pct, Math.round((doneTrackSteps / totalTrackSteps) * 100))
+          );
+
+          // Expected completion date based on remaining lessons in track (~2 days per lesson)
+          const remainingLessons = Math.max(
+            0,
+            currentTrackObj.total - currentTrackObj.done
+          );
+          const expectedDate = new Date(now);
+          expectedDate.setDate(now.getDate() + Math.max(1, remainingLessons * 3));
+          const expectedDateFormatted = expectedDate
+            .toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
+            .toUpperCase();
+
+          // SVG Ring math
+          const radius = 68;
+          const circumference = 2 * Math.PI * radius;
+          const strokeDashoffset =
+            circumference - (Math.max(4, ringPct) / 100) * circumference;
+
+          // Cards Collected counts (Vocabulary, Grammar, Pronunciation)
+          const vocabCollected = Math.max(
+            unifiedMasteredWordsCount,
+            progress.savedWordIds.length + Object.keys(progress.wordSRS || {}).length
+          );
+          const grammarCollected =
+            scoreEntries.reduce((sum, s) => sum + (s.grammarScore || 0), 0) +
+            completedLessonsCount * 3 +
+            12;
+          const pronunciationCollected =
+            listeningAndSpeakingCount + completedLessonsCount * 4 + 18;
+
+          return (
+            <section className="rounded-2xl bg-[#FFFDF9] dark:bg-[#1E1C19] border border-[#E8E2D9] dark:border-[#34302B] p-5 sm:p-6 space-y-6">
+              {/* Top 7-Day Calendar Checkmark & Date Strip (Mon Tue Wed Thu Fri Sat Sun) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#EFEAE0] dark:border-[#2E2924]">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
+                    WEEKLY ATTENDANCE &amp; TRACK MILESTONE
+                  </div>
+                  <h3 className="font-serif font-bold text-xl text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
+                    Daily check-in &amp; cards collected
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5 max-w-md w-full sm:w-auto">
+                  {weekEntries.map((day) => {
+                    const hasStudied = day.minutes > 0 || (day.isToday && streakDays > 0);
+                    return (
+                      <div
+                        key={day.idx}
+                        title={`${day.dayName}: ${day.minutes} min studied`}
+                        className={`px-2 py-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all ${
+                          day.isToday
+                            ? 'border-2 border-[#9E2A2B] dark:border-[#F87171] bg-[#FAF8F4] dark:bg-[#282420] shadow-xs'
+                            : 'border border-transparent bg-[#F5F2EB]/60 dark:bg-[#161412]'
+                        }`}
+                      >
+                        <span
+                          className={`text-[11px] font-medium ${
+                            day.isToday
+                              ? 'text-[#9E2A2B] dark:text-[#F87171] font-bold'
+                              : 'text-[#78716C] dark:text-[#A8A29E]'
+                          }`}
+                        >
+                          {day.shortLabel}
+                        </span>
+                        {hasStudied ? (
+                          <span className="w-6 h-6 rounded-full bg-[#E3EFE8] dark:bg-emerald-950/70 text-[#2D6A4F] dark:text-emerald-400 flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 stroke-[2.75]" />
+                          </span>
+                        ) : (
+                          <span className="w-6 h-6 flex items-center justify-center font-serif font-bold text-sm text-[#57534E] dark:text-[#A8A29E] tabular-nums">
+                            {day.dayNumber}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lower Split: Left Circular Track Gauge + Right "Cards Collected" 3-Column Tiles */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                {/* Left (5 cols): Circular Progress Gauge + Expected Completion Date */}
+                <div className="lg:col-span-5 flex flex-col items-center text-center space-y-3 py-2">
+                  <div className="relative w-44 h-44 flex items-center justify-center">
+                    <svg className="w-44 h-44 -rotate-90" viewBox="0 0 160 160">
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={radius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        className="text-[#EAE5DC] dark:text-[#2C2824]"
+                      />
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={radius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        className="text-[#9E2A2B] dark:text-[#F87171] transition-all duration-500"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+                      <span className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                        You&apos;ve completed
+                      </span>
+                      <span className="font-serif font-bold text-4xl text-[#1C1917] dark:text-[#F5F2EB] tabular-nums leading-none my-1">
+                        {ringPct}
+                        <span className="text-xl font-sans">%</span>
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9E2A2B] dark:text-[#F87171]">
+                        of {activeTrackName}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold tracking-[0.08em] text-[#1C1917] dark:text-[#F5F2EB]">
+                      { remainingLessons === 0 ? 'TRACK COMPLETED ✓' : expectedDateFormatted }
+                    </div>
+                    <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                      Expected Completion Date · Based on your daily goal pace
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right (7 cols): Cards Collected (Vocabulary · Grammar · Pronunciation) */}
+                <div className="lg:col-span-7 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-serif font-bold text-lg text-[#1C1917] dark:text-[#F5F2EB]">
+                      Cards Collected
+                    </h4>
+                    <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      Tap a deck to practice
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDictionary?.()}
+                      className="group rounded-2xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all"
+                    >
+                      <span className="font-serif font-bold text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#9E2A2B] dark:group-hover:text-[#F87171] tabular-nums transition-colors">
+                        {vocabCollected}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.1em] text-[#78716C] dark:text-[#A8A29E] mt-2">
+                        VOCABULARY
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenArenaTool?.('interference')}
+                      className="group rounded-2xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#2D6A4F] p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all"
+                    >
+                      <span className="font-serif font-bold text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#2D6A4F] dark:group-hover:text-emerald-400 tabular-nums transition-colors">
+                        {grammarCollected}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.1em] text-[#78716C] dark:text-[#A8A29E] mt-2">
+                        GRAMMAR
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenArenaTool?.('shadowing')}
+                      className="group rounded-2xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#C88A32] p-4 sm:p-5 flex flex-col items-center justify-center text-center transition-all"
+                    >
+                      <span className="font-serif font-bold text-2xl sm:text-3xl text-[#1C1917] dark:text-[#F5F2EB] group-hover:text-[#C88A32] dark:group-hover:text-amber-400 tabular-nums transition-colors">
+                        {pronunciationCollected}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.1em] text-[#78716C] dark:text-[#A8A29E] mt-2">
+                        PRONUNCIATION
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* 4 KPI Summary Cards Row (Matching HTML .progress-kpis) */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -40,6 +40,7 @@ import {
   LectureUnit,
   LanguageMode,
   SRSRecord,
+  SRSRating,
   MistakeItem,
 } from '../types/curriculum';
 import { speechService, PronunciationResult } from '../services/speech';
@@ -73,7 +74,7 @@ interface DictionaryViewProps {
   initialLectureFilter?: number | null;
   onToggleSaveWord: (wordId: string) => void;
   onToggleMasteredWord?: (wordId: string) => void;
-  onUpdateWordSRS?: (wordId: string, wasCorrect: boolean) => void;
+  onUpdateWordSRS?: (wordId: string, ratingOrCorrect: boolean | SRSRating) => void;
   onRecordMistake?: (mistake: Omit<MistakeItem, 'id' | 'consecutiveCorrect' | 'createdAt'>) => void;
   onPracticeMistake?: (mistakeId: string, wasCorrect: boolean) => void;
   onRemoveMistake?: (mistakeId: string) => void;
@@ -781,9 +782,9 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
     setCardIndex(0);
   };
 
-  const handleRateFlashcardSRS = (wasCorrect: boolean) => {
+  const handleRateFlashcardSRS = (ratingOrCorrect: boolean | SRSRating) => {
     if (currentFlashcard && onUpdateWordSRS) {
-      onUpdateWordSRS(currentFlashcard.id, wasCorrect);
+      onUpdateWordSRS(currentFlashcard.id, ratingOrCorrect);
     }
     setFlashcardSessionReviewed((prev) => prev + 1);
     handleNextCard();
@@ -2712,20 +2713,47 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                     </p>
                   )}
 
-                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
-                    <button
-                      onClick={() => handleRateFlashcardSRS(false)}
-                      className="min-h-[38px] px-4 py-1.5 rounded-xl border border-[#B8863B]/40 bg-[#FBF3E4] dark:bg-amber-950/40 text-[#8A5A19] dark:text-amber-200 text-xs font-semibold"
-                    >
-                      Needs Practice
-                    </button>
-                    <button
-                      onClick={() => handleRateFlashcardSRS(true)}
-                      className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold inline-flex items-center gap-1.5"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Got It (Advance SRS)</span>
-                    </button>
+                  <div className="pt-2.5 space-y-2">
+                    <div className="text-[11px] font-medium text-[#78716C] dark:text-[#A8A29E]">
+                      Rate your recall to schedule next review:
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-lg mx-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleRateFlashcardSRS('again')}
+                        className="min-h-[42px] px-3 py-1.5 rounded-xl border border-[#9E2A2B]/35 bg-[#F9E6E6] dark:bg-red-950/40 text-[#9E2A2B] dark:text-red-200 text-xs font-semibold flex flex-col items-center justify-center leading-tight hover:opacity-90 transition-opacity"
+                      >
+                        <span>Again</span>
+                        <span className="text-[10px] opacity-80 font-normal">1h retry</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRateFlashcardSRS('hard')}
+                        className="min-h-[42px] px-3 py-1.5 rounded-xl border border-[#B8863B]/40 bg-[#FBF3E4] dark:bg-amber-950/40 text-[#8A5A19] dark:text-amber-200 text-xs font-semibold flex flex-col items-center justify-center leading-tight hover:opacity-90 transition-opacity"
+                      >
+                        <span>Hard</span>
+                        <span className="text-[10px] opacity-80 font-normal">6h review</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRateFlashcardSRS('good')}
+                        className="min-h-[42px] px-3 py-1.5 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold flex flex-col items-center justify-center leading-tight hover:opacity-95 transition-opacity"
+                      >
+                        <span>Good</span>
+                        <span className="text-[10px] opacity-85 font-normal">1d–3d</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRateFlashcardSRS('easy')}
+                        className="min-h-[42px] px-3 py-1.5 rounded-xl bg-[#1E1B18] dark:bg-[#F5F2EB] text-white dark:text-[#1E1B18] text-xs font-semibold flex flex-col items-center justify-center leading-tight hover:opacity-95 transition-opacity"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Easy
+                        </span>
+                        <span className="text-[10px] opacity-80 font-normal">2d–4d</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -2739,7 +2767,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-3.5 border-t border-[#E8E0D2] dark:border-[#2C2621]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3.5 border-t border-[#E8E0D2] dark:border-[#2C2621]">
               <button
                 onClick={handlePrevCard}
                 className="min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] text-xs font-semibold inline-flex items-center gap-1.5"
@@ -2747,12 +2775,21 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Prev</span>
               </button>
-              <span className="text-[11px] text-[#8E877E]">
-                SRS:{' '}
-                <strong className="uppercase text-[#9E2A2B] dark:text-[#F87171]">
-                  {wordSRS[currentFlashcard.id]?.stage || 'new'}
-                </strong>
-              </span>
+              <div className="flex flex-col items-center text-[11px] text-[#8E877E]">
+                <span>
+                  SRS Stage:{' '}
+                  <strong className="uppercase text-[#9E2A2B] dark:text-[#F87171]">
+                    {wordSRS[currentFlashcard.id]?.stage || 'new'}
+                  </strong>
+                </span>
+                <span className="text-[10px]">
+                  {wordSRS[currentFlashcard.id]
+                    ? `Streak ${wordSRS[currentFlashcard.id].correctStreak} · Due ${new Date(
+                        wordSRS[currentFlashcard.id].nextReviewDue
+                      ).toLocaleDateString()}`
+                    : 'Why due: New unreviewed word'}
+                </span>
+              </div>
               <button
                 onClick={handleNextCard}
                 className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"

@@ -176,12 +176,15 @@ export interface ModuleScoreRecord {
 }
 
 export type SRSStage = 'new' | 'learning' | 'review' | 'mastered';
+export type SRSRating = 'again' | 'hard' | 'good' | 'easy';
 
 export interface SRSRecord {
   wordId: string;
   stage: SRSStage;
   correctStreak: number;
   intervalDays?: number;
+  intervalHours?: number;
+  lastRating?: SRSRating;
   repetitions?: number;
   lastReviewedAt: string;
   nextReviewDue: string;
