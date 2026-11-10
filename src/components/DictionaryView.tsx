@@ -156,6 +156,8 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [flashcardQuizPicked, setFlashcardQuizPicked] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  // Phones: example sentence + phonics footer fold behind a per-card toggle
+  const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
   const [flashcardAutoSpeak, setFlashcardAutoSpeak] = useState(false);
   const [flashcardSessionReviewed, setFlashcardSessionReviewed] = useState(0);
   const [flashcardMicListening, setFlashcardMicListening] = useState(false);
@@ -1253,7 +1255,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       {/* ===================================================================== */}
       {/* 2. MODE SWITCHER TABS (Scrollable on Mobile, Clean Pills on Desktop)  */}
       {/* ===================================================================== */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 -mx-[0.625rem] px-[0.625rem] sm:mx-0 sm:px-0 no-scrollbar">
         {(
           [
             {
@@ -3362,18 +3364,38 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         </div>
                       )}
 
-                      <p className="text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] leading-relaxed">
-                        “{item.englishExample}”
-                      </p>
-                      {isFullNepali && (
-                        <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E] mt-0.5">
-                          {item.nepaliExampleTranslation}
+                      <button
+                        type="button"
+                        aria-expanded={Boolean(expandedCardIds[item.id])}
+                        onClick={() =>
+                          setExpandedCardIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                        }
+                        className="sm:hidden mt-1 min-h-[36px] inline-flex items-center gap-1 text-[11px] font-semibold text-[#6E685F] dark:text-[#A8A29E]"
+                      >
+                        <span>{expandedCardIds[item.id] ? 'Hide example & phonics' : 'Example & phonics'}</span>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform ${expandedCardIds[item.id] ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+
+                      <div className={expandedCardIds[item.id] ? 'block animate-fade-up' : 'hidden sm:block'}>
+                        <p className="text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] leading-relaxed">
+                          “{item.englishExample}”
                         </p>
-                      )}
+                        {isFullNepali && (
+                          <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E] mt-0.5">
+                            {item.nepaliExampleTranslation}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     {/* Clean Footer Strip: Phonics Summary + AI Explain */}
-                    <div className="mt-3 pt-2.5 border-t border-[#F0EAE0] dark:border-[#2C2621] flex items-center justify-between gap-2 text-[11px]">
+                    <div
+                      className={`mt-3 pt-2.5 border-t border-[#F0EAE0] dark:border-[#2C2621] items-center justify-between gap-2 text-[11px] ${
+                        expandedCardIds[item.id] || aiWordExplanations[item.id] ? 'flex' : 'hidden sm:flex'
+                      }`}
+                    >
                       <span className="text-[#9E2A2B] dark:text-[#F87171] font-medium truncate">
                         {item.silentLettersSummary}
                       </span>
