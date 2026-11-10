@@ -31,6 +31,9 @@ import {
   FileText,
   XCircle,
   MoreVertical,
+  BookOpen,
+  PenLine,
+  Shuffle,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -85,12 +88,19 @@ interface LecturePlayerProps {
 
 export type ModuleStep = 0 | 1 | 2 | 3 | 4;
 
-const MODULE_TABS: { step: ModuleStep; number: string; label: string; shortLabel: string }[] = [
-  { step: 0, number: '01', label: 'Vocabulary & Phonics', shortLabel: 'Vocab' },
-  { step: 1, number: '02', label: 'Pronunciation Guide', shortLabel: 'Audio' },
-  { step: 2, number: '03', label: 'Spelling & Dictation Bee', shortLabel: 'Spelling' },
-  { step: 3, number: '04', label: 'Grammar & Builder', shortLabel: 'Grammar' },
-  { step: 4, number: '05', label: 'Real-Life Dialogue', shortLabel: 'Dialogue' },
+const MODULE_TABS: {
+  step: ModuleStep;
+  number: string;
+  label: string;
+  shortLabel: string;
+  description: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { step: 0, number: '01', label: 'Vocabulary & Phonics', shortLabel: 'Vocab', description: 'Words with silent-letter phonics', Icon: BookOpen },
+  { step: 1, number: '02', label: 'Pronunciation Guide', shortLabel: 'Audio', description: 'Hear it, then say it with the mic', Icon: Mic },
+  { step: 2, number: '03', label: 'Spelling & Dictation Bee', shortLabel: 'Spelling', description: 'Spelling rules, dictation & quiz', Icon: PenLine },
+  { step: 3, number: '04', label: 'Grammar & Builder', shortLabel: 'Grammar', description: 'SOV → SVO sentence builder', Icon: Shuffle },
+  { step: 4, number: '05', label: 'Real-Life Dialogue', shortLabel: 'Dialogue', description: 'Real-life dialogue & comprehension', Icon: MessageSquare },
 ];
 
 const ROLE_STYLES: Record<
@@ -106,10 +116,10 @@ const ROLE_STYLES: Record<
     labelNepali: 'Subject · कर्ता',
   },
   Verb: {
-    border: 'border-[#B91C1C]/35 dark:border-[#F87171]/40',
-    bg: 'bg-[#B91C1C]/5 dark:bg-[#B91C1C]/15',
-    activeBg: 'bg-[#B91C1C]/15 dark:bg-[#B91C1C]/30 ring-2 ring-[#B91C1C]',
-    text: 'text-[#991B1B] dark:text-[#FCA5A5]',
+    border: 'border-[#9E2A2B]/35 dark:border-[#F87171]/40',
+    bg: 'bg-[#9E2A2B]/5 dark:bg-[#9E2A2B]/15',
+    activeBg: 'bg-[#9E2A2B]/15 dark:bg-[#9E2A2B]/30 ring-2 ring-[#9E2A2B]',
+    text: 'text-[#872223] dark:text-[#FCA5A5]',
     label: 'Verb',
     labelNepali: 'Verb · क्रिया',
   },
@@ -755,7 +765,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
             <FileText className="w-4 h-4" />
             <span>Lecture Mistake Notes & Weak-Words Vault</span>
           </div>
@@ -796,7 +806,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <button
             type="button"
             onClick={() => setShowAddCustomNoteForm((prev) => !prev)}
-            className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5"
+            className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Mistake Note</span>
@@ -884,7 +894,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-ipa font-semibold uppercase px-2 py-0.5 rounded bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]">
+                    <span className="font-ipa font-semibold uppercase px-2 py-0.5 rounded bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171]">
                       {badgeLabel}
                     </span>
                     <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
@@ -892,16 +902,16 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     </span>
                     <span>·</span>
                     <span className="text-[#57534E] dark:text-[#A8A29E]">
-                      Mistake: <del className="text-[#B91C1C] font-ipa">{item.userWrongAnswer}</del>
+                      Mistake: <del className="text-[#9E2A2B] font-ipa">{item.userWrongAnswer}</del>
                     </span>
                     <span>→</span>
-                    <span className="font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
+                    <span className="font-ipa font-semibold text-[#2D6A4F] dark:text-emerald-400">
                       Correct: {item.correctAnswer}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2.5">
-                    <span className="font-ipa text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                    <span className="font-ipa text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                       Re-Drill Streak: {item.consecutiveCorrect}/2
                     </span>
                     <button
@@ -909,7 +919,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       onClick={() =>
                         speechService.speak(item.correctAnswer, { rate: preferredSpeechRate })
                       }
-                      className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#B91C1C]"
+                      className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#9E2A2B]"
                       title="Listen to correct answer"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
@@ -918,7 +928,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       <button
                         type="button"
                         onClick={() => onRemoveMistake(item.id)}
-                        className="p-1.5 rounded-lg text-[#57534E] hover:text-[#B91C1C]"
+                        className="p-1.5 rounded-lg text-[#57534E] hover:text-[#9E2A2B]"
                         title="Delete mistake note"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -989,7 +999,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         onPracticeMistake(item.id, ok);
                         setMistakeDrillInputs((prev) => ({ ...prev, [item.id]: '' }));
                       }}
-                      className="min-h-[2.25rem] px-[0.75rem] py-[0.25rem] rounded-lg bg-[#15803D] text-white text-xs font-semibold"
+                      className="min-h-[2.25rem] px-[0.75rem] py-[0.25rem] rounded-lg bg-[#2D6A4F] text-white text-xs font-semibold"
                     >
                       Verify Re-Drill
                     </button>
@@ -1021,7 +1031,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => window.print()}
-              className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+              className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save Study Sheet as PDF</span>
@@ -1033,7 +1043,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* Header */}
           <div className="border-b-2 border-[#1C1917] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
             <div>
-              <div className="text-xs font-ipa uppercase tracking-wider text-[#B91C1C] font-semibold">
+              <div className="text-xs font-ipa uppercase tracking-wider text-[#9E2A2B] font-semibold">
                 BhashaSetu Printable Study Cheat Sheet · Lecture {String(lecture.lectureNumber).padStart(2, '0')} ({lecture.level})
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold mt-1">{lecture.title}</h1>
@@ -1046,7 +1056,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
           {/* Section 1: 12 Core Words Table */}
           <div>
-            <h2 className="text-base font-bold uppercase tracking-wider text-[#B91C1C] mb-3">
+            <h2 className="text-base font-bold uppercase tracking-wider text-[#9E2A2B] mb-3">
               1. Core Vocabulary & Silent-Letter Phonics ({lecture.moduleA_vocabulary.length} Words)
             </h2>
             <div className="overflow-x-auto border border-[#E7E0D6] rounded-xl">
@@ -1068,7 +1078,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           seg.silent ? (
                             <span
                               key={i}
-                              className="text-[#B91C1C] underline decoration-dotted font-extrabold"
+                              className="text-[#9E2A2B] underline decoration-dotted font-extrabold"
                             >
                               {seg.text}
                             </span>
@@ -1080,7 +1090,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       <td className="py-2.5 px-3 font-ipa text-xs">
                         {item.ipa} ({item.partOfSpeech})
                       </td>
-                      <td className="py-2.5 px-3 text-xs text-[#B91C1C]">
+                      <td className="py-2.5 px-3 text-xs text-[#9E2A2B]">
                         {item.silentLettersSummary}
                       </td>
                       <td className="py-2.5 px-3 font-nepali font-medium">{item.nepaliMeaning}</td>
@@ -1095,7 +1105,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* Section 2: Spelling Formula & Key Examples */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E7E0D6] space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#9E2A2B]">
                 2. Orthographic Spelling Rule
               </div>
               <h3 className="text-base font-bold">{lecture.moduleC_spelling.ruleTitle}</h3>
@@ -1106,8 +1116,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 {lecture.moduleC_spelling.examples.map((ex, i) => (
                   <li key={i}>
                     • <strong>{ex.baseWord}</strong> →{' '}
-                    <span className="text-[#15803D] font-semibold">{ex.correctSpelling}</span> (NOT{' '}
-                    <span className="line-through text-[#B91C1C]">{ex.commonWrongSpelling}</span>)
+                    <span className="text-[#2D6A4F] font-semibold">{ex.correctSpelling}</span> (NOT{' '}
+                    <span className="line-through text-[#9E2A2B]">{ex.commonWrongSpelling}</span>)
                   </li>
                 ))}
               </ul>
@@ -1115,7 +1125,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
             {/* Section 3: Grammar Capstone Summary */}
             <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E7E0D6] space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#9E2A2B]">
                 3. Grammar & Syntax Capstone
               </div>
               <h3 className="text-base font-bold">{lecture.moduleD_grammar.topicTitle}</h3>
@@ -1143,7 +1153,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* Section 4: Personal Lecture Notes Scratchpad (Printed on Study Sheet) */}
           {scratchpadDraft.trim() && (
             <div className="p-5 rounded-xl bg-[#FAF7F2] border border-[#E7E0D6] space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#9E2A2B]">
                 4. My Personal Nepali-English Lecture Notes
               </div>
               <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-nepali text-[#1C1917]">
@@ -1173,10 +1183,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     return (
       <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6">
         <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#15803D]/10 text-[#15803D] dark:text-emerald-400 flex items-center justify-center mx-auto mb-5">
+          <div className="w-14 h-14 rounded-2xl bg-[#2D6A4F]/10 text-[#2D6A4F] dark:text-emerald-400 flex items-center justify-center mx-auto mb-5">
             <Award className="w-8 h-8" />
           </div>
-          <p className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-2">
+          <p className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] mb-2">
             Lecture {String(lecture.lectureNumber).padStart(2, '0')} Completed
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold text-[#1C1917] dark:text-[#F5F2EB] mb-2">
@@ -1235,7 +1245,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             </button>
             <button
               onClick={onBackToDashboard}
-              className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-sm font-medium hover:bg-[#991B1B] transition-colors flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+              className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-sm font-medium hover:bg-[#872223] transition-colors flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
             >
               Back to Syllabus Lectures
               <ArrowRight className="w-4 h-4" />
@@ -1274,7 +1284,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   </span>
                   <div className="w-16 sm:w-24 h-2 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
                     <div
-                      className="h-full bg-[#15803D] rounded-full transition-all duration-300"
+                      className="h-full bg-[#2D6A4F] rounded-full transition-all duration-300"
                       style={{ width: `${Math.max(6, lectureProgressPercent)}%` }}
                     />
                   </div>
@@ -1290,11 +1300,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     onClick={() => setShowScratchpadDrawer((prev) => !prev)}
                     className={`min-h-[40px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                       showScratchpadDrawer || scratchpadDraft.trim()
-                        ? 'border-[#15803D] bg-[#15803D]/10 text-[#15803D] dark:text-emerald-400'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB]'
+                        ? 'border-[#2D6A4F] bg-[#2D6A4F]/10 text-[#2D6A4F] dark:text-emerald-400'
+                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB]'
                     }`}
                   >
-                    <FileText className="w-3.5 h-3.5 text-[#15803D]" />
+                    <FileText className="w-3.5 h-3.5 text-[#2D6A4F]" />
                     <span>My Notes {scratchpadDraft.trim() ? '✓' : ''}</span>
                   </button>
 
@@ -1303,20 +1313,20 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     onClick={() => setShowMistakeNotesDrawer((prev) => !prev)}
                     className={`min-h-[40px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                       showMistakeNotesDrawer
-                        ? 'border-[#B91C1C] bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB]'
+                        ? 'border-[#9E2A2B] bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171]'
+                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB]'
                     }`}
                   >
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#B91C1C]" />
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     <span>Mistake Notes ({lectureMistakes.length})</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setShowCheatSheet(true)}
-                    className="min-h-[40px] px-3.5 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#B91C1C] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors"
                   >
-                    <Printer className="w-3.5 h-3.5 text-[#B91C1C]" />
+                    <Printer className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     <span>Study Cheat Sheet</span>
                   </button>
                 </div>
@@ -1327,7 +1337,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     type="button"
                     onClick={() => setShowMobileOverflowMenu((prev) => !prev)}
                     aria-label="More lecture options"
-                    className="min-h-[40px] min-w-[40px] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] flex items-center justify-center text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]"
+                    className="min-h-[40px] min-w-[40px] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] flex items-center justify-center text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -1343,11 +1353,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center justify-between"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-[#15803D]" />
+                          <FileText className="w-4 h-4 text-[#2D6A4F]" />
                           <span>My Personal Notes</span>
                         </span>
                         {scratchpadDraft.trim() && (
-                          <span className="text-[#15803D] font-ipa">Saved</span>
+                          <span className="text-[#2D6A4F] font-ipa">Saved</span>
                         )}
                       </button>
 
@@ -1360,10 +1370,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center justify-between"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-[#B91C1C]" />
+                          <AlertTriangle className="w-4 h-4 text-[#9E2A2B]" />
                           <span>Mistake Notes</span>
                         </span>
-                        <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
+                        <span className="font-ipa text-[#9E2A2B] dark:text-[#F87171]">
                           ({lectureMistakes.length})
                         </span>
                       </button>
@@ -1376,7 +1386,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         }}
                         className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center gap-2"
                       >
-                        <Printer className="w-4 h-4 text-[#B91C1C]" />
+                        <Printer className="w-4 h-4 text-[#9E2A2B]" />
                         <span>Study Cheat Sheet</span>
                       </button>
                     </div>
@@ -1392,7 +1402,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="mb-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                   <FileText className="w-4 h-4" />
                   <span>Personal Lecture Notes Scratchpad (Auto-Saved & Included on Printable Study Sheet)</span>
                 </div>
@@ -1402,7 +1412,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 {scratchpadSavedAt && (
-                  <span className="font-ipa text-[11px] text-[#15803D] dark:text-emerald-400 font-semibold">
+                  <span className="font-ipa text-[11px] text-[#2D6A4F] dark:text-emerald-400 font-semibold">
                     ✓ Auto-saved ({scratchpadSavedAt})
                   </span>
                 )}
@@ -1428,7 +1438,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 }
               }}
               placeholder="Write your personal notes for this lecture here (e.g., Remember: in 'knight', K and GH are silent; Nepali SOV -> English SVO)..."
-              className="w-full p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#15803D]"
+              className="w-full p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#2D6A4F]"
             />
           </div>
         )}
@@ -1438,10 +1448,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="mb-5">{renderMistakeNotesSection()}</div>
         )}
 
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
+        <div className="pb-4 sm:pb-5">
           <div>
             <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-              <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Lecture {String(lecture.lectureNumber).padStart(2, '0')}
               </span>
               <span className="mx-2" aria-hidden="true">·</span>
@@ -1451,7 +1461,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               {isCompleted && (
                 <>
                   <span className="mx-2" aria-hidden="true">·</span>
-                  <span className="text-[#15803D] dark:text-emerald-400 font-medium">
+                  <span className="text-[#2D6A4F] dark:text-emerald-400 font-medium">
                     Completed
                   </span>
                 </>
@@ -1471,43 +1481,89 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             )}
           </div>
 
-          {/* 5-Step Module Segmented Stepper with Compact Mobile Labels & Single First-Step Tick */}
-          <div className="grid grid-cols-5 gap-[0.2rem] sm:gap-[0.375rem] p-[0.25rem] sm:p-[0.375rem] bg-[#F2ECE1] dark:bg-[#1F1C18] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] shrink-0">
-            {MODULE_TABS.map((tab) => {
-              const isActive = activeModule === tab.step;
-              const isStepDone = isCompleted || completedSteps.includes(tab.step);
-              return (
-                <button
-                  key={tab.step}
-                  onClick={() => {
-                    speechService.triggerHaptic('light');
-                    goToModule(tab.step);
-                  }}
-                  className={`min-h-[2.75rem] px-[0.25rem] sm:px-[0.75rem] py-[0.35rem] sm:py-[0.5rem] rounded-lg text-center sm:text-left transition-all ${
-                    isActive
-                      ? 'bg-[#B91C1C] text-white shadow-xs'
-                      : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
-                  }`}
-                >
-                  <div className="flex items-center justify-center sm:justify-between gap-[0.15rem] text-[0.625rem] sm:text-[0.6875rem] font-ipa opacity-85">
-                    <span>{tab.number}</span>
-                    {tab.step === 0 && isStepDone && (
-                      <Check
-                        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${
-                          isActive ? 'text-white' : 'text-[#15803D] dark:text-emerald-400'
-                        }`}
-                      />
-                    )}
-                  </div>
-                  <div className="text-[0.65rem] sm:text-[0.75rem] font-semibold tracking-tight leading-tight">
-                    <span className="sm:hidden">{tab.shortLabel}</span>
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
         </div>
+
+        {/* 5-Step Stepper: icon dots joined by a progress line; Done / Now / Next on wider screens */}
+        {(() => {
+          const doneCount = MODULE_TABS.filter(
+            (t) => isCompleted || completedSteps.includes(t.step)
+          ).length;
+          return (
+            <nav
+              aria-label="Lecture steps"
+              className="relative grid grid-cols-5 pb-4 sm:pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]"
+            >
+              <div
+                aria-hidden="true"
+                className="absolute left-[10%] right-[10%] top-[1.1875rem] sm:top-6 h-0.5 bg-[#E6E0D4] dark:bg-[#2E2924]"
+              />
+              <div
+                aria-hidden="true"
+                className="absolute left-[10%] top-[1.1875rem] sm:top-6 h-0.5 bg-[#2D6A4F] transition-all duration-500"
+                style={{ width: `${(Math.min(4, doneCount) / 4) * 80}%` }}
+              />
+              {MODULE_TABS.map((tab) => {
+                const isActive = activeModule === tab.step;
+                const isStepDone = isCompleted || completedSteps.includes(tab.step);
+                const statusLabel = isActive ? 'Now' : isStepDone ? 'Done' : 'Next';
+                const TabIcon = tab.Icon;
+                return (
+                  <button
+                    key={tab.step}
+                    type="button"
+                    aria-current={isActive ? 'step' : undefined}
+                    aria-label={`Step ${tab.number}: ${tab.label} (${statusLabel})`}
+                    onClick={() => {
+                      speechService.triggerHaptic('light');
+                      goToModule(tab.step);
+                    }}
+                    className="group relative flex flex-col items-center gap-1 min-h-[3.5rem] px-0.5 text-center"
+                  >
+                    <span
+                      className={`relative w-[2.375rem] h-[2.375rem] sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                        isActive
+                          ? 'bg-[#9E2A2B] text-white shadow-[0_0_0_4px_#F8E7E3] dark:shadow-[0_0_0_4px_rgba(158,42,43,0.3)]'
+                          : isStepDone
+                          ? 'bg-[#2D6A4F] text-white'
+                          : 'bg-white dark:bg-[#1F1C18] border border-[#DFD7C8] dark:border-[#3A332D] text-[#6E685F] dark:text-[#A8A29E] group-hover:border-[#9E2A2B] group-hover:text-[#9E2A2B]'
+                      }`}
+                    >
+                      {isStepDone && !isActive ? (
+                        <Check className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={3} />
+                      ) : (
+                        <TabIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      )}
+                    </span>
+                    <span
+                      className={`text-[0.6875rem] sm:text-sm font-bold leading-tight ${
+                        isActive
+                          ? 'text-[#9E2A2B] dark:text-[#F87171]'
+                          : 'text-[#3D342B] dark:text-[#D6CFC4]'
+                      }`}
+                    >
+                      <span className="md:hidden">{tab.shortLabel}</span>
+                      <span className="hidden md:inline">{tab.label}</span>
+                    </span>
+                    <span
+                      className={`hidden md:block text-[0.625rem] font-extrabold uppercase tracking-[0.08em] ${
+                        isActive
+                          ? 'text-[#9E2A2B] dark:text-[#F87171]'
+                          : isStepDone
+                          ? 'text-[#1F5C3D] dark:text-emerald-400'
+                          : 'text-[#8C857B]'
+                      }`}
+                    >
+                      {statusLabel}
+                    </span>
+                    <span className="hidden lg:block text-[0.6875rem] leading-snug text-[#6E685F] dark:text-[#A8A29E] max-w-[11rem]">
+                      {tab.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          );
+        })()}
       </div>
 
       {/* ===================================================================== */}
@@ -1533,8 +1589,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 }}
                 className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                   selfTestMaskWords
-                    ? 'border-[#B91C1C] bg-[#B91C1C] text-white'
-                    : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                    ? 'border-[#9E2A2B] bg-[#9E2A2B] text-white'
+                    : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                 }`}
               >
                 {selfTestMaskWords ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -1570,7 +1626,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         <span className="mx-1.5" aria-hidden="true">·</span>
                         <span>{item.partOfSpeech}</span>
                         <span className="mx-1.5" aria-hidden="true">·</span>
-                        <span className="text-[#B91C1C] dark:text-[#F87171] font-medium">
+                        <span className="text-[#9E2A2B] dark:text-[#F87171] font-medium">
                           {item.silentLettersSummary}
                         </span>
                       </div>
@@ -1588,8 +1644,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             }
                             className={`min-h-[36px] px-2.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1 transition-colors ${
                               isWordMastered
-                                ? 'border-[#15803D] bg-[#15803D] text-white'
-                                : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:border-[#15803D]'
+                                ? 'border-[#2D6A4F] bg-[#2D6A4F] text-white'
+                                : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:border-[#2D6A4F]'
                             }`}
                           >
                             <Check className="w-3.5 h-3.5" />
@@ -1605,8 +1661,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           title={isSaved ? 'Bookmarked' : 'Bookmark word'}
                           className={`min-h-[36px] min-w-[36px] rounded-xl border flex items-center justify-center transition-colors shrink-0 ${
                             isSaved
-                              ? 'border-[#B91C1C]/40 bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]'
-                              : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B91C1C]'
+                              ? 'border-[#9E2A2B]/40 bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171]'
+                              : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E] hover:text-[#9E2A2B]'
                           }`}
                         >
                           {isSaved ? (
@@ -1627,7 +1683,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             onClick={() =>
                               setUnmaskedWordIds((prev) => ({ ...prev, [item.id]: true }))
                             }
-                            className="px-3 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-dashed border-[#B91C1C] text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]"
+                            className="px-3 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-dashed border-[#9E2A2B] text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]"
                           >
                             Tap to Reveal Word
                           </button>
@@ -1655,7 +1711,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                       <span
                                         key={idx}
                                         title="Silent letter (not pronounced)"
-                                        className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 dark:bg-[#B91C1C]/25 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
+                                        className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 dark:bg-[#9E2A2B]/25 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
                                       >
                                         {seg.text}
                                       </span>
@@ -1681,11 +1737,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           title="Tap to listen (1.0x)"
                           className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
                             isNormalSpeaking
-                              ? 'bg-[#B91C1C] text-white'
-                              : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                              ? 'bg-[#9E2A2B] text-white'
+                              : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                           }`}
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C] dark:text-[#F87171]" />
+                          <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B] dark:text-[#F87171]" />
                           <span className="font-ipa">1.0x</span>
                         </button>
 
@@ -1759,8 +1815,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         aria-label="Listen to example sentence"
                         className={`min-h-[32px] min-w-[32px] rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
                           isSentenceSpeaking
-                            ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                            : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] hover:text-[#B91C1C]'
+                            ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
+                            : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] hover:text-[#9E2A2B]'
                         }`}
                       >
                         <Volume2 className="w-3.5 h-3.5" />
@@ -1772,12 +1828,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
                     {englishTip && !isFullNepali ? (
                       <p className="text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] leading-relaxed">
-                        <strong className="text-[#B91C1C] dark:text-[#F87171]">Phonics Tip: </strong>
+                        <strong className="text-[#9E2A2B] dark:text-[#F87171]">Phonics Tip: </strong>
                         {englishTip}
                       </p>
                     ) : (
                       <p className="font-nepali text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] leading-relaxed">
-                        <strong className="text-[#B91C1C] dark:text-[#F87171]">Phonics Tip: </strong>
+                        <strong className="text-[#9E2A2B] dark:text-[#F87171]">Phonics Tip: </strong>
                         {item.usageTipNepali}
                       </p>
                     )}
@@ -1797,7 +1853,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               <button
                 type="button"
                 onClick={() => setVisibleVocabCount((prev) => prev + 10)}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white transition-colors inline-flex items-center justify-center gap-2"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs font-semibold hover:bg-[#9E2A2B] dark:hover:bg-[#9E2A2B] dark:hover:text-white transition-colors inline-flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Load More Words (+10)</span>
@@ -1809,7 +1865,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                <div className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                   Section {String(lecture.lectureNumber).padStart(2, '0')} Vocabulary Bank
                 </div>
                 <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -1820,7 +1876,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   onClick={() => setShowExtendedBank((prev) => !prev)}
-                  className="min-h-[40px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]"
+                  className="min-h-[40px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]"
                 >
                   {showExtendedBank ? 'Hide Word Bank' : 'Search Section Word Bank'}
                 </button>
@@ -1871,7 +1927,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           }}
                           className={`min-h-[32px] px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                             bankCategoryFilter === tab.id
-                              ? 'bg-white dark:bg-[#1F1C18] text-[#B91C1C] dark:text-[#F87171] shadow-xs'
+                              ? 'bg-white dark:bg-[#1F1C18] text-[#9E2A2B] dark:text-[#F87171] shadow-xs'
                               : 'text-[#57534E] dark:text-[#A8A29E]'
                           }`}
                         >
@@ -1920,7 +1976,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 onClick={() =>
                                   speechService.speak(bw.word, { rate: preferredSpeechRate })
                                 }
-                                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#B91C1C]"
+                                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#9E2A2B]"
                                 title="Listen"
                               >
                                 <Volume2 className="w-3.5 h-3.5" />
@@ -1928,7 +1984,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                               <button
                                 onClick={() => onToggleSaveWord(bw.id)}
                                 className={`p-1.5 rounded-lg ${
-                                  saved ? 'text-[#B91C1C]' : 'text-[#57534E]'
+                                  saved ? 'text-[#9E2A2B]' : 'text-[#57534E]'
                                 }`}
                                 title="Bookmark word"
                               >
@@ -2016,9 +2072,9 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleSpeak(item.word, `${item.id}-pron-norm`, preferredSpeechRate)}
-                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
                           >
-                            <Volume2 className="w-4 h-4 text-[#B91C1C]" />
+                            <Volume2 className="w-4 h-4 text-[#9E2A2B]" />
                             <span>Normal</span>
                           </button>
                           <button
@@ -2045,7 +2101,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                     onClick={() => handleSpeak(item.word, `${item.id}-syl-${sIdx}`, 0.65)}
                                     className={`min-h-[40px] px-3 py-1.5 rounded-lg font-ipa text-sm transition-transform active:scale-95 ${
                                       isStressed
-                                        ? 'bg-[#B91C1C] text-white font-semibold'
+                                        ? 'bg-[#9E2A2B] text-white font-semibold'
                                         : 'bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
                                     }`}
                                   >
@@ -2081,7 +2137,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                     <div className="lg:col-span-5 space-y-3">
                       <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
-                        <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+                        <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
                           Rule: {item.ruleTitle}
                         </div>
                         {englishRule && !isFullNepali ? (
@@ -2130,7 +2186,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             <div className="flex items-center justify-between font-semibold mb-1">
                               <span className="inline-flex items-center gap-1.5">
                                 {micResult.passed ? (
-                                  <CheckCircle2 className="w-4 h-4 text-[#15803D] dark:text-emerald-400" />
+                                  <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] dark:text-emerald-400" />
                                 ) : (
                                   <AlertCircle className="w-4 h-4 text-[#D97706]" />
                                 )}
@@ -2160,7 +2216,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
         <div className="space-y-6 animate-fade-up">
           {/* Spelling Rule Master Card */}
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
-            <div className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-1">
+            <div className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] mb-1">
               03. Core Orthographic Rule
             </div>
             <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -2197,10 +2253,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                   <tr className="bg-[#FAF7F2] dark:bg-[#141210] border-b border-[#E7E0D6] dark:border-[#2E2924] text-xs text-[#57534E] dark:text-[#A8A29E]">
                     <th className="py-3 px-4 font-semibold">Base Word</th>
                     <th className="py-3 px-4 font-semibold">Pattern / Rule</th>
-                    <th className="py-3 px-4 font-semibold text-[#15803D] dark:text-emerald-400">
+                    <th className="py-3 px-4 font-semibold text-[#2D6A4F] dark:text-emerald-400">
                       Correct Spelling
                     </th>
-                    <th className="py-3 px-4 font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    <th className="py-3 px-4 font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                       Common Error
                     </th>
                     {languageMode !== 'english-only' && (
@@ -2215,10 +2271,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       <td className="py-3 px-4 text-xs text-[#57534E] dark:text-[#A8A29E]">
                         {ex.transformation}
                       </td>
-                      <td className="py-3 px-4 font-ipa font-semibold text-[#15803D] dark:text-emerald-400">
+                      <td className="py-3 px-4 font-ipa font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         ✓ {ex.correctSpelling}
                       </td>
-                      <td className="py-3 px-4 font-ipa text-[#B91C1C] dark:text-[#F87171] line-through">
+                      <td className="py-3 px-4 font-ipa text-[#9E2A2B] dark:text-[#F87171] line-through">
                         {ex.commonWrongSpelling}
                       </td>
                       {languageMode !== 'english-only' && (
@@ -2253,7 +2309,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     <Headphones className="w-4 h-4" />
                     <span>Interactive Audio Dictation & Spelling Bee</span>
                   </div>
@@ -2285,13 +2341,13 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E]';
                   if (status === 'correct') {
                     pillClass =
-                      'border-[#15803D] bg-emerald-50 dark:bg-emerald-950/50 text-[#15803D] dark:text-emerald-300 font-semibold';
+                      'border-[#2D6A4F] bg-emerald-50 dark:bg-emerald-950/50 text-[#2D6A4F] dark:text-emerald-300 font-semibold';
                   } else if (status === 'wrong') {
                     pillClass =
-                      'border-[#B91C1C] bg-red-50 dark:bg-red-950/50 text-[#B91C1C] dark:text-red-300 font-semibold';
+                      'border-[#9E2A2B] bg-red-50 dark:bg-red-950/50 text-[#9E2A2B] dark:text-red-300 font-semibold';
                   }
                   if (isCurrent) {
-                    pillClass += ' ring-2 ring-[#B91C1C]';
+                    pillClass += ' ring-2 ring-[#9E2A2B]';
                   }
 
                   return (
@@ -2322,7 +2378,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           preferredSpeechRate
                         )
                       }
-                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
                     >
                       <Volume2 className="w-4 h-4" />
                       <span>Play Word Audio (1.0x)</span>
@@ -2354,7 +2410,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       }
                       className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5"
                     >
-                      <Volume2 className="w-4 h-4 text-[#B91C1C]" />
+                      <Volume2 className="w-4 h-4 text-[#9E2A2B]" />
                       <span>Hear in Context Sentence</span>
                     </button>
                   </div>
@@ -2381,7 +2437,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       {currentDictationWord.ipa} ({currentDictationWord.partOfSpeech})
                     </span>{' '}
                     ·{' '}
-                    <span className="text-[#B91C1C] dark:text-[#F87171] font-semibold">
+                    <span className="text-[#9E2A2B] dark:text-[#F87171] font-semibold">
                       {currentDictationWord.silentLettersSummary}
                     </span>
                   </div>
@@ -2410,7 +2466,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     autoCapitalize="none"
                     autoComplete="off"
                     spellCheck={false}
-                    className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] font-ipa text-base text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#B91C1C]"
+                    className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] font-ipa text-base text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
                   />
 
                   {!dictationChecked ? (
@@ -2441,7 +2497,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             true
                           )
                         }
-                        className="min-h-[48px] px-5 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5"
+                        className="min-h-[48px] px-5 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5"
                       >
                         <span>Next Word</span>
                         <ArrowRight className="w-4 h-4" />
@@ -2463,12 +2519,12 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       {dictationInput.trim().toLowerCase() ===
                       currentDictationWord.word.trim().toLowerCase() ? (
-                        <div className="flex items-center gap-2 text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Exact Spelling Match! Great ear for silent letters.</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-sm font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                           <XCircle className="w-4 h-4" />
                           <span>
                             Spelling Difference Detected (Automatically added to Mistake Notes)
@@ -2494,8 +2550,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                   key={idx}
                                   className={`px-1.5 py-0.5 rounded font-bold ${
                                     matches
-                                      ? 'bg-emerald-100 dark:bg-emerald-900/60 text-[#15803D] dark:text-emerald-300'
-                                      : 'bg-red-100 dark:bg-red-900/60 text-[#B91C1C] dark:text-red-300 underline'
+                                      ? 'bg-emerald-100 dark:bg-emerald-900/60 text-[#2D6A4F] dark:text-emerald-300'
+                                      : 'bg-red-100 dark:bg-red-900/60 text-[#9E2A2B] dark:text-red-300 underline'
                                   }`}
                                 >
                                   {ch}
@@ -2512,7 +2568,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             seg.silent ? (
                               <span
                                 key={idx}
-                                className="text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/15 underline decoration-dotted px-0.5 rounded"
+                                className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/15 underline decoration-dotted px-0.5 rounded"
                               >
                                 {seg.text}
                               </span>
@@ -2604,16 +2660,16 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         const isThisRight = opt === quiz.correctAnswer;
 
                         let btnStyle =
-                          'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]';
+                          'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]';
 
                         if (selected) {
                           if (isThisRight) {
-                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold ${
                               isThisSelected ? 'animate-correct-pop' : ''
                             }`;
                           } else if (isThisSelected && !isThisRight) {
                             btnStyle =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
+                              'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] dark:text-red-300 line-through animate-wrong-shake';
                           }
                         }
 
@@ -2673,7 +2729,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {activeModule === 3 && (
         <div className="space-y-6 animate-fade-up">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
-            <div className="flex items-center gap-2 text-xs font-medium text-[#B91C1C] dark:text-[#F87171] mb-1">
+            <div className="flex items-center gap-2 text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] mb-1">
               <Languages className="w-4 h-4" />
               <span>04. Practical Grammar Capstone & Sentence Builder</span>
             </div>
@@ -2711,7 +2767,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       isFullNepali ? 'font-nepali' : ''
                     }`}
                   >
-                    <span className="text-[#B91C1C] font-bold">•</span>
+                    <span className="text-[#9E2A2B] font-bold">•</span>
                     <span>{point}</span>
                   </li>
                 ))}
@@ -2771,7 +2827,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     className="p-5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <span className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                         {comp.contextLabel}
                       </span>
                       <button
@@ -2780,7 +2836,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         }
                         className="min-h-[38px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-medium inline-flex items-center gap-1.5"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                        <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                         <span>Listen English</span>
                       </button>
                     </div>
@@ -2872,7 +2928,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {scrambledBuilders.length > 0 && (
             <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                   <Puzzle className="w-4 h-4" />
                   <span>Interactive English Sentence Builder (SVO Word-Order Lab)</span>
                 </div>
@@ -2900,7 +2956,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <span className="text-xs font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                          <span className="text-xs font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                             Sentence Builder 0{bIdx + 1}
                           </span>
                           <span className="mx-2 text-xs text-[#57534E]">·</span>
@@ -2914,7 +2970,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           }
                           className="min-h-[2.25rem] px-[0.75rem] py-[0.25rem] rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-medium inline-flex items-center gap-1.5"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                          <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                           <span>Hear Target Audio</span>
                         </button>
                       </div>
@@ -3074,16 +3130,16 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                         const isThisRight = opt === ex.correctAnswer;
 
                         let btnStyle =
-                          'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]';
+                          'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]';
 
                         if (selected) {
                           if (isThisRight) {
-                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                            btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold ${
                               isThisSelected ? 'animate-correct-pop' : ''
                             }`;
                           } else if (isThisSelected && !isThisRight) {
                             btnStyle =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
+                              'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] dark:text-red-300 line-through animate-wrong-shake';
                           }
                         }
 
@@ -3141,7 +3197,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
                   <MessageSquare className="w-4 h-4" />
                   <span>05. Real-Life Conversation Dialogue & Comprehension</span>
                 </div>
@@ -3185,8 +3241,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             activeThisSpeed
                               ? 'bg-[#D97706] text-white border-[#D97706]'
                               : btn.rate === dialoguePlaybackRate && !isPlayingFullDialogue
-                              ? 'bg-[#B91C1C] text-white border-[#B91C1C] hover:bg-[#991B1B]'
-                              : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                              ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] hover:bg-[#872223]'
+                              : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                           }`}
                         >
                           {activeThisSpeed ? (
@@ -3260,7 +3316,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       onClick={() => setRolePlaySpeaker(rp.id)}
                       className={`min-h-[32px] px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                         rolePlaySpeaker === rp.id
-                          ? 'bg-white dark:bg-[#1F1C18] text-[#B91C1C] dark:text-[#F87171] shadow-xs'
+                          ? 'bg-white dark:bg-[#1F1C18] text-[#9E2A2B] dark:text-[#F87171] shadow-xs'
                           : 'text-[#57534E] dark:text-[#A8A29E]'
                       }`}
                     >
@@ -3275,8 +3331,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             {isPlayingFullDialogue &&
               activeDialogueLineIdx !== null &&
               lecture.moduleE_dialogue?.lines[activeDialogueLineIdx] && (
-                <div className="mt-4 p-3.5 rounded-xl bg-[#B91C1C]/10 dark:bg-[#B91C1C]/20 border border-[#B91C1C]/30 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 text-xs font-semibold text-[#B91C1C] dark:text-[#FCA5A5]">
+                <div className="mt-4 p-3.5 rounded-xl bg-[#9E2A2B]/10 dark:bg-[#9E2A2B]/20 border border-[#9E2A2B]/30 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 text-xs font-semibold text-[#9E2A2B] dark:text-[#FCA5A5]">
                     <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
                     <span>
                       Playing Turn {activeDialogueLineIdx + 1} of{' '}
@@ -3317,7 +3373,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       key={lineId}
                       className={`p-5 rounded-2xl border transition-all ${
                         isLineActive
-                          ? 'border-[#B91C1C] bg-[#B91C1C]/5 dark:bg-[#B91C1C]/15 ring-1 ring-[#B91C1C]'
+                          ? 'border-[#9E2A2B] bg-[#9E2A2B]/5 dark:bg-[#9E2A2B]/15 ring-1 ring-[#9E2A2B]'
                           : isEven
                           ? 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210]'
                           : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18]'
@@ -3328,7 +3384,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           <span
                             className={`w-7 h-7 rounded-lg text-xs font-bold flex items-center justify-center ${
                               isEven
-                                ? 'bg-[#B91C1C] text-white'
+                                ? 'bg-[#9E2A2B] text-white'
                                 : 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917]'
                             }`}
                           >
@@ -3361,11 +3417,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             }
                             className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${
                               speakingId === `${lineId}-norm`
-                                ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                                : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                                ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
+                                : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                             }`}
                           >
-                            <Volume2 className="w-3.5 h-3.5 text-[#B91C1C] dark:text-[#F87171]" />
+                            <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B] dark:text-[#F87171]" />
                             <span>Listen Line</span>
                           </button>
 
@@ -3388,11 +3444,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                             disabled={isListeningThisLine}
                             className={`min-h-[36px] px-3 py-1 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${
                               isListeningThisLine
-                                ? 'bg-[#B91C1C] text-white border-[#B91C1C] animate-pulse'
-                                : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                                ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] animate-pulse'
+                                : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                             }`}
                           >
-                            <Mic className="w-3.5 h-3.5 text-[#B91C1C] dark:text-[#F87171]" />
+                            <Mic className="w-3.5 h-3.5 text-[#9E2A2B] dark:text-[#F87171]" />
                             <span>{isListeningThisLine ? 'Listening...' : 'Speak Line'}</span>
                           </button>
                         </div>
@@ -3452,7 +3508,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 >
                                   <button
                                     type="button"
-                                    className="text-[11px] font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 hover:bg-[#B91C1C]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
+                                    className="text-[11px] font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 hover:bg-[#9E2A2B]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
                                   >
                                     <Volume2 className="w-3 h-3" />
                                     <span>{hw}</span>
@@ -3470,7 +3526,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 onClick={() =>
                                   handleSpeak(hw, `${lineId}-hw-${hIdx}`, preferredSpeechRate)
                                 }
-                                className="text-[11px] font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171] bg-[#B91C1C]/10 hover:bg-[#B91C1C]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
+                                className="text-[11px] font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 hover:bg-[#9E2A2B]/20 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors"
                               >
                                 <Volume2 className="w-3 h-3" />
                                 <span>{hw}</span>
@@ -3497,7 +3553,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
             <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
-                  <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-0.5">
+                  <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-0.5">
                     Reading & Listening Comprehension Check
                   </div>
                   <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -3536,7 +3592,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                       className="p-[1rem] sm:p-[1.25rem] rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]"
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                        <span className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                           Comprehension Question 0{qIdx + 1}
                         </span>
                         <button
@@ -3546,7 +3602,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           }
                           className="min-h-[2rem] px-2.5 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[0.6875rem] font-medium inline-flex items-center gap-1 text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]"
                         >
-                          <Volume2 className="w-3 h-3 text-[#B91C1C]" />
+                          <Volume2 className="w-3 h-3 text-[#9E2A2B]" />
                           <span>Listen Question</span>
                         </button>
                       </div>
@@ -3567,16 +3623,16 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           const isThisRight = opt === q.correctAnswer;
 
                           let btnStyle =
-                            'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]';
+                            'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]';
 
                           if (selected) {
                             if (isThisRight) {
-                              btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                              btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold ${
                                 isThisSelected ? 'animate-correct-pop' : ''
                               }`;
                             } else if (isThisSelected && !isThisRight) {
                               btnStyle =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
+                                'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] dark:text-red-300 line-through animate-wrong-shake';
                             }
                           }
 
@@ -3643,7 +3699,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 speechService.triggerHaptic('light');
                 goToModule((activeModule - 1) as ModuleStep);
               }}
-              className="min-h-[2.75rem] px-[0.75rem] sm:px-[1rem] py-[0.5rem] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] transition-colors inline-flex items-center gap-1.5 shrink-0"
+              className="min-h-[2.75rem] px-[0.75rem] sm:px-[1rem] py-[0.5rem] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors inline-flex items-center gap-1.5 shrink-0"
             >
               <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">
@@ -3702,7 +3758,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 });
                 handleFinishLecture();
               }}
-              className="min-h-[2.75rem] px-[1rem] sm:px-[1.5rem] py-[0.625rem] rounded-xl bg-[#15803D] hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+              className="min-h-[2.75rem] px-[1rem] sm:px-[1.5rem] py-[0.625rem] rounded-xl bg-[#2D6A4F] hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span className="sm:hidden">Finish</span>

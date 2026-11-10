@@ -3651,7 +3651,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Interactive Orthography Reading Game · {shuffledDetectivePassages.length} Shuffled Cases
               </div>
               <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -3675,7 +3675,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   }}
                   className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     detectivePassageIdx % shuffledDetectivePassages.length === idx
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
                   }`}
                 >
@@ -3689,7 +3689,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
               {currentPassage.title} ({currentPassage.level})
             </span>
-            <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Silent-Letter Words Found: {foundSilentTokenIndices.length} / {totalSilentInPassage}
             </span>
           </div>
@@ -3700,10 +3700,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               const isFound = foundSilentTokenIndices.includes(idx);
               const isWrong = wrongTokenIndices.includes(idx);
               let tokenClass =
-                'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]';
+                'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]';
               if (isFound) {
                 tokenClass =
-                  'bg-emerald-100 dark:bg-emerald-950/60 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-bold ring-1 ring-[#15803D] animate-correct-pop';
+                  'bg-emerald-100 dark:bg-emerald-950/60 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-bold ring-1 ring-[#2D6A4F] animate-correct-pop';
               } else if (isWrong) {
                 tokenClass =
                   'bg-stone-200/70 dark:bg-stone-800/60 border-stone-300 text-[#57534E] opacity-60 animate-wrong-shake';
@@ -3730,11 +3730,11 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   <span className="text-lg font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                     “{selectedTokenDetail.word}”
                   </span>
-                  <span className="font-ipa text-sm text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa text-sm text-[#9E2A2B] dark:text-[#F87171]">
                     {selectedTokenDetail.ipa}
                   </span>
                   {selectedTokenDetail.nepali && (
-                    <span className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                    <span className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                       ({selectedTokenDetail.nepali})
                     </span>
                   )}
@@ -3750,7 +3750,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   onClick={() =>
                     speechService.speak(selectedTokenDetail.word, { rate: preferredSpeechRate })
                   }
-                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
                   <span>1.0x</span>
@@ -3768,7 +3768,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           )}
 
           {foundSilentTokenIndices.length === totalSilentInPassage && (
-            <div className="p-4 rounded-xl bg-[#15803D]/10 border border-[#15803D] text-xs sm:text-sm font-semibold text-[#15803D] dark:text-emerald-300 flex items-center justify-between">
+            <div className="p-4 rounded-xl bg-[#2D6A4F]/10 border border-[#2D6A4F] text-xs sm:text-sm font-semibold text-[#2D6A4F] dark:text-emerald-300 flex items-center justify-between">
               <span>
                 🎉 Case Solved! You spotted all {totalSilentInPassage} silent-letter words in this passage!
               </span>
@@ -3781,7 +3781,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   setWrongTokenIndices([]);
                   setSelectedTokenDetail(null);
                 }}
-                className="px-3.5 py-1.5 rounded-lg bg-[#15803D] text-white text-xs font-semibold cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg bg-[#2D6A4F] text-white text-xs font-semibold cursor-pointer"
               >
                 Next Detective Case →
               </button>
@@ -3796,7 +3796,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       {activeTool === 'confusables' && (
         <section className="space-y-4">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Homophones & Spelling Contrast Arena · {shuffledConfusablePairs.length} Shuffled Sets
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -3817,7 +3817,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                         Shared Sound: {pair.ipa}
                       </span>
                       <button
@@ -3829,7 +3829,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         }
                         className="min-h-[34px] px-3 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] font-semibold inline-flex items-center gap-1.5"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                        <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                         <span>Hear Both</span>
                       </button>
                     </div>
@@ -3856,10 +3856,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           <div className="text-lg font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                             {side.w}
                           </div>
-                          <div className="font-nepali text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                          <div className="font-nepali text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                             {side.m}
                           </div>
-                          <div className="text-[11px] text-[#B91C1C] dark:text-[#F87171]">
+                          <div className="text-[11px] text-[#9E2A2B] dark:text-[#F87171]">
                             {side.rule}
                           </div>
                           <div className="text-xs text-[#57534E] dark:text-[#A8A29E] pt-1">
@@ -3883,12 +3883,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                         if (userAns) {
                           if (isRight) {
-                            style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-bold ${
+                            style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] font-bold ${
                               isPicked ? 'animate-correct-pop' : ''
                             }`;
                           } else if (isPicked) {
                             style =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                              'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                           }
                         }
                         return (
@@ -3925,7 +3925,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="space-y-5">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Nepali-to-English Translation & L1 Interference Lab · Shuffled Practice Sets
               </div>
               <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -3952,7 +3952,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   onClick={() => setInterferenceSubTab(sub.id)}
                   className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     interferenceSubTab === sub.id
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
                   }`}
                 >
@@ -3978,7 +3978,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                      <div className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         नेपाली वाक्य (SOV): “{drill.nepaliSentence}”
                       </div>
                       <div className="p-2.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[11px] font-nepali text-[#57534E] dark:text-[#A8A29E]">
@@ -4020,8 +4020,8 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                               }}
                               className={`min-h-[36px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                                 isUsed
-                                  ? 'bg-[#B91C1C]/10 border-[#B91C1C] text-[#B91C1C] line-through opacity-60'
-                                  : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                                  ? 'bg-[#9E2A2B]/10 border-[#9E2A2B] text-[#9E2A2B] line-through opacity-60'
+                                  : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                               }`}
                             >
                               {chunk}
@@ -4043,7 +4043,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             onClick={() =>
                               setSovPlacedChunks((prev) => ({ ...prev, [drill.id]: [] }))
                             }
-                            className="text-xs font-semibold text-[#B91C1C] hover:underline"
+                            className="text-xs font-semibold text-[#9E2A2B] hover:underline"
                           >
                             Reset
                           </button>
@@ -4055,7 +4055,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       <div
                         className={`p-3.5 rounded-xl border text-xs ${
                           isExactMatch
-                            ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300'
+                            ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300'
                             : 'bg-amber-50/80 dark:bg-amber-950/40 border-[#D97706] text-amber-900 dark:text-amber-200'
                         }`}
                       >
@@ -4084,7 +4084,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
-                      <div className="font-nepali text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                      <div className="font-nepali text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         {drill.nepaliContext}
                       </div>
                       <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4098,12 +4098,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                           if (picked) {
                             if (isRight) {
-                              btnClass = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-bold ${
+                              btnClass = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] font-bold ${
                                 isSelected ? 'animate-correct-pop' : ''
                               }`;
                             } else if (isSelected) {
                               btnClass =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                                'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                             }
                           }
                           return (
@@ -4151,7 +4151,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
-                      <div className="font-nepali text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <div className="font-nepali text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                         Nepali Postposition Cue: {drill.nepaliPostposition}
                       </div>
                       <div className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4165,12 +4165,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                           if (picked) {
                             if (isRight) {
-                              btnClass = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-bold ${
+                              btnClass = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] font-bold ${
                                 isSelected ? 'animate-correct-pop' : ''
                               }`;
                             } else if (isSelected) {
                               btnClass =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                                'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                             }
                           }
                           return (
@@ -4218,10 +4218,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
-                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                      <div className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         {drill.nepaliThought}
                       </div>
-                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#B91C1C] dark:text-[#F87171]">
+                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#9E2A2B] dark:text-[#F87171]">
                         <strong>Present Continuous Overuse Trap:</strong> {drill.wrongHabit}
                       </div>
                       <div className="space-y-2 pt-1">
@@ -4232,12 +4232,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                           if (picked) {
                             if (isRight) {
-                              style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-semibold ${
+                              style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] font-semibold ${
                                 isPicked ? 'animate-correct-pop' : ''
                               }`;
                             } else if (isPicked) {
                               style =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                                'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                             }
                           }
                           return (
@@ -4257,7 +4257,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             >
                               <span>{opt}</span>
                               {picked && isRight && (
-                                <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                                <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                               )}
                             </button>
                           );
@@ -4282,10 +4282,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
-                      <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                      <div className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         नेपाली भाव: “{drill.nepaliThought}”
                       </div>
-                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#B91C1C] dark:text-[#F87171]">
+                      <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-xs text-[#9E2A2B] dark:text-[#F87171]">
                         <strong>Common Direct-Translation Trap:</strong> {drill.commonNepaliTrap}
                       </div>
 
@@ -4300,12 +4300,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                           if (selected) {
                             if (isCorrect) {
-                              btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold ${
+                              btnStyle = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold ${
                                 isPicked ? 'animate-correct-pop' : ''
                               }`;
                             } else if (isPicked) {
                               btnStyle =
-                                'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                                'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                             }
                           }
                           return (
@@ -4325,7 +4325,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             >
                               <span>{opt}</span>
                               {selected && isCorrect && (
-                                <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                                <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                               )}
                             </button>
                           );
@@ -4353,7 +4353,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
       {activeTool === 'connected-speech' && (
         <section className="space-y-4">
           <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Fast-Speech Linking & Ear Decoder · {shuffledConnectedSpeechItems.length} Shuffled Sets
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -4377,7 +4377,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       <button
                         type="button"
                         onClick={() => speechService.speak(item.fullPhrase, { rate: 1.0 })}
-                        className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                        className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
                         <span>Play Natural (1.0x)</span>
@@ -4393,7 +4393,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1">
-                      <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                         How It Sounds in Fast Connected Speech:
                       </div>
                       <div className="font-ipa text-sm font-bold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4403,7 +4403,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         IPA: {item.ipaLinked}
                       </div>
                       {languageMode !== 'english-only' && (
-                        <div className="font-nepali text-xs text-[#15803D] dark:text-emerald-400">
+                        <div className="font-nepali text-xs text-[#2D6A4F] dark:text-emerald-400">
                           {item.nepaliMeaning}
                         </div>
                       )}
@@ -4420,12 +4420,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]';
                         if (picked) {
                           if (isRight) {
-                            style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#15803D] text-[#15803D] font-semibold ${
+                            style = `bg-emerald-50 dark:bg-emerald-950/50 border-[#2D6A4F] text-[#2D6A4F] font-semibold ${
                               isSelected ? 'animate-correct-pop' : ''
                             }`;
                           } else if (isSelected) {
                             style =
-                              'bg-red-50 dark:bg-red-950/50 border-[#B91C1C] text-[#B91C1C] line-through animate-wrong-shake';
+                              'bg-red-50 dark:bg-red-950/50 border-[#9E2A2B] text-[#9E2A2B] line-through animate-wrong-shake';
                           }
                         }
                         return (
@@ -4471,7 +4471,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="max-w-3xl mx-auto bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Feature #6 · Rapid Orthographic Reflex Arcade
               </div>
               <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4481,10 +4481,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
             <div className="flex items-center gap-3 font-ipa text-xs">
               <div className="px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] font-semibold">
-                Personal Best: <span className="text-[#B91C1C]">{sprintHighScore} pts</span>
+                Personal Best: <span className="text-[#9E2A2B]">{sprintHighScore} pts</span>
               </div>
               {sprintRunning && (
-                <div className="px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white font-bold inline-flex items-center gap-1.5">
+                <div className="px-3.5 py-2 rounded-xl bg-[#9E2A2B] text-white font-bold inline-flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />
                   <span>{sprintSecondsLeft}s</span>
                 </div>
@@ -4517,7 +4517,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   }}
                   className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
                     sprintTier === tier.id
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                       : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
                   }`}
                 >
@@ -4541,7 +4541,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               <button
                 type="button"
                 onClick={handleStartSprint}
-                className="min-h-[48px] px-7 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+                className="min-h-[48px] px-7 py-3 rounded-xl bg-[#9E2A2B] text-white text-sm font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
               >
                 <Zap className="w-4 h-4" />
                 <span>Start 60-Second Sprint Now</span>
@@ -4549,10 +4549,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
           ) : sprintFinished ? (
             <div className="text-center py-8 space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#15803D]/15 text-[#15803D] flex items-center justify-center mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-[#2D6A4F]/15 text-[#2D6A4F] flex items-center justify-center mx-auto">
                 <Award className="w-8 h-8" />
               </div>
-              <div className="text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+              <div className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                 60-Second Sprint Complete!
               </div>
               <h3 className="text-3xl font-bold font-ipa text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4564,7 +4564,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               <button
                 type="button"
                 onClick={handleStartSprint}
-                className="min-h-[46px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2"
+                className="min-h-[46px] px-6 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Play Again</span>
@@ -4590,7 +4590,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     }
                     className="min-h-[36px] px-3 py-1 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
                   >
-                    <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                    <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     <span>Hear Word</span>
                   </button>
                   <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -4602,7 +4602,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   {currentSprintItem.maskedDisplay}
                 </div>
 
-                <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+                <div className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                   {currentSprintItem.nepali} · ({currentSprintItem.rule})
                 </div>
               </div>
@@ -4613,7 +4613,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     key={opt}
                     type="button"
                     onClick={() => handleAnswerSprint(opt)}
-                    className="min-h-[54px] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C] font-ipa text-lg font-bold text-[#1C1917] dark:text-[#F5F2EB] transition-all"
+                    className="min-h-[54px] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#9E2A2B] font-ipa text-lg font-bold text-[#1C1917] dark:text-[#F5F2EB] transition-all"
                   >
                     {opt}
                   </button>
@@ -4623,7 +4623,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               {sprintFeedback && (
                 <div
                   className={`text-center text-xs font-bold ${
-                    sprintFeedback === 'correct' ? 'text-[#15803D]' : 'text-[#B91C1C]'
+                    sprintFeedback === 'correct' ? 'text-[#2D6A4F]' : 'text-[#9E2A2B]'
                   }`}
                 >
                   {sprintFeedback === 'correct'
@@ -4643,7 +4643,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 <GitBranch className="w-4 h-4" />
                 <span>Feature #7 · Morphological Phonics Tree Explorer</span>
               </div>
@@ -4663,7 +4663,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   onClick={() => setSelectedTreeId(tree.id)}
                   className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                     selectedTreeId === tree.id
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
                   }`}
                 >
@@ -4676,7 +4676,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           {/* Root Trunk Node */}
           <div className="p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Root Word Family · Target Letter “{currentWordTree.silentLetter}”
               </div>
               <div className="text-2xl font-bold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -4685,7 +4685,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   {currentWordTree.rootIpa}
                 </span>
               </div>
-              <div className="font-nepali text-xs sm:text-sm text-[#15803D] dark:text-emerald-400 mt-0.5">
+              <div className="font-nepali text-xs sm:text-sm text-[#2D6A4F] dark:text-emerald-400 mt-0.5">
                 {currentWordTree.rootMeaning}
               </div>
             </div>
@@ -4697,7 +4697,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   rate: preferredSpeechRate,
                 })
               }
-              className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+              className="min-h-[40px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
             >
               <Volume2 className="w-3.5 h-3.5" />
               <span>Hear Root Word</span>
@@ -4708,7 +4708,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Branch A: Letter Stays Silent */}
             <div className="p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#9E2A2B] dark:text-[#F87171]">
                 Branch 1 · Letter “{currentWordTree.silentLetter}” Stays Silent
               </div>
               {currentWordTree.silentBranch.map((b) => (
@@ -4729,7 +4729,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       }
                       className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1"
                     >
-                      <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                      <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                       <span>Hear</span>
                     </button>
                   </div>
@@ -4743,7 +4743,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
             {/* Branch B: Letter Wakes Up Aloud */}
             <div className="p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-300 dark:border-emerald-800 space-y-3">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#15803D] dark:text-emerald-400">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#2D6A4F] dark:text-emerald-400">
                 Branch 2 · Letter “{currentWordTree.silentLetter}” Wakes Up Aloud!
               </div>
               {currentWordTree.awakeBranch.map((b) => (
@@ -4752,7 +4752,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   className="p-4 rounded-xl bg-white dark:bg-[#1F1C18] border border-emerald-300/70 dark:border-emerald-800 space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-base font-bold text-[#15803D] dark:text-emerald-300">
+                    <span className="text-base font-bold text-[#2D6A4F] dark:text-emerald-300">
                       {b.word}
                     </span>
                     <button
@@ -4762,7 +4762,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           rate: preferredSpeechRate,
                         })
                       }
-                      className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1"
+                      className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#2D6A4F] text-white text-xs font-semibold inline-flex items-center gap-1"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
                       <span>Hear Awake Letter</span>
@@ -4788,7 +4788,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 <MessageSquare className="w-4 h-4" />
                 <span>Feature #8 · Interactive Branching Conversation Simulator</span>
               </div>
@@ -4812,7 +4812,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   }}
                   className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
                     activeScenarioIdx === idx
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                       : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
                   }`}
                 >
@@ -4824,7 +4824,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
           <div className="p-5 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <span className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 {currentScenario.title} · Turn {rolePlayTurnIdx + 1} of{' '}
                 {currentScenario.turns.length}
               </span>
@@ -4837,7 +4837,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 }
                 className="min-h-[36px] px-3 py-1 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] font-semibold inline-flex items-center gap-1.5"
               >
-                <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>Hear Speaker</span>
               </button>
             </div>
@@ -4865,10 +4865,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 <span
                   className={`font-mono font-bold tabular-nums ${
                     rolePlayRapportScore >= 85
-                      ? 'text-[#15803D] dark:text-emerald-400'
+                      ? 'text-[#2D6A4F] dark:text-emerald-400'
                       : rolePlayRapportScore >= 65
                       ? 'text-[#D97706]'
-                      : 'text-[#B91C1C]'
+                      : 'text-[#9E2A2B]'
                   }`}
                 >
                   {rolePlayRapportScore}% ({rolePlayRapportScore >= 85 ? 'Diplomatic C1 Register' : rolePlayRapportScore >= 65 ? 'Polite Standard Register' : 'Direct / Needs Softening'})
@@ -4878,10 +4878,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 <div
                   className={`h-full transition-all duration-300 ${
                     rolePlayRapportScore >= 85
-                      ? 'bg-[#15803D]'
+                      ? 'bg-[#2D6A4F]'
                       : rolePlayRapportScore >= 65
                       ? 'bg-[#D97706]'
-                      : 'bg-[#B91C1C]'
+                      : 'bg-[#9E2A2B]'
                   }`}
                   style={{ width: `${rolePlayRapportScore}%` }}
                 />
@@ -4899,8 +4899,8 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   onClick={handleSpeakRolePlayResponse}
                   className={`min-h-[38px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
                     rolePlayListening
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C] animate-pulse'
-                      : 'bg-white dark:bg-[#1F1C18] border-[#B91C1C] text-[#B91C1C] dark:text-[#F87171] hover:bg-[#B91C1C] hover:text-white'
+                      ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] animate-pulse'
+                      : 'bg-white dark:bg-[#1F1C18] border-[#9E2A2B] text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#9E2A2B] hover:text-white'
                   }`}
                 >
                   <Mic className="w-3.5 h-3.5" />
@@ -4922,7 +4922,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                 <div
                   className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
                     rolePlayVoiceResult.passed
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300'
                       : 'bg-amber-50 dark:bg-amber-950/40 border-[#D97706] text-amber-900 dark:text-amber-200'
                   }`}
                 >
@@ -4936,11 +4936,11 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               {currentRolePlayTurn.choices.map((ch, idx) => {
                 const isSelected = selectedRolePlayChoice === idx;
                 let style =
-                  'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C]';
+                  'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B]';
                 if (selectedRolePlayChoice !== null) {
                   if (ch.quality === 'best') {
                     style =
-                      'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold';
+                      'bg-emerald-50 dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold';
                   } else if (isSelected) {
                     style =
                       'bg-amber-50 dark:bg-amber-950/40 border-[#D97706] text-amber-900 dark:text-amber-200';
@@ -5003,7 +5003,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       setRolePlayTurnIdx((prev) => prev + 1);
                       setSelectedRolePlayChoice(null);
                     }}
-                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Next Conversation Turn</span>
                     <ArrowRight className="w-4 h-4" />
@@ -5018,7 +5018,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       setRolePlayRapportScore(80);
                       setRolePlayPolitenessHistory([]);
                     }}
-                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[40px] px-5 py-2 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>
                       Scenario Complete (Rapport: {rolePlayRapportScore}% · {rolePlayPolitenessHistory.filter((q) => q === 'best').length} Best Turns)! Next Scenario →
@@ -5053,7 +5053,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             className="lg:col-span-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4"
           >
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Feature #9 · Personal Lexicon & Flashcard Creator
               </div>
               <h2 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -5137,7 +5137,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
               <button
                 type="submit"
-                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center justify-center gap-1.5"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center justify-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Word to Custom Study Deck</span>
@@ -5150,7 +5150,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             {customWords.length > 0 && (
               <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     Custom Deck Flashcard Player ({(customFlashcardIdx % customWords.length) + 1} /{' '}
                     {customWords.length})
                   </span>
@@ -5178,7 +5178,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           }
                           className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                          <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                           <span>1.0x</span>
                         </button>
                         <button
@@ -5200,7 +5200,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
                       {customCardFlipped && (
                         <div className="pt-3 border-t border-[#E7E0D6] dark:border-[#2E2924] space-y-1">
-                          <div className="font-nepali text-lg font-bold text-[#15803D] dark:text-emerald-400">
+                          <div className="font-nepali text-lg font-bold text-[#2D6A4F] dark:text-emerald-400">
                             {card.nepaliMeaning}
                           </div>
                           <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -5228,7 +5228,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             setCustomCardFlipped(false);
                             setCustomFlashcardIdx((i) => (i + 1) % customWords.length);
                           }}
-                          className="text-xs font-semibold text-[#B91C1C]"
+                          className="text-xs font-semibold text-[#9E2A2B]"
                         >
                           Next Card →
                         </button>
@@ -5255,10 +5255,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         {cw.word}{' '}
                         <span className="font-ipa font-normal text-[#57534E]">{cw.ipa}</span>
                       </div>
-                      <div className="font-nepali text-[#15803D] dark:text-emerald-400 font-semibold">
+                      <div className="font-nepali text-[#2D6A4F] dark:text-emerald-400 font-semibold">
                         {cw.nepaliMeaning}
                       </div>
-                      <div className="text-[11px] text-[#B91C1C] dark:text-[#F87171]">
+                      <div className="text-[11px] text-[#9E2A2B] dark:text-[#F87171]">
                         {cw.silentLettersSummary}
                       </div>
                     </div>
@@ -5266,14 +5266,14 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       <button
                         type="button"
                         onClick={() => speechService.speak(cw.word, { rate: preferredSpeechRate })}
-                        className="p-1.5 rounded-lg text-[#B91C1C]"
+                        className="p-1.5 rounded-lg text-[#9E2A2B]"
                       >
                         <Volume2 className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onRemoveCustomWord(cw.id)}
-                        className="p-1.5 rounded-lg text-[#57534E] hover:text-[#B91C1C]"
+                        className="p-1.5 rounded-lg text-[#57534E] hover:text-[#9E2A2B]"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -5293,7 +5293,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924] print:hidden">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Feature #12 & Master Vocabulary List · Print-Ready Reference Sheets
               </div>
               <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -5336,7 +5336,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print / Save PDF</span>
@@ -5399,7 +5399,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             seg.silent ? (
                               <span
                                 key={i}
-                                className="text-[#B91C1C] dark:text-[#F87171] underline decoration-dotted"
+                                className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted"
                               >
                                 {seg.text}
                               </span>
@@ -5411,10 +5411,10 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         <td className="py-2.5 px-3.5 font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
                           {item.ipa} · {item.partOfSpeech}
                         </td>
-                        <td className="py-2.5 px-3.5 font-nepali font-medium text-[#15803D] dark:text-emerald-400">
+                        <td className="py-2.5 px-3.5 font-nepali font-medium text-[#2D6A4F] dark:text-emerald-400">
                           {item.nepaliMeaning}
                         </td>
-                        <td className="py-2.5 px-3.5 text-xs text-[#B91C1C] dark:text-[#F87171]">
+                        <td className="py-2.5 px-3.5 text-xs text-[#9E2A2B] dark:text-[#F87171]">
                           {item.silentLettersSummary}
                         </td>
                         <td className="py-2.5 px-3.5 font-ipa text-xs">
@@ -5426,7 +5426,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             onClick={() =>
                               speechService.speak(item.word, { rate: preferredSpeechRate })
                             }
-                            className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-[#B91C1C]"
+                            className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] text-[#9E2A2B]"
                           >
                             <Volume2 className="w-3.5 h-3.5" />
                           </button>
@@ -5488,7 +5488,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   key={card.cluster}
                   className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-1.5"
                 >
-                  <div className="font-bold text-sm text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="font-bold text-sm text-[#9E2A2B] dark:text-[#F87171]">
                     {card.cluster}
                   </div>
                   <div className="text-xs text-[#1C1917] dark:text-[#F5F2EB]">{card.rule}</div>
@@ -5532,7 +5532,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   <div className="font-bold text-sm text-[#1C1917] dark:text-[#F5F2EB]">
                     {f.title}
                   </div>
-                  <div className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     {f.formula}
                   </div>
                   <div className="font-nepali text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -5559,7 +5559,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                       {m.prompt}
                     </div>
-                    <div className="text-[#15803D] font-bold">Target: {m.correctAnswer}</div>
+                    <div className="text-[#2D6A4F] font-bold">Target: {m.correctAnswer}</div>
                     <div className="text-[#57534E]">{m.explanation}</div>
                   </div>
                 ))}
@@ -5571,7 +5571,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     <div className="font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                       {cw.word} ({cw.ipa}) — {cw.nepaliMeaning}
                     </div>
-                    <div className="text-[#B91C1C]">{cw.silentLettersSummary}</div>
+                    <div className="text-[#9E2A2B]">{cw.silentLettersSummary}</div>
                     <div className="text-[#57534E]">“{cw.englishExample}”</div>
                   </div>
                 ))}
@@ -5588,7 +5588,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="max-w-4xl mx-auto bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Timed Diagnostic Mock Test · IELTS / PTE / Job Interview Readiness
               </div>
               <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -5600,7 +5600,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </div>
 
             {examStarted && !examFinished && (
-              <div className="px-4 py-2 rounded-xl bg-[#B91C1C] text-white font-ipa text-sm font-bold inline-flex items-center gap-2">
+              <div className="px-4 py-2 rounded-xl bg-[#9E2A2B] text-white font-ipa text-sm font-bold inline-flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 <span>
                   {Math.floor(examSecondsLeft / 60)}:
@@ -5612,7 +5612,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
 
           {!examStarted && !examFinished ? (
             <div className="text-center py-8 space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#B91C1C]/12 text-[#B91C1C] flex items-center justify-center mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-[#9E2A2B]/12 text-[#9E2A2B] flex items-center justify-center mx-auto">
                 <Award className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -5630,7 +5630,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   setExamFinished(false);
                   setExamStarted(true);
                 }}
-                className="min-h-[48px] px-7 py-3 rounded-xl bg-[#B91C1C] text-white text-sm font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+                className="min-h-[48px] px-7 py-3 rounded-xl bg-[#9E2A2B] text-white text-sm font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
               >
                 <Play className="w-4 h-4 fill-current" />
                 <span>Start 10-Minute Diagnostic Exam</span>
@@ -5669,7 +5669,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               return (
                 <div className="space-y-6">
                   <div className="p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-center space-y-2">
-                    <div className="text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                    <div className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                       Diagnostic Assessment Complete
                     </div>
                     <div className="text-3xl font-bold font-ipa text-[#1C1917] dark:text-[#F5F2EB]">
@@ -5714,7 +5714,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             key={q.id}
                             className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2 text-xs"
                           >
-                            <div className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                            <div className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                               {q.sectionLabel}
                             </div>
                             <div className="text-[#1C1917] dark:text-[#F5F2EB] font-medium">
@@ -5747,7 +5747,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                         setExamFinished(false);
                         setExamStarted(true);
                       }}
-                      className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-2"
+                      className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-2"
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>Retake 10-Minute Simulator</span>
@@ -5763,7 +5763,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               return (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    <span className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                       {q.sectionLabel}
                     </span>
                     <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
@@ -5788,7 +5788,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           onClick={() =>
                             speechService.speak(q.audioText!, { rate: preferredSpeechRate })
                           }
-                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                          className="min-h-[40px] px-4 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                         >
                           <Volume2 className="w-4 h-4" />
                           <span>Play Exam Audio Prompt (1.0x)</span>
@@ -5823,8 +5823,8 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                             }}
                             className={`min-h-[40px] px-4 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 ${
                               examMicListening
-                                ? 'bg-[#15803D] text-white border-[#15803D] animate-pulse'
-                                : 'bg-white dark:bg-[#1F1C18] border-[#15803D] text-[#15803D]'
+                                ? 'bg-[#2D6A4F] text-white border-[#2D6A4F] animate-pulse'
+                                : 'bg-white dark:bg-[#1F1C18] border-[#2D6A4F] text-[#2D6A4F]'
                             }`}
                           >
                             <Mic className="w-4 h-4" />
@@ -5837,7 +5837,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                     )}
 
                     {examMicResult && q.section === 'speaking' && (
-                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-[#15803D] text-xs text-[#15803D] dark:text-emerald-300 flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-[#2D6A4F] text-xs text-[#2D6A4F] dark:text-emerald-300 flex items-center justify-between">
                         <span>You spoke: “{examMicResult.transcript}”</span>
                         <span className="font-ipa font-bold">{examMicResult.score}% Match</span>
                       </div>
@@ -5862,12 +5862,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           }}
                           className={`w-full p-4 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between gap-2 ${
                             isSelected
-                              ? 'border-[#B91C1C] bg-[#B91C1C]/10 text-[#1C1917] dark:text-[#F5F2EB] font-semibold ring-1 ring-[#B91C1C]'
+                              ? 'border-[#9E2A2B] bg-[#9E2A2B]/10 text-[#1C1917] dark:text-[#F5F2EB] font-semibold ring-1 ring-[#9E2A2B]'
                               : 'bg-[#FAF7F2] dark:bg-[#141210] border-[#E7E0D6] dark:border-[#2E2924]'
                           }`}
                         >
                           <span>{opt}</span>
-                          {isSelected && <Check className="w-4 h-4 text-[#B91C1C] shrink-0" />}
+                          {isSelected && <Check className="w-4 h-4 text-[#9E2A2B] shrink-0" />}
                         </button>
                       );
                     })}
@@ -5893,7 +5893,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                           setExamMicResult(null);
                           setExamQuestionIdx((i) => i + 1);
                         }}
-                        className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                        className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                       >
                         <span>Next Task</span>
                         <ArrowRight className="w-4 h-4" />
@@ -5902,7 +5902,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                       <button
                         type="button"
                         onClick={handleFinishExam}
-                        className="min-h-[42px] px-6 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                        className="min-h-[42px] px-6 py-2 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Submit Diagnostic Exam & View Band Report</span>
@@ -5923,7 +5923,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
         <section className="max-w-3xl mx-auto bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
             <div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 <Radio className={`w-4 h-4 ${commuterPlaying ? 'animate-pulse' : ''}`} />
                 <span>Hands-Free "Commuter Audio Mode" (Podcast Loop)</span>
               </div>
@@ -5989,7 +5989,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   {commuterTracks.length}
                 </span>
                 <span>·</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171] font-semibold">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171] font-semibold">
                   {commuterPhase === 'word-1x' && '🔊 1/4 · Word at 1.0x'}
                   {commuterPhase === 'pause-2s' && '⏳ 2/4 · 2s Mental Recall Pause'}
                   {commuterPhase === 'word-075x' && '🐢 3/4 · Word at 0.75x'}
@@ -6004,7 +6004,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
               <div className="font-ipa text-sm text-[#57534E] dark:text-[#A8A29E]">
                 {currentCommuterTrack.ipa} · {currentCommuterTrack.silentLettersSummary}
               </div>
-              <div className="font-nepali text-lg font-semibold text-[#15803D] dark:text-emerald-400">
+              <div className="font-nepali text-lg font-semibold text-[#2D6A4F] dark:text-emerald-400">
                 {currentCommuterTrack.nepaliMeaning}
               </div>
               <p className="text-sm text-[#1C1917] dark:text-[#F5F2EB] max-w-lg mx-auto">
@@ -6025,7 +6025,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
                   className={`min-h-[46px] px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 ${
                     commuterPlaying
                       ? 'bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917]'
-                      : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
+                      : 'bg-[#9E2A2B] text-white hover:bg-[#872223]'
                   }`}
                 >
                   {commuterPlaying ? (

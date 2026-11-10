@@ -353,7 +353,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
         {/* Top Modal Header */}
         <div className="flex items-start justify-between gap-3 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               <Sparkles className="w-4 h-4" />
               <span>24-Hour Spaced-Retention Pop-Up Quiz</span>
               <span>·</span>
@@ -390,7 +390,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
             {/* 3-Step Progress Bar */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                <span className="font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                   {currentQuestion.badge}
                 </span>
                 <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">
@@ -402,7 +402,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                   const answered = answersRecord[step];
                   let barColor = 'bg-[#E7E0D6] dark:bg-[#2E2924]';
                   if (answered) {
-                    barColor = answered.isCorrect ? 'bg-[#15803D]' : 'bg-[#B91C1C]';
+                    barColor = answered.isCorrect ? 'bg-[#2D6A4F]' : 'bg-[#9E2A2B]';
                   } else if (step === currentIdx) {
                     barColor = 'bg-[#D97706]';
                   }
@@ -423,7 +423,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                         rate: preferredSpeechRate,
                       })
                     }
-                    className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-[#991B1B]"
+                    className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-[#872223]"
                   >
                     <Volume2 className="w-3.5 h-3.5" />
                     <span>Hear Word (1.0x)</span>
@@ -444,7 +444,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setUseTypingMode((prev) => !prev)}
-                    className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] hover:underline"
+                    className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] hover:underline"
                   >
                     {useTypingMode ? 'Switch to 4 Options' : 'Type Spelling Directly'}
                   </button>
@@ -495,14 +495,14 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                       currentQuestion.correctAnswer.trim().toLowerCase();
 
                     let btnClass =
-                      'bg-[#FAF7F2] dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C]';
+                      'bg-[#FAF7F2] dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B]';
                     if (selectedOption) {
                       if (isRight) {
                         btnClass =
-                          'bg-emerald-50 dark:bg-emerald-950/40 border-[#15803D] text-[#15803D] dark:text-emerald-300 font-semibold animate-correct-pop';
+                          'bg-emerald-50 dark:bg-emerald-950/40 border-[#2D6A4F] text-[#2D6A4F] dark:text-emerald-300 font-semibold animate-correct-pop';
                       } else if (isSelected) {
                         btnClass =
-                          'bg-red-50 dark:bg-red-950/40 border-[#B91C1C] text-[#B91C1C] dark:text-red-300 line-through animate-wrong-shake';
+                          'bg-red-50 dark:bg-red-950/40 border-[#9E2A2B] text-[#9E2A2B] dark:text-red-300 line-through animate-wrong-shake';
                       }
                     }
 
@@ -516,10 +516,10 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                       >
                         <span className="font-nepali">{opt}</span>
                         {selectedOption && isRight && (
-                          <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                         )}
                         {selectedOption && isSelected && !isRight && (
-                          <XCircle className="w-4 h-4 text-[#B91C1C] shrink-0" />
+                          <XCircle className="w-4 h-4 text-[#9E2A2B] shrink-0" />
                         )}
                       </button>
                     );
@@ -537,7 +537,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                           seg.silent ? (
                             <span
                               key={i}
-                              className="text-[#B91C1C] dark:text-[#F87171] underline decoration-dotted"
+                              className="text-[#9E2A2B] dark:text-[#F87171] underline decoration-dotted"
                             >
                               {seg.text}
                             </span>
@@ -558,7 +558,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+                    className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
                   >
                     <span>
                       {currentIdx + 1 < questions.length ? 'Next Question' : 'Finish Challenge'}
@@ -572,12 +572,12 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
         ) : (
           /* Challenge Completed Summary View */
           <div className="p-6 rounded-2xl bg-white dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-center space-y-5">
-            <div className="w-14 h-14 rounded-2xl bg-[#15803D]/12 text-[#15803D] flex items-center justify-center mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-[#2D6A4F]/12 text-[#2D6A4F] flex items-center justify-center mx-auto">
               <Award className="w-8 h-8" />
             </div>
 
             <div className="space-y-1">
-              <div className="text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+              <div className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                 Daily Retention Check Complete!
               </div>
               <h3 className="text-2xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -600,15 +600,15 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                       {rec.question.targetWord.word}
                     </span>
                     {rec.isCorrect ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#2D6A4F]" />
                     ) : (
-                      <XCircle className="w-3.5 h-3.5 text-[#B91C1C]" />
+                      <XCircle className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     )}
                   </div>
                   <div className="font-ipa text-[11px] text-[#57534E] dark:text-[#A8A29E]">
                     {rec.question.targetWord.ipa}
                   </div>
-                  <div className="font-nepali text-xs text-[#15803D] dark:text-emerald-400">
+                  <div className="font-nepali text-xs text-[#2D6A4F] dark:text-emerald-400">
                     {rec.question.targetWord.nepaliMeaning}
                   </div>
                 </div>
@@ -633,7 +633,7 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold"
+                  className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold"
                 >
                   Continue to Dashboard
                 </button>

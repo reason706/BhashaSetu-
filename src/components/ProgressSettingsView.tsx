@@ -1265,7 +1265,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
           <button
             onClick={() => window.print()}
-            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
             <span>Print / Save Achievement Card as PDF</span>
@@ -1273,10 +1273,10 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </div>
 
         <div className="bg-white text-[#1C1917] border-4 border-double border-[#D97706] rounded-2xl p-8 sm:p-12 text-center space-y-6">
-          <div className="w-20 h-20 rounded-2xl bg-[#15803D] text-white flex items-center justify-center mx-auto shadow-md">
+          <div className="w-20 h-20 rounded-2xl bg-[#2D6A4F] text-white flex items-center justify-center mx-auto shadow-md">
             <Trophy className="w-10 h-10" />
           </div>
-          <div className="font-ipa text-xs uppercase tracking-widest text-[#B91C1C] font-semibold">
+          <div className="font-ipa text-xs uppercase tracking-widest text-[#9E2A2B] font-semibold">
             BhashaSetu · Official Milestone Achievement Card ({badgeInfo.tier} Tier)
           </div>
           <h1 className="font-serif-display text-3xl sm:text-4xl font-bold text-[#1C1917]">
@@ -1291,13 +1291,13 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto pt-4 border-t border-b border-[#E7E0D6] py-4">
             <div>
-              <div className="font-ipa text-xl font-bold text-[#15803D]">
+              <div className="font-ipa text-xl font-bold text-[#2D6A4F]">
                 {badgeInfo.current} / {badgeInfo.target}
               </div>
               <div className="text-xs text-[#57534E]">Milestone Progress ({badgeInfo.unit})</div>
             </div>
             <div>
-              <div className="font-ipa text-xl font-bold text-[#B91C1C]">
+              <div className="font-ipa text-xl font-bold text-[#9E2A2B]">
                 {unifiedMasteredWordsCount} Words
               </div>
               <div className="text-xs text-[#57534E]">Words Mastered</div>
@@ -1334,18 +1334,18 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
           <button
             onClick={() => window.print()}
-            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2"
+            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
             <span>Print / Save Certificate as PDF</span>
           </button>
         </div>
 
-        <div className="bg-white text-[#1C1917] border-4 border-double border-[#B91C1C] rounded-2xl p-8 sm:p-12 text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-[#B91C1C]/10 text-[#B91C1C] flex items-center justify-center mx-auto">
+        <div className="bg-white text-[#1C1917] border-4 border-double border-[#9E2A2B] rounded-2xl p-8 sm:p-12 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-[#9E2A2B]/10 text-[#9E2A2B] flex items-center justify-center mx-auto">
             <Award className="w-9 h-9" />
           </div>
-          <div className="font-ipa text-xs uppercase tracking-widest text-[#B91C1C] font-semibold">
+          <div className="font-ipa text-xs uppercase tracking-widest text-[#9E2A2B] font-semibold">
             BhashaSetu · English Phonics, Orthography & Syntax Curriculum
           </div>
           <h1 className="font-serif-display text-3xl sm:text-4xl font-bold text-[#1C1917]">
@@ -1361,13 +1361,13 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto pt-4 border-t border-b border-[#E7E0D6] py-4">
             <div>
-              <div className="font-ipa text-xl font-bold text-[#B91C1C]">
+              <div className="font-ipa text-xl font-bold text-[#9E2A2B]">
                 {trackInfo.done} / {trackInfo.total}
               </div>
               <div className="text-xs text-[#57534E]">Track Units Completed</div>
             </div>
             <div>
-              <div className="font-ipa text-xl font-bold text-[#15803D]">
+              <div className="font-ipa text-xl font-bold text-[#2D6A4F]">
                 {skillMetrics.overallAccuracy !== null ? `${skillMetrics.overallAccuracy}%` : '100%'}
               </div>
               <div className="text-xs text-[#57534E]">Quiz Accuracy</div>
@@ -1410,8 +1410,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-serif-display text-lg font-bold ${
                   firebaseUser
-                    ? 'bg-[#15803D] text-white'
-                    : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#B91C1C]'
+                    ? 'bg-[#2D6A4F] text-white'
+                    : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#9E2A2B]'
                 }`}
               >
                 {firebaseUser
@@ -1422,7 +1422,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-[#15803D] dark:text-emerald-400 inline-flex items-center gap-1">
+                <span className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400 inline-flex items-center gap-1">
                   <UserCheck className="w-3.5 h-3.5" />
                   <span>
                     {firebaseUser
@@ -1433,7 +1433,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <span
                   className={`px-2 py-0.5 rounded-md font-ipa text-[10px] font-semibold ${
                     firebaseUser
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-[#15803D] dark:text-emerald-300'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-[#2D6A4F] dark:text-emerald-300'
                       : 'bg-amber-100 dark:bg-amber-950/50 text-[#D97706] dark:text-amber-300'
                   }`}
                 >
@@ -1465,7 +1465,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   type="button"
                   disabled={isCloudSyncing || isSyncing}
                   onClick={handleSyncClick}
-                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#15803D] text-white text-xs font-semibold hover:bg-emerald-800 inline-flex items-center gap-2 transition-colors disabled:opacity-60"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#2D6A4F] text-white text-xs font-semibold hover:bg-emerald-800 inline-flex items-center gap-2 transition-colors disabled:opacity-60"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${isCloudSyncing || isSyncing ? 'animate-spin' : ''}`}
@@ -1479,9 +1479,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     type="button"
                     disabled={isCloudSyncing || isSyncing}
                     onClick={onPullFromCloud}
-                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#15803D] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#2D6A4F] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
                   >
-                    <Download className="w-3.5 h-3.5 text-[#15803D]" />
+                    <Download className="w-3.5 h-3.5 text-[#2D6A4F]" />
                     <span>Restore / Merge from Cloud</span>
                   </button>
                 )}
@@ -1489,7 +1489,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={onGoogleSignOut}
-                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5 transition-colors"
+                    className="min-h-[42px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5 transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>
@@ -1502,7 +1502,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   type="button"
                   disabled={isCloudSyncing}
                   onClick={onGoogleSignIn}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs sm:text-sm font-semibold hover:bg-[#B91C1C] dark:hover:bg-[#B91C1C] dark:hover:text-white inline-flex items-center gap-2.5 transition-colors shadow-xs disabled:opacity-60"
+                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] text-xs sm:text-sm font-semibold hover:bg-[#9E2A2B] dark:hover:bg-[#9E2A2B] dark:hover:text-white inline-flex items-center gap-2.5 transition-colors shadow-xs disabled:opacity-60"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                     <path
@@ -1541,13 +1541,13 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
           <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
             <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Words & SRS Queue</div>
-            <div className="font-ipa font-bold text-sm text-[#15803D] dark:text-emerald-400 mt-0.5">
+            <div className="font-ipa font-bold text-sm text-[#2D6A4F] dark:text-emerald-400 mt-0.5">
               {unifiedMasteredWordsCount} Mastered · {srsCount} SRS
             </div>
           </div>
           <div className="p-3 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
             <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">Mistakes & Notes</div>
-            <div className="font-ipa font-bold text-sm text-[#B91C1C] dark:text-[#F87171] mt-0.5">
+            <div className="font-ipa font-bold text-sm text-[#9E2A2B] dark:text-[#F87171] mt-0.5">
               {progress.mistakeNotebook.length} Mistakes · {notesCount} Notes
             </div>
           </div>
@@ -1572,7 +1572,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </div>
 
         {cloudSyncStatusMsg && (
-          <div className="text-xs font-medium text-[#15803D] dark:text-emerald-400 flex items-center gap-1.5">
+          <div className="text-xs font-medium text-[#2D6A4F] dark:text-emerald-400 flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             <span>{cloudSyncStatusMsg}</span>
           </div>
@@ -3499,7 +3499,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   setDraftProfileName(displayUserName);
                   setIsEditingProfileName((prev) => !prev);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
+                className="px-3 py-1.5 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
               >
                 {isEditingProfileName ? 'Close' : 'Edit name'}
               </button>
@@ -3516,7 +3516,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     value={draftProfileName}
                     onChange={(e) => setDraftProfileName(e.target.value)}
                     placeholder="Enter your name"
-                    className="flex-1 h-9 px-3 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1A1714] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#A82020]"
+                    className="flex-1 h-9 px-3 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1A1714] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
                   />
                   <button
                     type="button"
@@ -3526,7 +3526,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       }
                       setIsEditingProfileName(false);
                     }}
-                    className="h-9 px-3.5 rounded-xl bg-[#A82020] text-white text-xs font-semibold"
+                    className="h-9 px-3.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold"
                   >
                     Save
                   </button>
@@ -3562,7 +3562,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={onGoogleSignOut}
-                  className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#A82020] dark:hover:text-[#F87171] inline-flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#9E2A2B] dark:hover:text-[#F87171] inline-flex items-center gap-1.5 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sign out</span>
@@ -3572,7 +3572,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={onGoogleSignIn}
-                    className="px-3.5 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] hover:bg-[#A82020] dark:hover:bg-[#A82020] dark:hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    className="px-3.5 py-2 rounded-xl bg-[#1C1917] dark:bg-[#F5F2EB] text-white dark:text-[#1C1917] hover:bg-[#9E2A2B] dark:hover:bg-[#9E2A2B] dark:hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     <span>Sign in with Google</span>
@@ -3685,7 +3685,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
         {/* CARD 2: Your study environment */}
         <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
             YOUR STUDY ENVIRONMENT
           </div>
 
@@ -3808,7 +3808,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
         {/* CARD 3: Audio & pronunciation lab */}
         <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
             AUDIO &amp; PRONUNCIATION LAB
           </div>
 
@@ -3835,7 +3835,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   )
                 }
                 title="Click to preview dialogue speed"
-                className="px-2.5 py-1 rounded-lg bg-[#F8E9E5] dark:bg-red-950/50 text-[#A82020] dark:text-red-300 font-ipa text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-[#F2DCD6] transition-colors shrink-0"
+                className="px-2.5 py-1 rounded-lg bg-[#F8E9E5] dark:bg-red-950/50 text-[#9E2A2B] dark:text-red-300 font-ipa text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-[#F2DCD6] transition-colors shrink-0"
               >
                 <Volume2 className="w-3.5 h-3.5" />
                 <span>{formattedDialogueRate}</span>
@@ -3854,7 +3854,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   const r = Number(parseFloat(e.target.value).toFixed(2));
                   handleUpdateCalibration({ dialogueRate: r });
                 }}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[#EAE4D8] dark:bg-[#2E2924] accent-[#A82020]"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[#EAE4D8] dark:bg-[#2E2924] accent-[#9E2A2B]"
               />
               <div className="flex items-center justify-between text-[10px] text-[#78716C] dark:text-[#A8A29E]">
                 {[
@@ -3872,7 +3872,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       onClick={() => handleUpdateCalibration({ dialogueRate: tick.rate })}
                       className={`transition-colors ${
                         isTickActive
-                          ? 'font-bold text-[#A82020] dark:text-[#F87171]'
+                          ? 'font-bold text-[#9E2A2B] dark:text-[#F87171]'
                           : 'hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
                       }`}
                     >
@@ -3993,7 +3993,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   audioLabSectionRef.current?.scrollIntoView({ behavior: scrollBehavior() });
                 }, 100);
               }}
-              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
+              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
             >
               {showFullAudioLab ? 'Hide lab' : 'Open lab'}
             </button>
@@ -4002,7 +4002,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
         {/* CARD 4: Your data, in your hands */}
         <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171] mb-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
             YOUR DATA, IN YOUR HANDS
           </div>
 
@@ -4028,7 +4028,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <button
                 type="button"
                 onClick={handleExportProgressJSON}
-                className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+                className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
               >
                 Export
               </button>
@@ -4048,7 +4048,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
+              className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors"
             >
               Choose file
             </button>
@@ -4076,7 +4076,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* Row 4: Reset all progress (Local & Cloud) */}
           <div className="pt-4 flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold text-[#A82020] dark:text-[#F87171]">
+              <div className="text-sm font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Reset progress
               </div>
               <div className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
@@ -4089,7 +4089,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 setResetIncludeCloud(true);
                 setIsResetModalOpen(true);
               }}
-              className="px-3.5 py-2 rounded-xl border border-[#A82020]/40 dark:border-red-800/60 bg-[#FAF2F0] dark:bg-red-950/30 text-xs font-semibold text-[#A82020] dark:text-red-300 hover:bg-[#A82020] hover:text-white transition-colors inline-flex items-center gap-1.5 shrink-0"
+              className="px-3.5 py-2 rounded-xl border border-[#9E2A2B]/40 dark:border-red-800/60 bg-[#FAF2F0] dark:bg-red-950/30 text-xs font-semibold text-[#9E2A2B] dark:text-red-300 hover:bg-[#9E2A2B] hover:text-white transition-colors inline-flex items-center gap-1.5 shrink-0"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Reset progress</span>
@@ -4110,7 +4110,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-2xl p-6 space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-[#FAF2F0] dark:bg-red-950/50 border border-[#A82020]/30 text-[#A82020] dark:text-red-300 flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-xl bg-[#FAF2F0] dark:bg-red-950/50 border border-[#9E2A2B]/30 text-[#9E2A2B] dark:text-red-300 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
@@ -4162,7 +4162,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   type="checkbox"
                   checked={resetIncludeCloud}
                   onChange={(e) => setResetIncludeCloud(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-[#A82020] rounded"
+                  className="mt-0.5 w-4 h-4 accent-[#9E2A2B] rounded"
                 />
                 <div className="text-xs">
                   <div className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -4190,7 +4190,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 type="button"
                 disabled={isResettingProgress}
                 onClick={handleConfirmResetProgress}
-                className="px-5 py-2.5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors shadow-xs disabled:opacity-60"
+                className="px-5 py-2.5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors shadow-xs disabled:opacity-60"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>
@@ -4217,7 +4217,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
               <Sliders className="w-4 h-4" />
               <span>Long-Form Dialogue Audio Speed & Pitch Calibration</span>
             </div>
@@ -4236,7 +4236,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-colors ${
                 isPlayingCalibrationDialogue
                   ? 'bg-[#D97706] text-white'
-                  : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
+                  : 'bg-[#9E2A2B] text-white hover:bg-[#872223]'
               }`}
             >
               {isPlayingCalibrationDialogue ? (
@@ -4264,7 +4264,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <label className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   1. Long-Form Dialogue Speed:
                 </label>
-                <span className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                <span className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                   Active: {dialogueCalibration.dialogueRate}x
                 </span>
               </div>
@@ -4297,7 +4297,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       className={`min-h-[52px] p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
                         active
                           ? 'bg-[#1C1917] text-white dark:bg-[#F5F2EB] dark:text-[#1C1917] border-transparent'
-                          : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                          : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                       }`}
                     >
                       <div className="font-ipa text-xs font-semibold flex items-center justify-between">
@@ -4326,7 +4326,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                     2. Speaker A Pitch Shift (Lower / Warm Voice):
                   </span>
-                  <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     {dialogueCalibration.speakerAPitch.toFixed(2)}
                   </span>
                 </div>
@@ -4349,7 +4349,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       }}
                       className={`min-h-[38px] px-2.5 py-1.5 rounded-lg border font-ipa text-xs font-semibold transition-all ${
                         Math.abs(dialogueCalibration.speakerAPitch - p.pitch) < 0.02
-                          ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                          ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                           : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
                       }`}
                     >
@@ -4364,7 +4364,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                     3. Speaker B Pitch Shift (Higher / Crisp Voice):
                   </span>
-                  <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     {dialogueCalibration.speakerBPitch.toFixed(2)}
                   </span>
                 </div>
@@ -4390,7 +4390,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       }}
                       className={`min-h-[38px] px-2.5 py-1.5 rounded-lg border font-ipa text-xs font-semibold transition-all ${
                         Math.abs(dialogueCalibration.speakerBPitch - p.pitch) < 0.02
-                          ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                          ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                           : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
                       }`}
                     >
@@ -4458,12 +4458,12 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     key={idx}
                     className={`p-3.5 rounded-xl border transition-all ${
                       isLineActive
-                        ? 'bg-white dark:bg-[#1F1C18] border-[#B91C1C] ring-1 ring-[#B91C1C]'
+                        ? 'bg-white dark:bg-[#1F1C18] border-[#9E2A2B] ring-1 ring-[#9E2A2B]'
                         : 'bg-white/90 dark:bg-[#1F1C18]/90 border-[#E7E0D6] dark:border-[#2E2924]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                      <span className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                         {line.speaker} ·{' '}
                         <span className="font-ipa text-[11px] text-[#57534E] dark:text-[#A8A29E]">
                           Pitch{' '}
@@ -4475,9 +4475,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handlePlaySingleCalibrationLine(idx)}
-                        className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C] text-xs font-semibold inline-flex items-center gap-1.5"
+                        className="min-h-[32px] px-2.5 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#9E2A2B] text-xs font-semibold inline-flex items-center gap-1.5"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                        <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                         <span>Listen ({dialogueCalibration.dialogueRate}x)</span>
                       </button>
                     </div>
@@ -4506,11 +4506,11 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                               speakerIndex: line.speakerIndex,
                             })
                           }
-                          className="px-2 py-0.5 rounded-md bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1"
+                          className="px-2 py-0.5 rounded-md bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1"
                           title={tp.note}
                         >
                           <span className="font-semibold">{tp.word}</span>
-                          <span className="font-ipa text-[#B91C1C] dark:text-[#F87171]">
+                          <span className="font-ipa text-[#9E2A2B] dark:text-[#F87171]">
                             {tp.ipa}
                           </span>
                         </button>
@@ -4530,7 +4530,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
               <Mic className="w-4 h-4" />
               <span>Interactive Sound Practice & Voice Diagnostic Studio</span>
             </div>
@@ -4606,8 +4606,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                         }}
                         className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 ${
                           active
-                            ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                            : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C]/50'
+                            ? 'border-[#9E2A2B] bg-[#9E2A2B]/8 dark:bg-[#9E2A2B]/20'
+                            : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#9E2A2B]/50'
                         }`}
                       >
                         <div className="min-w-0">
@@ -4618,7 +4618,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                             {drill.ipa} · {drill.silentRule}
                           </div>
                         </div>
-                        <Volume2 className="w-4 h-4 text-[#B91C1C] shrink-0" />
+                        <Volume2 className="w-4 h-4 text-[#9E2A2B] shrink-0" />
                       </button>
                     );
                   })}
@@ -4637,7 +4637,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     setPracticeResult(null);
                   }}
                   placeholder="Type any word or sentence you want to practice speaking..."
-                  className="w-full p-3 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#B91C1C]"
+                  className="w-full p-3 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
                 />
                 <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                   First listen to the model pronunciation at 0.5x, 0.75x, or 1.0x on the right, then tap the microphone to test your voice.
@@ -4653,7 +4653,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E]">
                 <span>Target Pronunciation Prompt</span>
                 {practiceTab !== 'custom' && (
-                  <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     Syllable Guide: {currentDrill.syllableGuide}
                   </span>
                 )}
@@ -4671,7 +4671,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       <span className="font-nepali ml-2">({currentDrill.nepaliMeaning})</span>
                     )}
                   </div>
-                  <div className="text-[#B91C1C] dark:text-[#F87171] font-medium">
+                  <div className="text-[#9E2A2B] dark:text-[#F87171] font-medium">
                     Phonics Focus: {currentDrill.trapWarning}
                   </div>
                   {isFullNepali && (
@@ -4693,9 +4693,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     key={b.rate}
                     type="button"
                     onClick={() => speechService.speak(activePracticeTargetText, { rate: b.rate })}
-                    className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors"
                   >
-                    <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                    <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     <span>{b.label}</span>
                   </button>
                 ))}
@@ -4706,7 +4706,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   className={`min-h-[42px] px-4 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-2 transition-all ${
                     isListeningPracticeMic
                       ? 'bg-[#D97706] text-white animate-pulse'
-                      : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
+                      : 'bg-[#9E2A2B] text-white hover:bg-[#872223]'
                   }`}
                 >
                   <Mic className="w-4 h-4" />
@@ -4760,7 +4760,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       ? '✓ Clear Pronunciation Match!'
                       : 'Keep Practicing — Phoneme Calibration Feedback'}
                   </div>
-                  <span className="font-ipa text-sm font-bold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa text-sm font-bold text-[#9E2A2B] dark:text-[#F87171]">
                     Accuracy Score: {practiceResult.score}%
                   </span>
                 </div>
@@ -4769,7 +4769,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <div className="w-full h-2.5 rounded-full bg-white dark:bg-[#141210] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
-                      practiceResult.passed ? 'bg-[#15803D]' : 'bg-[#D97706]'
+                      practiceResult.passed ? 'bg-[#2D6A4F]' : 'bg-[#D97706]'
                     }`}
                     style={{ width: `${Math.max(6, practiceResult.score)}%` }}
                   />
@@ -4808,7 +4808,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 </p>
 
                 {practiceTab !== 'custom' && !practiceResult.passed && (
-                  <div className="text-xs font-medium text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171]">
                     Coaching Tip: {currentDrill.trapWarning}
                   </div>
                 )}
@@ -4816,14 +4816,14 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 {onRecordMistake && (
                   <div className="pt-1 flex items-center justify-between gap-2">
                     {savedToMistakesBanner ? (
-                      <span className="text-xs font-semibold text-[#15803D] dark:text-emerald-400">
+                      <span className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
                         ✓ Added to your Mistake Notebook for extra practice!
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={handleAddDrillToMistakeNotebook}
-                        className="min-h-[34px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] inline-flex items-center gap-1.5"
+                        className="min-h-[34px] px-3 py-1 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] inline-flex items-center gap-1.5"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>Save to Mistake Notebook</span>
@@ -4843,7 +4843,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
               <Headphones className="w-4 h-4" />
               <span>Phoneme Discrimination & Ear Calibration</span>
             </div>
@@ -4901,7 +4901,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-3"
               >
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-ipa font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                     Sound {item.side}: {item.phoneme}
                   </span>
                   <span className="font-ipa text-[#57534E] dark:text-[#A8A29E]">{item.ipa}</span>
@@ -4918,9 +4918,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => speechService.speak(item.word, { rate: 1.0 })}
-                    className="min-h-[36px] px-3 py-1 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-xs font-semibold inline-flex items-center gap-1"
+                    className="min-h-[36px] px-3 py-1 rounded-lg bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs font-semibold inline-flex items-center gap-1"
                   >
-                    <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                    <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                     <span>1.0x</span>
                   </button>
                   <button
@@ -4948,7 +4948,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => handlePlayMysteryMinimalPair(0.75)}
-                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5"
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-1.5"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Play Mystery Sound</span>
@@ -4997,7 +4997,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
 
       {/* 4. Language & Nepali Assistance Mode Selector */}
       <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-1">
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
           <Globe className="w-4 h-4" />
           <span>Language & Nepali Display Preference</span>
         </div>
@@ -5038,8 +5038,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 onClick={() => onUpdateLanguageMode(option.id)}
                 className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   active
-                    ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20 ring-1 ring-[#B91C1C]'
-                    : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#B91C1C]/50'
+                    ? 'border-[#9E2A2B] bg-[#9E2A2B]/8 dark:bg-[#9E2A2B]/20 ring-1 ring-[#9E2A2B]'
+                    : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] hover:border-[#9E2A2B]/50'
                 }`}
               >
                 <div>
@@ -5048,10 +5048,10 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                       {option.title}
                     </span>
                     {active && (
-                      <CheckCircle2 className="w-4 h-4 text-[#B91C1C] dark:text-[#F87171] shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-[#9E2A2B] dark:text-[#F87171] shrink-0" />
                     )}
                   </div>
-                  <div className="text-[11px] font-medium text-[#B91C1C] dark:text-[#F87171] mb-2">
+                  <div className="text-[11px] font-medium text-[#9E2A2B] dark:text-[#F87171] mb-2">
                     {option.badge}
                   </div>
                   <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
@@ -5069,7 +5069,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         {/* Voice & Audio Speed Studio */}
         <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
           <div>
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Word Vocabulary Voice Profile
             </div>
             <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -5143,11 +5143,11 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 onClick={handleTestSingleVoice}
                 className={`min-h-[40px] px-3.5 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                   isTestingVoice === 'single'
-                    ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                    : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                    ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
+                    : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                 }`}
               >
-                <Volume2 className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>Test Single Voice</span>
               </button>
 
@@ -5156,11 +5156,11 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 onClick={handleTestDialogueVoices}
                 className={`min-h-[40px] px-3.5 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                   isTestingVoice === 'dialogue'
-                    ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                    : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C]'
+                    ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
+                    : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
                 }`}
               >
-                <MessageSquare className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <MessageSquare className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>Test Two-Person Voices (A & B)</span>
               </button>
             </div>
@@ -5171,7 +5171,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
           <div className="space-y-5">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Study Personalization
               </div>
               <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -5191,7 +5191,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     onClick={() => onUpdateLevel(lvl)}
                     className={`min-h-[44px] px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                       progress.selectedLevel === lvl
-                        ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                        ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                         : 'border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
                     }`}
                   >
@@ -5260,7 +5260,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         {/* Data Backup Export & Restore */}
         <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Local Data Portability
             </div>
             <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -5303,9 +5303,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-2"
             >
-              <Upload className="w-4 h-4 text-[#B91C1C]" />
+              <Upload className="w-4 h-4 text-[#9E2A2B]" />
               <span>Restore from Backup File</span>
             </button>
           </div>
@@ -5322,7 +5322,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setStudySheetPrintMode('combined')}
-                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-1.5"
+                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-1.5"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print / Save PDF Study Sheet</span>
@@ -5336,17 +5336,17 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     progress.wordSRS
                   )
                 }
-                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5"
+                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-1.5"
               >
-                <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <FileDown className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>Saved Words (.CSV)</span>
               </button>
               <button
                 type="button"
                 onClick={() => exportMistakeNotebookToCSV(progress.mistakeNotebook)}
-                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5"
+                className="min-h-[40px] px-3 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-1.5"
               >
-                <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <FileDown className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>Mistake Notebook (.CSV)</span>
               </button>
             </div>
@@ -5363,7 +5363,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#57534E] dark:text-[#A8A29E]">
                 {isOnline ? (
                   <>
-                    <Wifi className="w-4 h-4 text-[#15803D]" />
+                    <Wifi className="w-4 h-4 text-[#2D6A4F]" />
                     <span>Online</span>
                   </>
                 ) : (
@@ -5405,14 +5405,14 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* Add to Home Screen Action */}
           <div className="pt-4 border-t border-[#E7E0D6] dark:border-[#2E2924]">
             {isInstalled ? (
-              <div className="text-xs font-semibold text-[#15803D] dark:text-emerald-400 flex items-center gap-2">
+              <div className="text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>BhashaSetu is installed on your home screen (Standalone Mode).</span>
               </div>
             ) : isInstallable ? (
               <button
                 onClick={install}
-                className="w-full min-h-[46px] px-5 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center justify-center gap-2"
+                className="w-full min-h-[46px] px-5 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] transition-colors inline-flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 <span>Add BhashaSetu to Home Screen (Install PWA)</span>

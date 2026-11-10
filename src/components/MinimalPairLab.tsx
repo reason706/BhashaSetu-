@@ -416,7 +416,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E6E0D4] dark:border-stone-800 pb-5">
         <div>
-          <p className="text-xs font-semibold text-[#B91C1C] dark:text-red-400">
+          <p className="text-xs font-semibold text-[#9E2A2B] dark:text-red-400">
             Phoneme Contrast & Acoustic Discrimination Lab
           </p>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 mt-1">
@@ -450,7 +450,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
             }}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeMode === 'ear-quiz'
-                ? 'bg-[#B91C1C] text-white shadow-sm'
+                ? 'bg-[#9E2A2B] text-white shadow-sm'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900'
             }`}
           >
@@ -460,7 +460,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
             onClick={() => setActiveMode('voice-duel')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeMode === 'voice-duel'
-                ? 'bg-[#15803D] text-white shadow-sm'
+                ? 'bg-[#2D6A4F] text-white shadow-sm'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900'
             }`}
           >
@@ -482,11 +482,11 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
               }}
               className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-[#FAF7F2] dark:bg-stone-800 border-[#B91C1C] dark:border-amber-500 shadow-sm'
+                  ? 'bg-[#FAF7F2] dark:bg-stone-800 border-[#9E2A2B] dark:border-amber-500 shadow-sm'
                   : 'bg-white dark:bg-stone-900/60 border-[#E6E0D4] dark:border-stone-800 hover:border-stone-400'
               }`}
             >
-              <div className="font-mono text-sm font-bold text-[#B91C1C] dark:text-amber-400">
+              <div className="font-mono text-sm font-bold text-[#9E2A2B] dark:text-amber-400">
                 {group.contrastBadge}
               </div>
               <div className="text-xs font-bold text-stone-900 dark:text-stone-100 mt-1 line-clamp-1">
@@ -537,7 +537,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <div>
-                          <span className="text-xs font-mono font-bold text-[#B91C1C] dark:text-amber-400">
+                          <span className="text-xs font-mono font-bold text-[#9E2A2B] dark:text-amber-400">
                             Phoneme {data.phonemeSymbol}
                           </span>
                           <h4 className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100">
@@ -595,7 +595,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
                   }}
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#F5F0E6] dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-bold hover:bg-[#E6E0D4] transition-colors cursor-pointer"
                 >
-                  <Headphones className="w-3.5 h-3.5 text-[#B91C1C] dark:text-amber-400" />
+                  <Headphones className="w-3.5 h-3.5 text-[#9E2A2B] dark:text-amber-400" />
                   Play Both Back-to-Back ({pair.wordA.word} → {pair.wordB.word})
                 </button>
               </div>
@@ -609,7 +609,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
         <div className="rounded-2xl border border-[#E6E0D4] dark:border-stone-800 p-5 sm:p-6 bg-[#FAF7F2] dark:bg-stone-900 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <span className="text-xs font-semibold text-[#B91C1C] dark:text-amber-400">
+              <span className="text-xs font-semibold text-[#9E2A2B] dark:text-amber-400">
                 Blind Acoustic Discrimination Test · {activeGroup.contrastBadge}
               </span>
               <h4 className="font-serif text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-100 mt-0.5">
@@ -643,7 +643,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => handlePlayMysteryAudio(preferredSpeechRate)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <Volume2 className="w-4 h-4" />
                 {hasPlayedMysteryAudio ? 'Replay Mystery Word (1.0x)' : 'Play Mystery Word (1.0x)'}
@@ -669,9 +669,9 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
               let borderStyle = 'border-[#E6E0D4] dark:border-stone-800 bg-white dark:bg-[#1C1917]';
               if (selectedGuess !== null) {
                 if (isCorrectChoice) {
-                  borderStyle = 'border-[#15803D] bg-emerald-50/70 dark:bg-emerald-950/30';
+                  borderStyle = 'border-[#2D6A4F] bg-emerald-50/70 dark:bg-emerald-950/30';
                 } else if (isSelected) {
-                  borderStyle = 'border-[#B91C1C] bg-red-50/70 dark:bg-red-950/30';
+                  borderStyle = 'border-[#9E2A2B] bg-red-50/70 dark:bg-red-950/30';
                 }
               }
 
@@ -683,14 +683,14 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
                   className={`p-5 rounded-xl border-2 text-left transition-all cursor-pointer ${borderStyle}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-[#B91C1C] dark:text-amber-400">
+                    <span className="font-mono text-xs font-bold text-[#9E2A2B] dark:text-amber-400">
                       Option {side} · Phoneme {item.phonemeSymbol}
                     </span>
                     {selectedGuess !== null && isCorrectChoice && (
-                      <CheckCircle2 className="w-5 h-5 text-[#15803D]" />
+                      <CheckCircle2 className="w-5 h-5 text-[#2D6A4F]" />
                     )}
                     {selectedGuess !== null && isSelected && !isCorrectChoice && (
-                      <XCircle className="w-5 h-5 text-[#B91C1C]" />
+                      <XCircle className="w-5 h-5 text-[#9E2A2B]" />
                     )}
                   </div>
                   <div className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100 mt-1">
@@ -711,11 +711,11 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-[#E6E0D4] dark:border-stone-800">
               <div className="text-xs sm:text-sm">
                 {selectedGuess === quizTargetSide ? (
-                  <span className="font-bold text-[#15803D] dark:text-emerald-400">
+                  <span className="font-bold text-[#2D6A4F] dark:text-emerald-400">
                     Spot on! You accurately distinguished {mysteryWordObj.word} ({mysteryWordObj.ipa}).
                   </span>
                 ) : (
-                  <span className="font-bold text-[#B91C1C] dark:text-red-400">
+                  <span className="font-bold text-[#9E2A2B] dark:text-red-400">
                     The spoken word was “{mysteryWordObj.word}” ({mysteryWordObj.ipa}). Cue:{' '}
                     {mysteryWordObj.articulationCue}
                   </span>
@@ -758,7 +758,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <span className="font-mono text-xs font-bold text-[#B91C1C] dark:text-amber-400">
+                        <span className="font-mono text-xs font-bold text-[#9E2A2B] dark:text-amber-400">
                           Target {side} · {item.phonemeSymbol}
                         </span>
                         <h5 className="font-serif text-xl font-bold text-stone-900 dark:text-stone-100">
@@ -781,7 +781,7 @@ export const MinimalPairLab: React.FC<MinimalPairLabProps> = ({
                           disabled={recordingKey !== null}
                           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                             isRec
-                              ? 'bg-[#B91C1C] text-white'
+                              ? 'bg-[#9E2A2B] text-white'
                               : 'bg-stone-900 dark:bg-amber-600 text-white hover:opacity-90'
                           }`}
                         >

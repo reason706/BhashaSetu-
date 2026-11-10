@@ -114,7 +114,7 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
       <div className="w-full max-w-xl bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-t-3xl sm:rounded-2xl p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171] mb-0.5">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-0.5">
               Dynamic Curriculum Builder
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -148,8 +148,8 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
                   onClick={() => setTopic(preset.topic)}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     topic === preset.topic
-                      ? 'border-[#B91C1C] bg-[#B91C1C]/8 dark:bg-[#B91C1C]/20'
-                      : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#141210] hover:border-[#B91C1C]/50'
+                      ? 'border-[#9E2A2B] bg-[#9E2A2B]/8 dark:bg-[#9E2A2B]/20'
+                      : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#141210] hover:border-[#9E2A2B]/50'
                   }`}
                 >
                   <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -179,7 +179,7 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g., Aviation & Airport Travel, Legal Contracts, Customer Support..."
-              className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-white dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#B91C1C]"
+              className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-white dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
             />
           </div>
 
@@ -232,7 +232,7 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
             <button
               type="submit"
               disabled={isGenerating || !isOnline}
-              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] disabled:opacity-50 inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] disabled:opacity-50 inline-flex items-center gap-2 whitespace-nowrap shrink-0"
             >
               {isGenerating ? (
                 <>

@@ -163,7 +163,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
       <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2.5 max-w-3xl">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               <Compass className="w-4 h-4" />
               <span>About BhashaSetu · Linguistic Methodology & Reference</span>
             </div>
@@ -183,9 +183,9 @@ export const AboutView: React.FC<AboutViewProps> = ({
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               onClick={onOpenSettings}
-              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-2"
             >
-              <Globe className="w-4 h-4 text-[#B91C1C]" />
+              <Globe className="w-4 h-4 text-[#9E2A2B]" />
               <span>
                 {languageMode === 'english-only'
                   ? 'Mode: English Only'
@@ -197,7 +197,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
 
             <button
               onClick={onStartCurriculum}
-              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs sm:text-sm font-semibold hover:bg-[#991B1B] transition-colors inline-flex items-center gap-2"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold hover:bg-[#872223] transition-colors inline-flex items-center gap-2"
             >
               <span>Explore Lectures (01–12)</span>
               <ArrowRight className="w-4 h-4" />
@@ -258,10 +258,10 @@ export const AboutView: React.FC<AboutViewProps> = ({
               >
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-ipa text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    <span className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                       {pillar.step}
                     </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-center text-[#B91C1C]">
+                    <div className="w-8 h-8 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-center text-[#9E2A2B]">
                       <Icon className="w-4 h-4" />
                     </div>
                   </div>
@@ -281,7 +281,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
       {/* Sequential CEFR Curriculum Architecture (B1 -> B2 -> C1) */}
       <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
         <div>
-          <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+          <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
             Sequential CEFR Track Architecture
           </div>
           <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -292,7 +292,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-ipa text-xs font-semibold px-2.5 py-0.5 rounded bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171]">
+              <span className="font-ipa text-xs font-semibold px-2.5 py-0.5 rounded bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171]">
                 Track 1 · Level B1
               </span>
               <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -326,7 +326,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
 
           <div className="p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-ipa text-xs font-semibold px-2.5 py-0.5 rounded bg-[#15803D]/15 text-[#15803D] dark:text-emerald-400">
+              <span className="font-ipa text-xs font-semibold px-2.5 py-0.5 rounded bg-[#2D6A4F]/15 text-[#2D6A4F] dark:text-emerald-400">
                 Track 3 · Level C1
               </span>
               <span className="font-ipa text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -347,7 +347,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
       <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
           <div>
-            <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+            <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Interactive Phonics Reference
             </div>
             <h2 className="text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-0.5">
@@ -363,7 +363,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
               onClick={() => setActiveClusterFilter('ALL')}
               className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
                 activeClusterFilter === 'ALL'
-                  ? 'bg-[#B91C1C] text-white'
+                  ? 'bg-[#9E2A2B] text-white'
                   : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
               }`}
             >
@@ -375,7 +375,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
                 onClick={() => setActiveClusterFilter(entry.cluster)}
                 className={`min-h-[34px] px-2.5 py-1 rounded-lg font-ipa text-xs font-semibold transition-colors ${
                   activeClusterFilter === entry.cluster
-                    ? 'bg-[#B91C1C] text-white'
+                    ? 'bg-[#9E2A2B] text-white'
                     : 'bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-[#57534E] dark:text-[#A8A29E]'
                 }`}
               >
@@ -393,7 +393,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="font-ipa text-xs font-bold px-2.5 py-0.5 rounded bg-[#B91C1C]/12 text-[#B91C1C] dark:text-[#F87171]">
+                  <span className="font-ipa text-xs font-bold px-2.5 py-0.5 rounded bg-[#9E2A2B]/12 text-[#9E2A2B] dark:text-[#F87171]">
                     {entry.cluster}
                   </span>
                   <h3 className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] mt-1.5">
@@ -425,7 +425,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
                         <span className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                           {ex.word}
                         </span>
-                        <span className="font-ipa text-[11px] text-[#B91C1C] dark:text-[#F87171]">
+                        <span className="font-ipa text-[11px] text-[#9E2A2B] dark:text-[#F87171]">
                           (silent {ex.silentPart})
                         </span>
                       </div>
@@ -443,7 +443,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
                         onClick={() =>
                           speechService.speak(ex.word, { rate: preferredSpeechRate })
                         }
-                        className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#B91C1C] text-[#B91C1C]"
+                        className="p-1.5 rounded-lg border border-[#E7E0D6] dark:border-[#2E2924] hover:border-[#9E2A2B] text-[#9E2A2B]"
                         title={`Listen to ${ex.word} (1.0x)`}
                       >
                         <Volume2 className="w-3.5 h-3.5" />

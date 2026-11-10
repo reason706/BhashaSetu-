@@ -88,9 +88,9 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-2 transition-colors"
+            className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-2 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 text-[#B91C1C]" />
+            <ArrowLeft className="w-4 h-4 text-[#9E2A2B]" />
             <span>Back to Workspace</span>
           </button>
 
@@ -98,7 +98,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
             <button
               type="button"
               onClick={() => window.print()}
-              className="min-h-[42px] px-5 py-2 rounded-xl bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] inline-flex items-center gap-2 shadow-xs transition-colors"
+              className="min-h-[42px] px-5 py-2 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold hover:bg-[#872223] inline-flex items-center gap-2 shadow-xs transition-colors"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save as Formatted PDF</span>
@@ -125,9 +125,9 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
             <button
               type="button"
               onClick={() => handleCSVExport('combined')}
-              className="min-h-[42px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#B91C1C] inline-flex items-center gap-1.5 transition-colors"
+              className="min-h-[42px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-1.5 transition-colors"
             >
-              <FileDown className="w-3.5 h-3.5 text-[#B91C1C]" />
+              <FileDown className="w-3.5 h-3.5 text-[#9E2A2B]" />
               <span>Combined (.CSV)</span>
             </button>
           </div>
@@ -142,7 +142,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
               onClick={() => setSheetFocus('combined')}
               className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                 sheetFocus === 'combined'
-                  ? 'bg-[#B91C1C] text-white'
+                  ? 'bg-[#9E2A2B] text-white'
                   : 'text-[#57534E] dark:text-[#A8A29E]'
               }`}
             >
@@ -156,7 +156,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
               onClick={() => setSheetFocus('saved')}
               className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                 sheetFocus === 'saved'
-                  ? 'bg-[#B91C1C] text-white'
+                  ? 'bg-[#9E2A2B] text-white'
                   : 'text-[#57534E] dark:text-[#A8A29E]'
               }`}
             >
@@ -168,7 +168,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
               onClick={() => setSheetFocus('mistakes')}
               className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                 sheetFocus === 'mistakes'
-                  ? 'bg-[#B91C1C] text-white'
+                  ? 'bg-[#9E2A2B] text-white'
                   : 'text-[#57534E] dark:text-[#A8A29E]'
               }`}
             >
@@ -195,7 +195,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                 </>
               ) : (
                 <>
-                  <Eye className="w-3.5 h-3.5 text-[#15803D]" />
+                  <Eye className="w-3.5 h-3.5 text-[#2D6A4F]" />
                   <span>Full Answer Reference Sheet</span>
                 </>
               )}
@@ -207,7 +207,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                 onClick={() => setIncludeCoreFallbackIfEmpty((prev) => !prev)}
                 className="min-h-[36px] px-3 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] inline-flex items-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#B91C1C]" />
+                <Sparkles className="w-3.5 h-3.5 text-[#9E2A2B]" />
                 <span>
                   {includeCoreFallbackIfEmpty
                     ? 'Showing 20 Core Silent-Letter Starter Words'
@@ -219,7 +219,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
         </div>
 
         {exportBanner && (
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-[#15803D] dark:text-emerald-300 flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-[#2D6A4F] dark:text-emerald-300 flex items-center justify-between">
             <span>✓ {exportBanner}</span>
             <button
               type="button"
@@ -239,7 +239,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
         {/* Sheet Header */}
         <div className="border-b-2 border-[#1C1917] pb-5 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <div className="font-ipa text-xs uppercase tracking-widest text-[#B91C1C] font-bold">
+            <div className="font-ipa text-xs uppercase tracking-widest text-[#9E2A2B] font-bold">
               BhashaSetu · Physical On-The-Go Study & Self-Test Worksheet
             </div>
             <h1 className="font-serif-display text-2xl sm:text-3xl font-bold text-[#1C1917] mt-1">
@@ -278,7 +278,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
           <section className="space-y-3">
             <div className="flex items-center justify-between border-b border-[#E7E0D6] pb-2">
               <div className="flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-[#B91C1C]" />
+                <CheckSquare className="w-4 h-4 text-[#9E2A2B]" />
                 <h2 className="text-base sm:text-lg font-bold text-[#1C1917]">
                   Part I · Saved Vocabulary & Silent-Letter Phonics ({savedWordsList.length} Words)
                 </h2>
@@ -329,7 +329,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                                     seg.silent ? (
                                       <span
                                         key={i}
-                                        className="text-[#B91C1C] underline decoration-2"
+                                        className="text-[#9E2A2B] underline decoration-2"
                                       >
                                         {seg.text}
                                       </span>
@@ -356,7 +356,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                             {selfTestBlankMode ? (
                               <div className="h-6 border-b border-dashed border-[#1C1917]/60 w-36" />
                             ) : (
-                              <span className="font-nepali font-semibold text-[#15803D] text-xs">
+                              <span className="font-nepali font-semibold text-[#2D6A4F] text-xs">
                                 {item.nepaliMeaning}
                               </span>
                             )}
@@ -389,7 +389,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
           <section className="space-y-3 pt-2">
             <div className="flex items-center justify-between border-b border-[#E7E0D6] pb-2">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-[#B91C1C]" />
+                <AlertTriangle className="w-4 h-4 text-[#9E2A2B]" />
                 <h2 className="text-base sm:text-lg font-bold text-[#1C1917]">
                   Part II · Mistake Notebook Error-Correction Log ({mistakeNotebook.length} Items)
                 </h2>
@@ -428,7 +428,7 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                           {idx + 1}
                         </td>
                         <td className="py-2.5 px-2.5 font-ipa align-top">
-                          <div className="font-bold uppercase text-[#B91C1C]">
+                          <div className="font-bold uppercase text-[#9E2A2B]">
                             {m.sourceType}
                           </div>
                           <div className="text-[10px] text-[#57534E]">
@@ -443,14 +443,14 @@ export const PrintableStudySheetModal: React.FC<PrintableStudySheetModalProps> =
                             </div>
                           )}
                         </td>
-                        <td className="py-2.5 px-2.5 align-top font-ipa text-[#B91C1C] line-through">
+                        <td className="py-2.5 px-2.5 align-top font-ipa text-[#9E2A2B] line-through">
                           {m.userWrongAnswer}
                         </td>
                         <td className="py-2.5 px-2.5 align-top">
                           {selfTestBlankMode ? (
                             <div className="h-6 border-b border-dashed border-[#1C1917]/60 w-36" />
                           ) : (
-                            <span className="font-ipa font-bold text-[#15803D]">
+                            <span className="font-ipa font-bold text-[#2D6A4F]">
                               {m.correctAnswer}
                             </span>
                           )}

@@ -385,7 +385,7 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E6E0D4] dark:border-stone-800 pb-5">
         <div>
-          <p className="text-xs font-semibold text-[#B91C1C] dark:text-red-400">
+          <p className="text-xs font-semibold text-[#9E2A2B] dark:text-red-400">
             L1 Interference & Silent-Letter Proofreading Engine
           </p>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 mt-1">
@@ -419,8 +419,8 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
               <strong
                 className={
                   detectedIssues.length > 0
-                    ? 'text-[#B91C1C] dark:text-red-400'
-                    : 'text-[#15803D] dark:text-emerald-400'
+                    ? 'text-[#9E2A2B] dark:text-red-400'
+                    : 'text-[#2D6A4F] dark:text-emerald-400'
                 }
               >
                 {detectedIssues.length}
@@ -454,7 +454,7 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
               >
                 {copiedPolished ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-[#15803D]" />
+                    <Check className="w-3.5 h-3.5 text-[#2D6A4F]" />
                     Copied!
                   </>
                 ) : (
@@ -469,7 +469,7 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
             {detectedIssues.length > 0 && (
               <button
                 onClick={applyAllFixes}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803D] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2D6A4F] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Fix All {detectedIssues.length} Issues Instantly
@@ -487,7 +487,7 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
 
           {detectedIssues.length === 0 ? (
             <div className="rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/30 p-5 space-y-2">
-              <div className="flex items-center gap-2 text-[#15803D] dark:text-emerald-400 font-bold text-sm">
+              <div className="flex items-center gap-2 text-[#2D6A4F] dark:text-emerald-400 font-bold text-sm">
                 <CheckCircle2 className="w-5 h-5" />
                 Zero Nepali-Interference or Silent-Letter Errors Found!
               </div>
@@ -503,23 +503,23 @@ export const WritingInterferenceLinter: React.FC<WritingInterferenceLinterProps>
                   className="rounded-xl border border-[#E6E0D4] dark:border-stone-800 bg-[#FAF7F2] dark:bg-stone-900 p-4 space-y-2.5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-[#B91C1C] dark:text-amber-400">
+                    <span className="text-[11px] font-semibold text-[#9E2A2B] dark:text-amber-400">
                       {issue.rule.categoryLabel}
                     </span>
                     <button
                       onClick={() => applySingleFix(issue)}
-                      className="px-2.5 py-1 rounded-lg bg-[#15803D] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="px-2.5 py-1 rounded-lg bg-[#2D6A4F] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     >
                       Apply Fix → “{issue.suggestedText}”
                     </button>
                   </div>
 
                   <div className="text-xs font-mono flex flex-wrap items-center gap-2">
-                    <span className="line-through text-[#B91C1C] dark:text-red-400 font-bold">
+                    <span className="line-through text-[#9E2A2B] dark:text-red-400 font-bold">
                       {issue.matchedText}
                     </span>
                     <span className="text-stone-400">→</span>
-                    <span className="text-[#15803D] dark:text-emerald-400 font-bold">
+                    <span className="text-[#2D6A4F] dark:text-emerald-400 font-bold">
                       {issue.suggestedText}
                     </span>
                   </div>

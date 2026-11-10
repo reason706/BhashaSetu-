@@ -216,7 +216,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
     <div className="bg-white dark:bg-[#1C1917] rounded-2xl border border-[#E6E0D4] dark:border-stone-800 p-5 sm:p-7 shadow-sm space-y-6">
       {/* Header */}
       <div className="border-b border-[#E6E0D4] dark:border-stone-800 pb-5">
-        <p className="text-xs font-semibold text-[#B91C1C] dark:text-red-400">
+        <p className="text-xs font-semibold text-[#9E2A2B] dark:text-red-400">
           Interactive Vocal Tract Sagittal Diagram & Articulatory Phonetics
         </p>
         <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 mt-1">
@@ -256,7 +256,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
         <div className="lg:col-span-6 rounded-2xl border border-[#E6E0D4] dark:border-stone-800 bg-[#FAF7F2] dark:bg-stone-900 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between gap-2 mb-3">
             <div>
-              <span className="font-mono text-lg font-bold text-[#B91C1C] dark:text-amber-400">
+              <span className="font-mono text-lg font-bold text-[#9E2A2B] dark:text-amber-400">
                 {activeProfile.symbol}
               </span>
               <span className="text-xs text-stone-500 dark:text-stone-400 ml-2">
@@ -266,7 +266,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
             <span
               className={`text-xs font-mono font-bold ${
                 activeProfile.voiced
-                  ? 'text-[#15803D] dark:text-emerald-400'
+                  ? 'text-[#2D6A4F] dark:text-emerald-400'
                   : 'text-[#D97706] dark:text-amber-400'
               }`}
             >
@@ -330,7 +330,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
               <path
                 d={activeProfile.tonguePathD}
                 fill="rgba(185, 28, 28, 0.14)"
-                stroke="#B91C1C"
+                stroke="#9E2A2B"
                 strokeWidth="5"
                 strokeLinecap="round"
               />
@@ -340,7 +340,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                 cx={activeProfile.tongueTipCoord.x}
                 cy={activeProfile.tongueTipCoord.y}
                 r="5"
-                fill="#B91C1C"
+                fill="#9E2A2B"
               />
 
               {/* Contact / Constriction Highlight Ring */}
@@ -371,9 +371,9 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                 width="24"
                 height="16"
                 rx="4"
-                fill={activeProfile.voiced ? '#15803D' : '#78716C'}
+                fill={activeProfile.voiced ? '#2D6A4F' : '#78716C'}
               />
-              <text x="76" y="197" fontSize="10" fill={activeProfile.voiced ? '#15803D' : '#78716C'} fontWeight="bold">
+              <text x="76" y="197" fontSize="10" fill={activeProfile.voiced ? '#2D6A4F' : '#78716C'} fontWeight="bold">
                 {activeProfile.voiced ? 'Vocal Cords: VIBRATING (zzz)' : 'Vocal Cords: OPEN (quiet)'}
               </text>
 
@@ -384,7 +384,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
               <text x="195" y="102" fontSize="9.5" fill="#78716C" fontWeight="600">
                 Tooth Ridge
               </text>
-              <text x="120" y="168" fontSize="10" fill="#B91C1C" fontWeight="bold">
+              <text x="120" y="168" fontSize="10" fill="#9E2A2B" fontWeight="bold">
                 Tongue Body
               </text>
               <text x="160" y="34" fontSize="10.5" fill="#D97706" fontWeight="bold">
@@ -418,7 +418,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                   key={idx}
                   className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 flex items-start gap-2.5"
                 >
-                  <span className="font-mono font-bold text-[#B91C1C] dark:text-amber-400 shrink-0">
+                  <span className="font-mono font-bold text-[#9E2A2B] dark:text-amber-400 shrink-0">
                     0{idx + 1}.
                   </span>
                   <span>{step}</span>
@@ -476,7 +476,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                           onClick={() => handlePracticeSpeak(item.word)}
                           disabled={recordingWord !== null}
                           className={`p-2 rounded-lg text-white cursor-pointer ${
-                            isRec ? 'bg-[#B91C1C]' : 'bg-stone-900 dark:bg-amber-600'
+                            isRec ? 'bg-[#9E2A2B]' : 'bg-stone-900 dark:bg-amber-600'
                           }`}
                           title="Record & Test"
                         >
@@ -490,7 +490,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                     </div>
 
                     {item.silentNote && (
-                      <div className="text-[11px] text-[#B91C1C] dark:text-amber-400 font-medium">
+                      <div className="text-[11px] text-[#9E2A2B] dark:text-amber-400 font-medium">
                         Rule: {item.silentNote}
                       </div>
                     )}
@@ -501,7 +501,7 @@ export const ArticulationGuideLab: React.FC<ArticulationGuideLabProps> = ({
                         <span
                           className={
                             res.score >= 80
-                              ? 'text-[#15803D] font-bold'
+                              ? 'text-[#2D6A4F] font-bold'
                               : 'text-[#D97706] font-bold'
                           }
                         >

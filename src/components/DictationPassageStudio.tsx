@@ -274,7 +274,7 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E6E0D4] dark:border-stone-800 pb-5">
         <div>
-          <p className="text-xs font-semibold text-[#B91C1C] dark:text-red-400">
+          <p className="text-xs font-semibold text-[#9E2A2B] dark:text-red-400">
             Multi-Speed Acoustic Dictation & Orthographic Diff Engine
           </p>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 mt-1">
@@ -306,7 +306,7 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
       {/* Audio Deck */}
       <div className="rounded-2xl border border-[#E6E0D4] dark:border-stone-800 bg-[#FAF7F2] dark:bg-stone-900 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="text-xs font-mono text-[#B91C1C] dark:text-amber-400 font-bold">
+          <div className="text-xs font-mono text-[#9E2A2B] dark:text-amber-400 font-bold">
             {activePassage.level} Track · {activePassage.domain} · Played {playCount}x
           </div>
           <h4 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
@@ -322,7 +322,7 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handlePlayPassage(preferredSpeechRate)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#B91C1C] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-bold hover:bg-red-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             <Volume2 className="w-4 h-4" />
             Play Passage (1.0x)
@@ -372,7 +372,7 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
             <button
               onClick={handleGradeDictation}
               disabled={!userInput.trim()}
-              className="px-5 py-2.5 rounded-xl bg-[#15803D] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer disabled:opacity-40 whitespace-nowrap shrink-0"
+              className="px-5 py-2.5 rounded-xl bg-[#2D6A4F] text-white text-xs font-bold hover:bg-emerald-800 transition-colors cursor-pointer disabled:opacity-40 whitespace-nowrap shrink-0"
             >
               Check Dictation & Silent Letters
             </button>
@@ -401,10 +401,10 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
               if (selectedCompOption !== null) {
                 if (isCorrect) {
                   btnClass =
-                    'border-[#15803D] bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 font-bold';
+                    'border-[#2D6A4F] bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 font-bold';
                 } else if (isSelected) {
                   btnClass =
-                    'border-[#B91C1C] bg-red-50/80 dark:bg-red-950/40 text-red-900 dark:text-red-200';
+                    'border-[#9E2A2B] bg-red-50/80 dark:bg-red-950/40 text-red-900 dark:text-red-200';
                 }
               }
               return (
@@ -455,7 +455,7 @@ export const DictationPassageStudio: React.FC<DictationPassageStudioProps> = ({
                 tok.status === 'exact'
                   ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200'
                   : tok.status === 'silent-letter-error'
-                  ? 'border-red-300 dark:border-red-800 bg-red-50/80 dark:bg-red-950/30 text-[#B91C1C] dark:text-red-300'
+                  ? 'border-red-300 dark:border-red-800 bg-red-50/80 dark:bg-red-950/30 text-[#9E2A2B] dark:text-red-300'
                   : 'border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200';
 
               return (

@@ -297,7 +297,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       return {
         label: 'Mastered',
         isMastered: true,
-        badgeClass: 'bg-[#15803D]/12 text-[#15803D] dark:text-emerald-400 border-[#15803D]/30',
+        badgeClass: 'bg-[#2D6A4F]/12 text-[#2D6A4F] dark:text-emerald-400 border-[#2D6A4F]/30',
       };
     }
     if (rec?.stage === 'review' || (rec?.intervalDays ?? 0) >= 3) {

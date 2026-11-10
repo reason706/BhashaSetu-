@@ -288,12 +288,12 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-between gap-4 bg-white dark:bg-[#141210]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F8E7E3] dark:bg-red-950/60 text-[#A82020] dark:text-red-300 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F8E7E3] dark:bg-red-950/60 text-[#9E2A2B] dark:text-red-300 flex items-center justify-center shrink-0">
               <MessageSquare className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A82020] dark:text-[#F87171]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171]">
                   AI CONVERSATION PARTNER
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-[#DCECE2] text-[#1F5C3D] text-[10px] font-semibold">
@@ -338,8 +338,8 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
                 onClick={() => selectScenario(sc)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0 border ${
                   active
-                    ? 'bg-[#A82020] text-white border-[#A82020] shadow-xs'
-                    : 'bg-white dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020]/50'
+                    ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] shadow-xs'
+                    : 'bg-white dark:bg-[#141210] text-[#57534E] dark:text-[#A8A29E] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B]/50'
                 }`}
               >
                 <span>{sc.title}</span>
@@ -374,7 +374,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
                       onClick={() =>
                         speechService.speak(turn.text, { rate: preferredSpeechRate })
                       }
-                      className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#A82020] dark:text-[#F87171]"
+                      className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#9E2A2B] dark:text-[#F87171]"
                       title="Listen to sentence"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
@@ -408,7 +408,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
                               rate: preferredSpeechRate,
                             })
                           }
-                          className="text-[#A82020] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
+                          className="text-[#9E2A2B] dark:text-[#F87171] hover:underline inline-flex items-center gap-1"
                         >
                           <Volume2 className="w-3 h-3" />
                           <span>Hear natural phrasing</span>
@@ -433,7 +433,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
 
           {isSending && (
             <div className="flex items-center gap-2 text-xs text-[#78716C] p-2">
-              <Loader2 className="w-4 h-4 animate-spin text-[#A82020]" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#9E2A2B]" />
               <span>{selectedScenario.role} is replying and reviewing your grammar...</span>
             </div>
           )}
@@ -445,7 +445,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
           {suggestions.length > 0 && (
             <div className="space-y-1.5">
               <div className="text-[11px] font-medium text-[#78716C] flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#A82020]" />
+                <Sparkles className="w-3 h-3 text-[#9E2A2B]" />
                 <span>Suggested replies (click to send or edit):</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -455,7 +455,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
                     type="button"
                     disabled={isSending}
                     onClick={() => setUserInput(sug)}
-                    className="text-left px-3 py-1.5 rounded-xl bg-[#FAF8F4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#A82020] text-xs text-[#1C1917] dark:text-[#F5F2EB] transition-colors"
+                    className="text-left px-3 py-1.5 rounded-xl bg-[#FAF8F4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-xs text-[#1C1917] dark:text-[#F5F2EB] transition-colors"
                   >
                     “{sug}”
                   </button>
@@ -465,7 +465,7 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
           )}
 
           {errorMsg && (
-            <div className="text-xs text-[#A82020] dark:text-red-300 bg-[#F8E7E3]/60 dark:bg-red-950/40 px-3 py-2 rounded-xl">
+            <div className="text-xs text-[#9E2A2B] dark:text-red-300 bg-[#F8E7E3]/60 dark:bg-red-950/40 px-3 py-2 rounded-xl">
               {errorMsg}
             </div>
           )}
@@ -484,8 +484,8 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
               title="Speak your response in English"
               className={`h-11 w-11 rounded-xl border flex items-center justify-center shrink-0 transition-colors ${
                 isListeningMic
-                  ? 'bg-[#A82020] text-white border-[#A82020] animate-pulse'
-                  : 'bg-[#FAF8F4] dark:bg-[#1F1C18] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] hover:border-[#A82020]'
+                  ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] animate-pulse'
+                  : 'bg-[#FAF8F4] dark:bg-[#1F1C18] border-[#E6E0D4] dark:border-[#2E2924] text-[#57534E] hover:border-[#9E2A2B]'
               }`}
             >
               <Mic className="w-4 h-4" />
@@ -496,13 +496,13 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Type your response in English (or click the mic to speak)..."
-              className="flex-1 h-11 px-4 rounded-xl bg-[#FAF8F4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#A82020]"
+              className="flex-1 h-11 px-4 rounded-xl bg-[#FAF8F4] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-sm text-[#1C1917] dark:text-[#F5F2EB] focus:outline-none focus:border-[#9E2A2B]"
             />
 
             <button
               type="submit"
               disabled={isSending || !userInput.trim()}
-              className="h-11 px-5 rounded-xl bg-[#A82020] hover:bg-[#8E1B1B] disabled:opacity-40 text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 shrink-0 transition-colors"
+              className="h-11 px-5 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] disabled:opacity-40 text-white text-xs sm:text-sm font-medium inline-flex items-center gap-2 shrink-0 transition-colors"
             >
               <span>Send</span>
               <Send className="w-3.5 h-3.5" />

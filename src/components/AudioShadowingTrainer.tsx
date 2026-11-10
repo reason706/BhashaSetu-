@@ -1232,7 +1232,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
       {/* Studio Header & Mode Switcher */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
             <Activity className="w-4 h-4" />
             <span>Tool 8 · Web Audio API Acoustic Waveform & Rhythm Shadowing Trainer</span>
           </div>
@@ -1255,7 +1255,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
             }}
             className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
               studioMode === 'waveform-trainer'
-                ? 'bg-[#B91C1C] text-white shadow-xs'
+                ? 'bg-[#9E2A2B] text-white shadow-xs'
                 : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
             }`}
           >
@@ -1270,7 +1270,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
             }}
             className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
               studioMode === 'auto-loop'
-                ? 'bg-[#B91C1C] text-white shadow-xs'
+                ? 'bg-[#9E2A2B] text-white shadow-xs'
                 : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]'
             }`}
           >
@@ -1329,7 +1329,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                 }}
                 className={`min-h-[34px] px-3 py-1 rounded-lg border text-xs font-semibold transition-all ${
                   curatedIdx === idx
-                    ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                    ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                     : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924]'
                 }`}
               >
@@ -1378,7 +1378,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
       <div className="p-5 sm:p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-md bg-[#B91C1C]/10 text-[#B91C1C] dark:text-[#F87171] font-bold">
+            <span className="px-2.5 py-0.5 rounded-md bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171] font-bold">
               {activeSentence.level}
             </span>
             <span className="font-semibold text-[#57534E] dark:text-[#A8A29E]">
@@ -1428,7 +1428,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                       {w.isStressed ? '● STRESS' : '• weak'}
                     </span>
                     {w.hasSilentLetter && (
-                      <span className="text-[#B91C1C] dark:text-[#F87171] font-bold">· Silent</span>
+                      <span className="text-[#9E2A2B] dark:text-[#F87171] font-bold">· Silent</span>
                     )}
                   </div>
                   <div
@@ -1438,7 +1438,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                         : 'font-normal text-[#57534E] dark:text-[#A8A29E]'
                     } ${
                       w.hasSilentLetter
-                        ? 'underline decoration-[#B91C1C] decoration-2 underline-offset-4'
+                        ? 'underline decoration-[#9E2A2B] decoration-2 underline-offset-4'
                         : ''
                     }`}
                   >
@@ -1453,7 +1453,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
         {/* IPA, Connected Speech & Nepali Meaning */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[#E7E0D6] dark:border-[#2E2924] text-xs">
           <div className="space-y-1">
-            <div className="font-ipa text-[#B91C1C] dark:text-[#F87171] font-medium">
+            <div className="font-ipa text-[#9E2A2B] dark:text-[#F87171] font-medium">
               IPA: {activeSentence.ipa}
             </div>
             <div className="text-[#57534E] dark:text-[#A8A29E]">
@@ -1462,7 +1462,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
           </div>
           <div className="space-y-1">
             {languageMode !== 'english-only' && (
-              <div className="font-nepali text-sm font-semibold text-[#15803D] dark:text-emerald-400">
+              <div className="font-nepali text-sm font-semibold text-[#2D6A4F] dark:text-emerald-400">
                 {activeSentence.nepali}
               </div>
             )}
@@ -1524,7 +1524,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
             <div className="lg:col-span-7 p-4 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#B91C1C] dark:text-[#F87171]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#9E2A2B] dark:text-[#F87171]">
                     Step 2 · Record & Compare Your Voice (Web Audio API)
                   </div>
                   <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
@@ -1533,8 +1533,8 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                 </div>
 
                 {isRecording && (
-                  <div className="px-3 py-1 rounded-full bg-[#B91C1C]/15 border border-[#B91C1C] text-[#B91C1C] dark:text-[#F87171] font-ipa text-xs font-bold inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#B91C1C] animate-ping" />
+                  <div className="px-3 py-1 rounded-full bg-[#9E2A2B]/15 border border-[#9E2A2B] text-[#9E2A2B] dark:text-[#F87171] font-ipa text-xs font-bold inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#9E2A2B] animate-ping" />
                     <span>Mic Level: {liveMicLevel}%</span>
                   </div>
                 )}
@@ -1545,7 +1545,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                   <button
                     type="button"
                     onClick={handleStartRecording}
-                    className="min-h-[42px] px-4 py-2 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs"
+                    className="min-h-[42px] px-4 py-2 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs"
                   >
                     <Mic className="w-4 h-4" />
                     <span>
@@ -1556,7 +1556,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                   <button
                     type="button"
                     onClick={handleStopRecording}
-                    className="min-h-[42px] px-4 py-2 rounded-xl bg-[#15803D] hover:bg-emerald-800 text-white text-xs font-semibold inline-flex items-center gap-2 animate-pulse"
+                    className="min-h-[42px] px-4 py-2 rounded-xl bg-[#2D6A4F] hover:bg-emerald-800 text-white text-xs font-semibold inline-flex items-center gap-2 animate-pulse"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                     <span>Stop & Compare Waveforms</span>
@@ -1570,20 +1570,20 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                       onClick={handlePlayUserRecording}
                       className={`min-h-[42px] px-3.5 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 ${
                         isPlayingUserAudio
-                          ? 'bg-[#15803D] text-white border-[#15803D]'
+                          ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
                           : 'bg-white dark:bg-[#1F1C18] border-[#E7E0D6] dark:border-[#2E2924]'
                       }`}
                     >
-                      <Play className="w-3.5 h-3.5 fill-current text-[#15803D]" />
+                      <Play className="w-3.5 h-3.5 fill-current text-[#2D6A4F]" />
                       <span>{isPlayingUserAudio ? 'Playing Yours...' : 'Play My Recording'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={handlePlayBackToBackComparison}
-                      className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5 hover:border-[#B91C1C]"
+                      className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-semibold inline-flex items-center gap-1.5 hover:border-[#9E2A2B]"
                     >
-                      <Sliders className="w-3.5 h-3.5 text-[#B91C1C]" />
+                      <Sliders className="w-3.5 h-3.5 text-[#9E2A2B]" />
                       <span>Compare (Native → You)</span>
                     </button>
                   </>
@@ -1890,16 +1890,16 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                   <div
                     className={`w-14 h-14 rounded-2xl flex items-center justify-center font-ipa text-xl font-bold ${
                       comparisonMetrics.overallScore >= 80
-                        ? 'bg-[#15803D] text-white'
+                        ? 'bg-[#2D6A4F] text-white'
                         : comparisonMetrics.overallScore >= 65
                         ? 'bg-[#D97706] text-white'
-                        : 'bg-[#B91C1C] text-white'
+                        : 'bg-[#9E2A2B] text-white'
                     }`}
                   >
                     {comparisonMetrics.overallScore}%
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+                    <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                       Web Audio API Waveform & Rhythm Analysis Complete
                     </div>
                     <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -1945,7 +1945,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                   <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                     2. Syllable Stress Peak Alignment
                   </div>
-                  <div className="text-2xl font-bold font-ipa text-[#15803D] dark:text-emerald-400">
+                  <div className="text-2xl font-bold font-ipa text-[#2D6A4F] dark:text-emerald-400">
                     {comparisonMetrics.stressAlignmentScore}%
                   </div>
                   <div className="text-[11px] text-[#57534E] dark:text-[#A8A29E]">
@@ -1989,7 +1989,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                           {we.word}
                         </span>
                         {we.status === 'strong' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D] shrink-0" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#2D6A4F] shrink-0" />
                         ) : (
                           <Sparkles className="w-3.5 h-3.5 text-[#D97706] shrink-0" />
                         )}
@@ -2002,10 +2002,10 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                           style={{ width: `${Math.round(we.userEnergy * 100)}%` }}
                           className={`h-full rounded-full ${
                             we.status === 'strong'
-                              ? 'bg-[#15803D]'
+                              ? 'bg-[#2D6A4F]'
                               : we.status === 'moderate'
                               ? 'bg-[#D97706]'
-                              : 'bg-[#B91C1C]'
+                              : 'bg-[#9E2A2B]'
                           }`}
                         />
                       </div>
@@ -2020,7 +2020,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
                   Acoustic Coaching Feedback: {comparisonMetrics.feedbackSummary}
                 </div>
                 {languageMode !== 'english-only' && (
-                  <div className="font-nepali text-[#15803D] dark:text-emerald-400">
+                  <div className="font-nepali text-[#2D6A4F] dark:text-emerald-400">
                     {comparisonMetrics.nepaliFeedback}
                   </div>
                 )}
@@ -2033,7 +2033,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
         <div className="p-6 rounded-2xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-semibold text-[#B91C1C] dark:text-[#F87171]">
+              <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Hands-Free Automated 3-Step Cadence Loop
               </div>
               <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -2054,7 +2054,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
               className={`min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 ${
                 shadowPhase !== 'idle'
                   ? 'bg-[#D97706] text-white'
-                  : 'bg-[#B91C1C] text-white hover:bg-[#991B1B]'
+                  : 'bg-[#9E2A2B] text-white hover:bg-[#872223]'
               }`}
             >
               {shadowPhase !== 'idle' ? (
@@ -2073,7 +2073,7 @@ export const AudioShadowingTrainer: React.FC<AudioShadowingTrainerProps> = ({
 
           <div className="p-4 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-between text-xs font-ipa">
             <span>Current Loop Status:</span>
-            <span className="font-bold text-[#B91C1C] dark:text-[#F87171]">
+            <span className="font-bold text-[#9E2A2B] dark:text-[#F87171]">
               {shadowPhase === 'idle' && 'Ready to Start'}
               {shadowPhase === 'playing-slow' && '🔊 Step 1/3: Playing 0.75x Careful Speed...'}
               {shadowPhase === 'user-repeat-pause' &&
