@@ -53,6 +53,7 @@ import { getMassiveLexicon } from '../data/massiveLexicon';
 import { CORE_SYLLABUS } from '../data/syllabus';
 import { WordPhoneticsPopover } from './ui/ResponsivePrimitives';
 import { toast } from 'sonner';
+import { scrollBehavior } from '../hooks/useModalBehavior';
 
 interface LecturePlayerProps {
   lecture: LectureUnit;
@@ -733,7 +734,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     };
     onCompleteLecture(scoreRecord);
     setShowCompletionSummary(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const goToModule = (nextStep: ModuleStep, markCurrentComplete = false) => {
@@ -744,7 +745,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     setIsPlayingFullDialogue(false);
     setActiveDialogueLineIdx(null);
     setActiveModule(nextStep);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const englishGrammar = ENGLISH_GRAMMAR_CONTENT[lecture.id];

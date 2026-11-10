@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { CEFRLevel, LanguageMode } from '../types/curriculum';
 import { speechService } from '../services/speech';
+import { useModalBehavior, backdropDismiss, MODAL_BACKDROP_CLASS, scrollBehavior } from '../hooks/useModalBehavior';
 
 export interface RoleplayScenario {
   id: string;
@@ -135,8 +136,10 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ behavior: scrollBehavior() });
   }, [turns, isSending]);
+
+  useModalBehavior(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -275,7 +278,12 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 sm:p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={backdropDismiss(onClose)}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center ${MODAL_BACKDROP_CLASS} p-0 sm:p-4 animate-fade-up`}
+    >
       <div className="w-full max-w-3xl bg-[#FAF8F4] dark:bg-[#181512] border border-[#E6E0D4] dark:border-[#2E2924] rounded-t-3xl sm:rounded-2xl shadow-xl flex flex-col max-h-[92vh] overflow-hidden">
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-between gap-4 bg-white dark:bg-[#141210]">

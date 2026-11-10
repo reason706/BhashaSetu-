@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
+import { MotionConfig } from 'motion/react';
 import App from './App.tsx';
 import './index.css';
 
@@ -24,4 +25,9 @@ if (import.meta.env.PROD) {
   });
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+// MotionConfig "user" makes every motion/react animation respect prefers-reduced-motion
+createRoot(document.getElementById('root')!).render(
+  <MotionConfig reducedMotion="user">
+    <App />
+  </MotionConfig>
+);

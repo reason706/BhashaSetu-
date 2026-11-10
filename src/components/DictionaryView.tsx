@@ -62,6 +62,7 @@ import {
   WordPhoneticsPopover,
   SelectSheetOption,
 } from './ui/ResponsivePrimitives';
+import { scrollBehavior } from '../hooks/useModalBehavior';
 
 interface DictionaryViewProps {
   lectures: LectureUnit[];
@@ -3434,7 +3435,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               <button
                 onClick={() => {
                   setCurrentPage((p) => Math.max(1, p - 1));
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: scrollBehavior() });
                 }}
                 disabled={safePage <= 1}
                 className="min-h-[38px] px-3.5 py-1.5 rounded-xl border border-[#E8E0D2] dark:border-[#2C2621] bg-white dark:bg-[#191715] text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"
@@ -3464,7 +3465,7 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               <button
                 onClick={() => {
                   setCurrentPage((p) => Math.min(totalPages, p + 1));
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: scrollBehavior() });
                 }}
                 disabled={safePage >= totalPages}
                 className="min-h-[38px] px-4 py-1.5 rounded-xl bg-[#9E2A2B] text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40"

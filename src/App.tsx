@@ -87,6 +87,7 @@ import {
 } from './services/storage';
 import { speechService } from './services/speech';
 import { useOnlineStatus } from './hooks/usePWA';
+import { MODAL_OPEN_EVENT, scrollBehavior } from './hooks/useModalBehavior';
 import { LecturePlayer, ModuleStep } from './components/LecturePlayer';
 import { LessonProgressCard } from './components/LessonProgressCard';
 import { LevelUpCelebrationModal } from './components/LevelUpCelebrationModal';
@@ -374,6 +375,17 @@ export default function App() {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
+  }, []);
+
+  // Any modal opening closes the top-bar popovers so only one pop-up is visible
+  useEffect(() => {
+    const closeShellPopovers = () => {
+      setIsAvatarMenuOpen(false);
+      setIsSearchDropdownOpen(false);
+      setIsMobileSearchOpen(false);
+    };
+    window.addEventListener(MODAL_OPEN_EVENT, closeShellPopovers);
+    return () => window.removeEventListener(MODAL_OPEN_EVENT, closeShellPopovers);
   }, []);
 
   // Focus the expanded phone search field as soon as it opens
@@ -1139,35 +1151,35 @@ export default function App() {
       setInitialArenaTool(null);
     }
     setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const openProgressSubView = (subView: 'overview' | 'achievements') => {
     setActiveLectureId(null);
     setProgressSubViewTarget(subView);
     setActiveTab('progress');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const openArenaTool = (tool: ArenaToolTab) => {
     setInitialArenaTool(tool);
     setActiveLectureId(null);
     setActiveTab('arena');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const openLecture = (id: string, step: ModuleStep = 0) => {
     setInitialModuleStep(step);
     setActiveLectureId(id);
     setActiveTab('lessons');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   const openSectionInDictionary = (lectureNumber: number) => {
     setDictionaryLectureFilter(lectureNumber);
     setActiveLectureId(null);
     setActiveTab('dictionary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   // Global Top Search Bar Instant Results (Words, Lessons, Practice Arena Activities)
@@ -3318,7 +3330,7 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           sentenceCoachSectionRef.current?.scrollIntoView({
-                            behavior: 'smooth',
+                            behavior: scrollBehavior(),
                             block: 'center',
                           });
                           window.setTimeout(() => {

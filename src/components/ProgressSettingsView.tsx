@@ -78,6 +78,8 @@ import {
   PronunciationResult,
 } from '../services/speech';
 import { ResponsiveSelectSheet } from './ui/ResponsivePrimitives';
+import { useModalBehavior, backdropDismiss, MODAL_BACKDROP_CLASS, scrollBehavior } from '../hooks/useModalBehavior';
+
 
 interface ProgressSettingsViewProps {
   mode: 'progress' | 'settings';
@@ -427,6 +429,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
   const [showFullAudioLab, setShowFullAudioLab] = useState(false);
   const [selectedActivityDate, setSelectedActivityDate] = useState<string | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  useModalBehavior(isResetModalOpen, () => setIsResetModalOpen(false));
   const [resetIncludeCloud, setResetIncludeCloud] = useState(true);
   const [isResettingProgress, setIsResettingProgress] = useState(false);
   const audioLabSectionRef = useRef<HTMLElement | null>(null);
@@ -3987,7 +3990,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               onClick={() => {
                 setShowFullAudioLab((prev) => !prev);
                 setTimeout(() => {
-                  audioLabSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  audioLabSectionRef.current?.scrollIntoView({ behavior: scrollBehavior() });
                 }, 100);
               }}
               className="px-4 py-2 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] text-xs font-medium text-[#A82020] dark:text-[#F87171] hover:bg-[#FAF8F4] dark:hover:bg-[#141210] transition-colors shrink-0"
@@ -4101,7 +4104,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="reset-progress-modal-title"
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onMouseDown={backdropDismiss(() => setIsResetModalOpen(false))}
+          className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS} flex items-center justify-center p-4 animate-fade-up`}
         >
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-2xl p-6 space-y-5">
             <div className="flex items-start justify-between gap-3">

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Zap, Coins, Share2, Check, X, Sparkles } from 'lucide-react';
 import { speechService } from '../services/speech';
 import { CEFRLevel } from '../types/curriculum';
+import { useModalBehavior, backdropDismiss, MODAL_BACKDROP_CLASS } from '../hooks/useModalBehavior';
 
 export interface LevelUpCelebrationModalProps {
   isOpen: boolean;
@@ -32,6 +33,8 @@ export const LevelUpCelebrationModal: React.FC<LevelUpCelebrationModalProps> = (
       speechService.playCelebrationChime('milestone');
     }
   }, [isOpen]);
+
+  useModalBehavior(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -65,7 +68,8 @@ export const LevelUpCelebrationModal: React.FC<LevelUpCelebrationModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="level-up-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      onMouseDown={backdropDismiss(onClose)}
+      className={`fixed inset-0 z-50 flex items-center justify-center ${MODAL_BACKDROP_CLASS} p-4 animate-fade-up`}
     >
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden bg-gradient-to-b from-[#FFF6E5] via-[#FAF8F4] to-[#F3EDE0] dark:from-[#261F18] dark:via-[#1A1714] dark:to-[#141210] border border-[#E6DEC8] dark:border-[#3A3228] shadow-2xl p-6 sm:p-7 text-center">
         {/* Close Button */}

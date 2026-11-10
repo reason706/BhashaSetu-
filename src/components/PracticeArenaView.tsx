@@ -68,6 +68,7 @@ import { ArticulationGuideLab } from './ArticulationGuideLab';
 import { DictationPassageStudio } from './DictationPassageStudio';
 import { toast } from 'sonner';
 import { ResponsiveSelectSheet, WordPhoneticsPopover } from './ui/ResponsivePrimitives';
+import { scrollBehavior } from '../hooks/useModalBehavior';
 
 interface NaatiCclSegment {
   id: string;
@@ -1712,7 +1713,7 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
     if (onSelectTool) {
       onSelectTool(tool);
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
 
   // Core + Curated vocabulary list for the Master Vocabulary Sheet

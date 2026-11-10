@@ -20,6 +20,7 @@ import {
   VocabularyItem,
 } from '../types/curriculum';
 import { speechService } from '../services/speech';
+import { useModalBehavior, backdropDismiss, MODAL_BACKDROP_CLASS } from '../hooks/useModalBehavior';
 
 interface DailyChallengeModalProps {
   isOpen: boolean;
@@ -267,6 +268,8 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
     }
   }, [isOpen, currentIdx, currentQuestion, preferredSpeechRate, selectedOption, isCompletedView]);
 
+  useModalBehavior(isOpen && !!currentQuestion, onClose);
+
   if (!isOpen || !currentQuestion) return null;
 
   const handleSelectAnswer = (answer: string) => {
@@ -340,7 +343,8 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+      onMouseDown={backdropDismiss(onClose)}
+      className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS} flex items-center justify-center p-4 overflow-y-auto animate-fade-up`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="daily-challenge-title"

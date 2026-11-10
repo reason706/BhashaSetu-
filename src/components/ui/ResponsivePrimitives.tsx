@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { speechService } from '../../services/speech';
 import { toast } from 'sonner';
+import { useModalBehavior, MODAL_BACKDROP_CLASS } from '../../hooks/useModalBehavior';
 
 export interface SelectOptionItem<T extends string | number = string> {
   value: T;
@@ -64,6 +65,8 @@ export function ResponsiveSelectSheet<T extends string | number = string>({
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 640 : false
   );
+  // Only one pop-up open at a time: the phone sheet joins the shared modal stack
+  useModalBehavior(open && isMobile, () => setOpen(false));
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 640);
@@ -112,7 +115,7 @@ export function ResponsiveSelectSheet<T extends string | number = string>({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18 }}
-                  className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]"
+                  className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS}`}
                 />
               </Dialog.Overlay>
               <Dialog.Content asChild>

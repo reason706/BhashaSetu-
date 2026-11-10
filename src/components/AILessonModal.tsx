@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, Wand2, AlertCircle } from 'lucide-react';
 import { CEFRLevel, LectureUnit, LanguageMode } from '../types/curriculum';
+import { useModalBehavior, backdropDismiss, MODAL_BACKDROP_CLASS } from '../hooks/useModalBehavior';
 
 interface AILessonModalProps {
   isOpen: boolean;
@@ -54,6 +55,11 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const requestClose = () => {
+    if (!isGenerating) onClose();
+  };
+  useModalBehavior(isOpen, requestClose);
+
   if (!isOpen) return null;
 
   const isFullNepali = languageMode === 'full-nepali';
@@ -99,7 +105,12 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 sm:p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={backdropDismiss(requestClose)}
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center ${MODAL_BACKDROP_CLASS} p-0 sm:p-4 animate-fade-up`}
+    >
       <div className="w-full max-w-xl bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-t-3xl sm:rounded-2xl p-6 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
