@@ -438,6 +438,24 @@
   .kpi { display: flex; flex-direction: column; gap: 10px; }
   .kpi .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
+  /* ---- practice tool start / result screen (artifact .pr-start) ---- */
+  .pr-start {
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 28px 20px;
+    border-radius: 20px; background: linear-gradient(135deg, #EFEADE, #E2D6C3); border: 1px solid #E0D6C4;
+  }
+  .pr-big {
+    width: 84px; height: 84px; border-radius: 26px; background: #fff; color: #9E2A2B; display: flex; align-items: center;
+    justify-content: center; box-shadow: 0 14px 28px -16px rgba(110, 80, 40, .6);
+  }
+  .pr-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; max-width: 420px; }
+  .pr-meta > div { background: rgba(255, 255, 255, .75); border-radius: 14px; padding: 10px 6px; }
+  .pr-meta b { display: block; font-family: var(--font-display); font-size: 18px; }
+  .pr-meta span { font-size: 11px; color: #6E685F; font-weight: 600; }
+  .dark .pr-start { background: linear-gradient(135deg, #221E1A, #181512); border-color: #2E2924; }
+  .dark .pr-big { background: #1F1C18; color: #F87171; }
+  .dark .pr-meta > div { background: rgba(20, 18, 16, .7); }
+  .dark .pr-meta span { color: #A8A29E; }
+
   /* ---- page-load stagger for direct children of a .main page ---- */
   .main > * { animation: fadeSlideUpPage .45s cubic-bezier(.22,1,.36,1) backwards; }
   .main > *:nth-child(2) { animation-delay: .04s; }

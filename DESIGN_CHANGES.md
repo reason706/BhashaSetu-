@@ -245,3 +245,27 @@ mastery-quiz overlays. Lines 1–559 are the shared stylesheet.
 and its intro / completion overlays. The app's existing grid of word cards,
 dictation bee and completion flow stay. Porting those would replace working
 features rather than restyle them.
+
+## Session 4: Practice arena + tools
+
+**Artifact read:** `project/Arena.dc.html`, lines 560–783 (all markup and
+the page script). Lines 1–559 are the shared stylesheet. The `.pr-*` tool
+classes came from the Main and Arena stylesheets.
+
+| Artifact | Before | Change (`PracticeArenaView.tsx`) |
+|---|---|---|
+| `.ls-head` "Practice arena" + `btn-p` Daily challenge | Eyebrow, title and subtitle | Artifact head. Daily challenge uses the existing `onOpenDailyChallenge`. |
+| `.ls-stats` slim strip | none | Real data only: best sprint, detective cases solved, mistakes to re-drill |
+| `.ls-resume` "RECOMMENDED · 3 MIN" | none | Espresso strip with a sage icon tile; opens Spaced repetition review |
+| `.ls-sfield` tool search + count | none | New search over tool titles and descriptions (core and labs), with result count and clear button |
+| `.ls-tabs` skill tabs with counts | Rounded filter chips + activity-count badge | Underline tabs (All / Vocabulary / Grammar / Speaking) with live counts |
+| `.ar-grid`: auto-fill 270px `.card.hov`, category-toned `.ico` (vocabulary crimson, grammar ochre, speaking sage), category `.tag` | Pastel tiles toned by index | Artifact cards. Phones: one bordered list of rows with a chevron. |
+| `.ar-labs`: always-visible "Specialised labs" (3 columns, horizontal scroll on phones) | Hidden behind a toggle | Always visible, artifact `.card.hov` lab tiles |
+| Empty state `.card.paper` | none | "No tools match" card |
+| Tool page header (`btn-g btn-sm` back, `.ico.sm.i-crim`, serif title) | Custom header | Artifact header, Shuffle as `btn-g btn-sm` |
+| `.pr-start` / `.pr-big` / `.pr-meta` | Plain centred start and result screens | Gradient start panel with 84px white icon tile on the sprint start, sprint result and exam-simulator start. The sprint start also gets the Tier / Personal best / 60 s meta row. |
+| Tool containers `.card` | 20 hand-rolled white containers | `.card` |
+
+**Not ported:** the artifact's "Inside a tool" demo is an illustration, not
+a feature. Its tool-switcher tabs (`.pr-tabs`) weren't added, because the
+app intentionally has no prev/next tool navigation. Tool logic is unchanged.
