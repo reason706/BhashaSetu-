@@ -129,6 +129,9 @@ export default function App() {
   // Global Top Search Bar State
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  // Phones: search collapses to an icon that expands over the whole top bar
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const globalSearchInputRef = useRef<HTMLInputElement | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Top-Right User Avatar Dropdown State
@@ -338,11 +341,47 @@ export default function App() {
         !searchContainerRef.current.contains(e.target as Node)
       ) {
         setIsSearchDropdownOpen(false);
+        setIsMobileSearchOpen(false);
+      }
+    };
+    // Escape closes the search / avatar popovers; "/" focuses the global search
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSearchDropdownOpen(false);
+        setIsMobileSearchOpen(false);
+        setIsAvatarMenuOpen(false);
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        !!target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+      if (e.key === '/' && !isTyping && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        if (window.matchMedia('(max-width: 639px)').matches) {
+          setIsMobileSearchOpen(true);
+        }
+        setIsSearchDropdownOpen(true);
+        window.setTimeout(() => globalSearchInputRef.current?.focus(), 0);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
+
+  // Focus the expanded phone search field as soon as it opens
+  useEffect(() => {
+    if (isMobileSearchOpen) {
+      window.setTimeout(() => globalSearchInputRef.current?.focus(), 0);
+    }
+  }, [isMobileSearchOpen]);
 
   // Sync dark mode class on <html>
   useEffect(() => {
@@ -831,6 +870,39 @@ export default function App() {
   const wordsLearnedDisplayCount = useMemo(() => {
     return unifiedMasteredWordsCount;
   }, [unifiedMasteredWordsCount]);
+
+  // Shared XP + learner level (used by the top bar, Today's goal card and the level-up modal)
+  const learnerXP = useMemo(() => {
+    const stepTotalCount = (
+      Object.values(progress.completedStepsByLecture || {}) as number[][]
+    ).reduce((sum, arr) => sum + arr.length, 0);
+    return (
+      courseStats.completedCount * 250 +
+      stepTotalCount * 35 +
+      wordsLearnedDisplayCount * 15 +
+      (progress.sprintHighScore || 0) * 5 +
+      (progress.dailyChallengeTotalCompleted || 0) * 60 +
+      bonusShareXP
+    );
+  }, [
+    progress.completedStepsByLecture,
+    progress.sprintHighScore,
+    progress.dailyChallengeTotalCompleted,
+    courseStats.completedCount,
+    wordsLearnedDisplayCount,
+    bonusShareXP,
+  ]);
+  const learnerLevelNumber = Math.max(1, Math.floor(learnerXP / 500) + 1);
+  const learnerLevelTitle =
+    learnerLevelNumber < 3
+      ? 'Starter'
+      : learnerLevelNumber < 5
+      ? 'Explorer'
+      : learnerLevelNumber < 8
+      ? 'Communicator'
+      : learnerLevelNumber < 12
+      ? 'Fluent Speaker'
+      : 'Bridge Master';
 
   // Spaced Repetition (wordSRS) "Words Due Today" Queue
   const dueSRSWords = useMemo(() => {
@@ -1433,12 +1505,19 @@ export default function App() {
         {/* Center: Interactive Global Search Bar */}
         <div
           ref={searchContainerRef}
-          className="relative flex-1 max-w-md mx-auto hidden sm:block"
+          className={`${
+            isMobileSearchOpen
+              ? 'absolute inset-x-0 top-0 h-16 z-50 flex items-center gap-2 px-3 bg-[#FAF8F4] dark:bg-[#141210] animate-fade-up'
+              : 'hidden'
+          } sm:relative sm:inset-auto sm:h-auto sm:z-auto sm:px-0 sm:gap-0 sm:bg-transparent sm:dark:bg-transparent sm:block sm:flex-1 sm:max-w-md sm:mx-auto sm:animate-none`}
         >
-          <div className="relative">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#78716C] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              type="text"
+              ref={globalSearchInputRef}
+              type="search"
+              aria-label="Search words, lessons, or activities"
+              enterKeyHint="search"
               value={globalSearchQuery}
               onFocus={() => setIsSearchDropdownOpen(true)}
               onChange={(e) => {
@@ -1446,22 +1525,47 @@ export default function App() {
                 setIsSearchDropdownOpen(true);
               }}
               placeholder="Search words, lessons, or activities"
-              className="w-full h-10 pl-10 pr-8 rounded-xl bg-[#F3EFE6] dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-xs sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#78716C] focus:outline-none focus:border-[#A82020] transition-colors"
+              className="w-full h-11 sm:h-10 pl-10 pr-14 rounded-xl bg-white sm:bg-[#F3EFE6] dark:bg-[#1F1C18] border border-[#9E2A2B] sm:border-[#E6E0D4] dark:border-[#2E2924] text-base sm:text-sm text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#78716C] focus:outline-none focus:border-[#9E2A2B] focus:ring-4 focus:ring-[#F8E7E3] dark:focus:ring-[#9E2A2B]/25 transition-colors [&::-webkit-search-cancel-button]:hidden"
             />
-            {globalSearchQuery && (
+            {globalSearchQuery ? (
               <button
                 type="button"
-                onClick={() => setGlobalSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917]"
+                aria-label="Clear search"
+                onClick={() => {
+                  setGlobalSearchQuery('');
+                  globalSearchInputRef.current?.focus();
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+            ) : (
+              <kbd
+                aria-hidden="true"
+                className="hidden sm:inline-flex absolute right-2.5 top-1/2 -translate-y-1/2 font-ipa text-[11px] font-semibold border border-[#DFD7C8] dark:border-[#3A332D] border-b-2 rounded-md px-1.5 text-[#57534E] dark:text-[#A8A29E] bg-[#FAF8F4] dark:bg-[#141210]"
+              >
+                /
+              </kbd>
             )}
           </div>
 
+          {isMobileSearchOpen && (
+            <button
+              type="button"
+              aria-label="Close search"
+              onClick={() => {
+                setIsMobileSearchOpen(false);
+                setIsSearchDropdownOpen(false);
+              }}
+              className="sm:hidden w-11 h-11 shrink-0 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-center"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Instant Global Search Results Popover */}
           {isSearchDropdownOpen && globalSearchResults && (
-            <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl shadow-xl p-3 space-y-3 z-50 max-h-[420px] overflow-y-auto">
+            <div className="absolute left-3 right-3 top-full sm:left-0 sm:right-0 sm:top-auto mt-2 bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl shadow-xl p-3 space-y-3 z-50 max-h-[420px] overflow-y-auto">
               {globalSearchResults.matchingLectures.length === 0 &&
               globalSearchResults.matchingWords.length === 0 &&
               globalSearchResults.matchingActivities.length === 0 ? (
@@ -1482,6 +1586,7 @@ export default function App() {
                           onClick={() => {
                             openLecture(lec.id, 0);
                             setIsSearchDropdownOpen(false);
+                            setIsMobileSearchOpen(false);
                           }}
                           className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
                         >
@@ -1510,6 +1615,7 @@ export default function App() {
                             speechService.speak(w.word, { rate: progress.preferredSpeechRate });
                             navigateTab('dictionary');
                             setIsSearchDropdownOpen(false);
+                            setIsMobileSearchOpen(false);
                           }}
                           className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
                         >
@@ -1541,6 +1647,7 @@ export default function App() {
                           onClick={() => {
                             openArenaTool(act.id);
                             setIsSearchDropdownOpen(false);
+                            setIsMobileSearchOpen(false);
                           }}
                           className="w-full px-2.5 py-2 rounded-xl hover:bg-[#FAF8F4] dark:hover:bg-[#141210] text-left flex items-center justify-between text-xs"
                         >
@@ -1562,15 +1669,47 @@ export default function App() {
         </div>
 
         {/* Right: Streak Indicator + Interactive User Avatar Menu */}
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto sm:ml-0">
+          {/* Phones: search icon that expands over the whole bar */}
+          <button
+            type="button"
+            aria-label="Search words, lessons, or activities"
+            aria-expanded={isMobileSearchOpen}
+            onClick={() => {
+              setIsAvatarMenuOpen(false);
+              setIsMobileSearchOpen(true);
+              setIsSearchDropdownOpen(true);
+            }}
+            className="sm:hidden w-10 h-10 rounded-xl border border-[#E6E0D4] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-[#1C1917] dark:text-[#F5F2EB] flex items-center justify-center"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
           <button
             type="button"
             onClick={() => openProgressSubView('overview')}
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors"
+            aria-label={`${progress.currentStreakDays || 0}-day streak`}
+            className="inline-flex items-center gap-1 sm:gap-1.5 h-10 px-2.5 sm:px-3 rounded-full bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-[13px] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors whitespace-nowrap"
             title="View your study streak and shields"
           >
-            <Flame className="w-4 h-4 text-[#A82020]" />
-            <span>{progress.currentStreakDays || 0} day streak</span>
+            <Flame className="w-4 h-4 text-[#9E2A2B] dark:text-[#F87171]" />
+            <b className="font-extrabold">{progress.currentStreakDays || 0}</b>
+            <span className="hidden md:inline font-semibold text-[#6E685F] dark:text-[#A8A29E]">day streak</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openProgressSubView('achievements')}
+            aria-label={`Level ${learnerLevelNumber}, ${learnerLevelTitle}`}
+            className="inline-flex items-center gap-1 sm:gap-1.5 h-10 px-2.5 sm:px-3 rounded-full bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] text-[13px] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors whitespace-nowrap"
+            title={`${learnerXP.toLocaleString()} XP · view achievements`}
+          >
+            <Trophy className="w-4 h-4 text-[#B07D2E]" />
+            <b className="font-extrabold">
+              <span className="hidden sm:inline">Lv </span>
+              {learnerLevelNumber}
+            </b>
+            <span className="hidden lg:inline font-semibold text-[#6E685F] dark:text-[#A8A29E]">{learnerLevelTitle}</span>
           </button>
 
           {/* User Avatar Button + Rich User Profile, Login & Settings Popover */}
@@ -1579,6 +1718,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setAvatarDraftName(fullDisplayName);
+                setIsSearchDropdownOpen(false);
                 setIsAvatarMenuOpen((prev) => !prev);
               }}
               aria-label="Open user account, login, and settings menu"
@@ -2809,12 +2949,13 @@ export default function App() {
               {/* ============================================================= */}
               {/* ASYMMETRIC TWO-COLUMN DESKTOP GRID (8 COLS STAGE / 4 COLS RAIL) */}
               {/* ============================================================= */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="flex flex-col gap-5 sm:gap-6 lg:grid lg:grid-cols-12 lg:items-start">
                 {/* =========================================================== */}
                 {/* LEFT COLUMN (8 COLS): PRIMARY LEARNING STAGE                */}
                 {/* =========================================================== */}
-                <div className="lg:col-span-8 space-y-6 min-w-0">
+                <div className="contents lg:block lg:col-span-8 lg:space-y-6 min-w-0">
                   {/* 1. UNIFIED HERO + ACTIVE LESSON STEP TRACKER CARD */}
+                  <div className="order-2 lg:order-none min-w-0">
                   {(() => {
                     const completedSteps =
                       progress.completedStepsByLecture?.[recommendedLecture.id] || [];
@@ -3007,7 +3148,7 @@ export default function App() {
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                          <div className="grid grid-flow-col auto-cols-[minmax(6.25rem,1fr)] sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-5 gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0 snap-x">
                             {stepItems.map((item) => {
                               const isStepDone = completedSteps.includes(item.step);
                               const isStepCurrent = !isStepDone && item.step === nextStepIdx;
@@ -3043,7 +3184,7 @@ export default function App() {
                           </div>
 
                           {/* 3 CEFR Track Progress Pills (Brand Palette: Sage, Ochre, Crimson) */}
-                          <div className="grid grid-cols-3 gap-2 pt-1">
+                          <div className="grid grid-flow-col auto-cols-[minmax(8.5rem,1fr)] sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-3 gap-2 pt-1 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
                             {[
                               {
                                 id: 'B1' as const,
@@ -3099,8 +3240,10 @@ export default function App() {
                       </section>
                     );
                   })()}
+                  </div>
 
                   {/* 2. QUICK TOOLS: 4-CARD EDITORIAL PRACTICE GRID (BRAND COLORS ONLY) */}
+                  <div className="order-4 lg:order-none min-w-0">
                   <section className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -3235,8 +3378,10 @@ export default function App() {
                       </button>
                     </div>
                   </section>
+                  </div>
 
                   {/* 3. PAIRED VOCABULARY ROW: WORD OF THE DAY + SILENT-LETTER SPOTLIGHT */}
+                  <div className="order-5 lg:order-none min-w-0">
                   <section className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
                     {/* Left Vocab Card: Word of the Day */}
                     {isInitialHydrating || isWordOfTheDayLoading || !wordOfTheDay ? (
@@ -3527,8 +3672,10 @@ export default function App() {
                       </div>
                     )}
                   </section>
+                  </div>
 
                   {/* 4. YOUR WEAK SPOTS & MISTAKE RADAR */}
+                  <div className="order-6 lg:order-none min-w-0">
                   {isInitialHydrating ? (
                     <section
                       aria-label="Loading Weak-Spot Mistake Radar"
@@ -3656,8 +3803,10 @@ export default function App() {
                       </div>
                     </section>
                   )}
+                  </div>
 
                   {/* 5. AI SENTENCE & GRAMMAR COACH (SVO vs SOV) */}
+                  <div className="order-7 lg:order-none min-w-0">
                   <section
                     ref={sentenceCoachSectionRef}
                     className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-4"
@@ -3815,13 +3964,15 @@ export default function App() {
                       </div>
                     )}
                   </section>
+                  </div>
                 </div>
 
                 {/* =========================================================== */}
                 {/* RIGHT COLUMN (4 COLS): DAILY COMPANION, GOALS & HABIT RAIL  */}
                 {/* =========================================================== */}
-                <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
+                <aside className="contents lg:block lg:col-span-4 lg:space-y-6 lg:sticky lg:top-6">
                   {/* 1. BRAND-ALIGNED "TODAY GOALS" CARD (WARM SANDSTONE & PAPER) */}
+                  <div className="order-3 lg:order-none min-w-0">
                   {(() => {
                     const todayMins = homeWeekBars.entries[6]?.minutes || 0;
                     const targetMins = progress.dailyGoalMinutes || 15;
@@ -3832,17 +3983,7 @@ export default function App() {
                     const ringOffset =
                       ringCircumference - (Math.max(8, ringPct) / 100) * ringCircumference;
 
-                    const stepTotalCount = (
-                      Object.values(progress.completedStepsByLecture || {}) as number[][]
-                    ).reduce((sum, arr) => sum + arr.length, 0);
-                    const totalXPEarned =
-                      courseStats.completedCount * 250 +
-                      stepTotalCount * 35 +
-                      wordsLearnedDisplayCount * 15 +
-                      (progress.sprintHighScore || 0) * 5 +
-                      (progress.dailyChallengeTotalCompleted || 0) * 60 +
-                      bonusShareXP;
-                    const learnerLevelNumber = Math.max(1, Math.floor(totalXPEarned / 500) + 1);
+                    const totalXPEarned = learnerXP;
 
                     return (
                       <section className="rounded-2xl overflow-hidden bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] shadow-xs">
@@ -3981,8 +4122,10 @@ export default function App() {
                       </section>
                     );
                   })()}
+                  </div>
 
                   {/* 2. YOUR WEEK: 7-DAY BAR CHART WITH GOAL-MET INDICATORS */}
+                  <div className="order-8 lg:order-none min-w-0">
                   <section className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -4151,8 +4294,10 @@ export default function App() {
                       <span>Tap bar to inspect</span>
                     </div>
                   </section>
+                  </div>
 
                   {/* 3. DAILY CHALLENGE HABIT TRIGGER CARD */}
+                  <div className="order-1 lg:order-none min-w-0">
                   <section className="rounded-2xl bg-[#FAF8F4] dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-4 sm:p-5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-[#F2EBDC] dark:bg-[#26221E] text-[#8C6527] dark:text-amber-300 flex items-center justify-center shrink-0">
@@ -4175,8 +4320,10 @@ export default function App() {
                       Start · 2m
                     </button>
                   </section>
+                  </div>
 
                   {/* 4. COMPACT 2x2 COURSE & LEXICON SNAPSHOT */}
+                  <div className="order-9 lg:order-none min-w-0">
                   {isInitialHydrating ? (
                     <section
                       aria-label="Loading learning metrics"
@@ -4267,6 +4414,7 @@ export default function App() {
                       </button>
                     </section>
                   )}
+                  </div>
                 </aside>
               </div>
             </div>
@@ -4401,23 +4549,10 @@ export default function App() {
       {/* Image 3 Inspired: Level Up & Milestone Celebration Modal */}
       <LevelUpCelebrationModal
         isOpen={isLevelUpModalOpen}
-        levelNumber={Math.max(
-          1,
-          Math.floor(
-            (courseStats.completedCount * 250 +
-              wordsLearnedDisplayCount * 15 +
-              bonusShareXP) /
-              500
-          ) + 1
-        )}
+        levelNumber={learnerLevelNumber}
         cefrLevel={progress.selectedLevel}
         milestoneTitle={`${progress.selectedLevel} Track · ${courseStats.completedCount}/${courseStats.totalUnits} Lessons & ${wordsLearnedDisplayCount} Words Explored`}
-        xpEarned={
-          courseStats.completedCount * 250 +
-          wordsLearnedDisplayCount * 15 +
-          (progress.sprintHighScore || 0) * 5 +
-          150
-        }
+        xpEarned={learnerXP}
         masteryPointsEarned={
           courseStats.completedCount * 50 +
           (progress.currentStreakDays || 1) * 20 +
