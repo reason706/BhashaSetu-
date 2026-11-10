@@ -4,6 +4,7 @@ import {
   Volume2,
   Turtle,
   Bookmark,
+  BookOpen,
   BookmarkCheck,
   RotateCw,
   Layers,
@@ -1164,28 +1165,20 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       {/* ===================================================================== */}
       {/* 1. CLEAN EDITORIAL HEADER + COMPACT UTILITY ACTIONS                   */}
       {/* ===================================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-[#E8E0D2] dark:border-[#2C2621] mb-5">
-        <div>
-          <div className="text-[0.6875rem] font-bold tracking-[0.14em] uppercase text-[#9E2A2B] dark:text-[#F87171] mb-1.5">
-            YOUR VOCABULARY · {allWords.length.toLocaleString()} WORDS
-          </div>
-          <h1 className="font-serif fluid-title-xl font-bold tracking-tight text-[#1E1B18] dark:text-[#F5F2EB]">
-            Dictionary &amp; lexicon
-          </h1>
-          <p className="text-xs sm:text-sm text-[#5E5850] dark:text-[#A8A29E] mt-1">
-            Explore pronunciation, Nepali meanings, silent-letter rules, and interactive word drills.
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <h1 className="serif m-0 text-[28px] md:text-[34px] leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">
+          Dictionary
+        </h1>
 
         {/* Compact Utility Bar: Audio Loop & Export Dropdown */}
-        <div className="flex items-center gap-2 self-start sm:self-end shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
+            aria-label="Commuter audio"
+            aria-pressed={commuterOpen}
             onClick={() => setCommuterOpen((prev) => !prev)}
-            className={`min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all border ${
-              commuterOpen || commuterPlaying
-                ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] shadow-xs'
-                : 'bg-white dark:bg-[#191715] border-[#E8E0D2] dark:border-[#2C2621] text-[#1E1B18] dark:text-[#F5F2EB] hover:border-[#9E2A2B]/50'
+            className={`btn btn-g !min-h-[42px] !w-[42px] md:!w-auto !px-0 md:!px-3.5 !text-[13px] !rounded-xl md:!rounded-[14px] ${
+              commuterOpen || commuterPlaying ? '!bg-[#9E2A2B] !text-white !border-[#9E2A2B]' : ''
             }`}
           >
             <Radio
@@ -1197,20 +1190,22 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   : 'text-[#9E2A2B]'
               }`}
             />
-            <span>{commuterPlaying ? 'Audio Playing' : 'Audio Loop'}</span>
+            <span className="hidden md:inline">{commuterPlaying ? 'Audio playing' : 'Commuter audio'}</span>
           </button>
 
           {/* Export / Study Sheet Dropdown */}
           <div ref={exportDropdownRef} className="relative">
             <button
               type="button"
+              aria-label="Export"
+              aria-expanded={exportDropdownOpen}
               onClick={() => setExportDropdownOpen((prev) => !prev)}
-              className="min-h-[38px] px-3.5 py-1.5 rounded-full bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]/50 text-xs font-medium text-[#1E1B18] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-all"
+              className="btn btn-g !min-h-[42px] !w-[42px] md:!w-auto !px-0 md:!px-3.5 !text-[13px] !rounded-xl md:!rounded-[14px]"
             >
-              <Printer className="w-3.5 h-3.5 text-[#5E5850]" />
-              <span>Export</span>
+              <Printer className="w-4 h-4" />
+              <span className="hidden md:inline">Export</span>
               <ChevronDown
-                className={`w-3.5 h-3.5 text-[#8E877E] transition-transform ${
+                className={`hidden md:block w-3.5 h-3.5 text-[#8E877E] transition-transform ${
                   exportDropdownOpen ? 'rotate-180' : ''
                 }`}
               />
@@ -1252,10 +1247,56 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
         </div>
       </div>
 
+      {/* .ls-stats: words / learned / saved */}
+      <section
+        aria-label="Your lexicon"
+        className="card !px-3 !py-2.5 md:!px-5 md:!py-3 !rounded-2xl md:!rounded-[20px] flex items-center justify-between gap-2 mb-4"
+      >
+        {[
+          { key: 'w', tone: 'i-ink', Icon: BookOpen, v: allWords.length.toLocaleString(), l: 'Words' },
+          { key: 'm', tone: 'i-sage', Icon: CheckCircle2, v: masteredWordIds.length.toLocaleString(), l: 'Learned' },
+          { key: 's', tone: 'i-crim', Icon: Bookmark, v: savedWordIds.length.toLocaleString(), l: 'Saved' },
+        ].map((st, i) => (
+          <React.Fragment key={st.key}>
+            {i > 0 && <span aria-hidden="true" className="w-px h-7 bg-[#EAE4D8] dark:bg-[#2E2924]" />}
+            <div className="flex items-center gap-[7px] md:gap-2.5 min-w-0">
+              <span className={`ico xs ${st.tone} hidden md:flex`}>
+                <st.Icon className="w-3.5 h-3.5" />
+              </span>
+              <span>
+                <span className="serif block text-lg md:text-xl leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">{st.v}</span>
+                <span className="muted block text-[10px] md:text-[11px] font-semibold whitespace-nowrap">{st.l}</span>
+              </span>
+            </div>
+          </React.Fragment>
+        ))}
+      </section>
+
+      {/* .ls-resume: SRS review */}
+      <button
+        type="button"
+        onClick={() => {
+          setViewMode('flashcards');
+          handleReshuffleDictionaryPractice();
+        }}
+        className="w-full mb-4 flex items-center gap-3 p-2.5 pr-3 rounded-[18px] bg-[#1C1917] dark:bg-[#F5F2EB] text-[#F5F2EB] dark:text-[#1C1917] text-left shadow-[0_14px_28px_-18px_rgba(28,25,23,0.6)] hover:-translate-y-px transition-transform"
+      >
+        <span className="w-10 h-10 shrink-0 rounded-xl bg-[#2D6A4F] text-white flex items-center justify-center">
+          <Layers className="w-[18px] h-[18px]" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[11px] font-extrabold tracking-[0.1em] text-[#E9C77B] dark:text-[#2D6A4F]">SRS REVIEW · ~3 MIN</span>
+          <span className="block text-sm font-bold truncate">Review your deck with flashcards</span>
+        </span>
+        <span className="w-10 h-10 shrink-0 rounded-full bg-[#E9C77B] text-[#1C1917] flex items-center justify-center">
+          <Play className="w-3.5 h-3.5 fill-current" />
+        </span>
+      </button>
+
       {/* ===================================================================== */}
       {/* 2. MODE SWITCHER TABS (Scrollable on Mobile, Clean Pills on Desktop)  */}
       {/* ===================================================================== */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 -mx-[0.625rem] px-[0.625rem] sm:mx-0 sm:px-0 no-scrollbar">
+      <div className="flex items-center gap-5 overflow-x-auto mb-4 border-b border-[#EAE4D8] dark:border-[#2E2924] no-scrollbar" role="tablist" aria-label="Dictionary mode">
         {(
           [
             {
@@ -1319,24 +1360,24 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   handleReshuffleDictionaryPractice();
                 }
               }}
-              className={`min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
+              role="tab"
+              aria-selected={active}
+              className={`relative shrink-0 pt-2 pb-2.5 text-[13px] inline-flex items-center gap-1.5 whitespace-nowrap transition-colors after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[3px] after:rounded-t-[3px] after:bg-[#9E2A2B] after:transition-transform after:duration-200 ${
                 active
-                  ? 'bg-[#1E1B18] dark:bg-[#F5F2EB] text-[#FAF8F5] dark:text-[#1E1B18] border-[#1E1B18] dark:border-[#F5F2EB] font-semibold shadow-xs'
-                  : 'bg-white dark:bg-[#191715] text-[#5E5850] dark:text-[#A8A29E] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#8E877E]/50 hover:text-[#1E1B18] dark:hover:text-[#F5F2EB]'
+                  ? 'font-bold text-[#1C1917] dark:text-[#F5F2EB] after:scale-x-100'
+                  : 'font-semibold text-[#6E685F] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] after:scale-x-0'
               }`}
             >
               <IconComponent
-                className={`w-3.5 h-3.5 ${
-                  active ? 'text-current' : 'text-[#9E2A2B] dark:text-[#F87171]'
-                }`}
+                className={`w-4 h-4 ${active ? 'text-[#9E2A2B] dark:text-[#F87171]' : 'text-current'}`}
               />
               <span>{tab.label}</span>
               {tab.badge && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-semibold ${
+                  className={`px-1.5 py-px rounded-full text-[10px] font-bold ${
                     active
-                      ? 'bg-white/20 dark:bg-black/15 text-current'
-                      : 'bg-[#F3EFE6] dark:bg-[#141210] text-[#5E5850] dark:text-[#A8A29E]'
+                      ? 'bg-[#F8E7E3] text-[#9E2A2B] dark:bg-red-950/40 dark:text-[#FCA5A5]'
+                      : 'bg-[#EFE9DD] text-[#6E685F] dark:bg-[#2E2924] dark:text-[#A8A29E]'
                   }`}
                 >
                   {tab.badge}
@@ -1351,12 +1392,12 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
       {/* 3. STREAMLINED SEARCH & FILTER BAR (Hidden in Mistake Notebook)       */}
       {/* ===================================================================== */}
       {viewMode !== 'mistakes' && (
-        <div className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] rounded-2xl p-3 sm:p-4 mb-6 space-y-3 shadow-2xs">
+        <div className="mb-5 space-y-2.5">
           {/* ROW 1: Search Bar + Curriculum Section Dropdown (12 Managed Lecture Banks) in Same Line */}
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1 min-w-0">
-              <Search className="w-4 h-4 text-[#8E877E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-[18px] h-[18px] text-[#8E877E] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -1365,8 +1406,9 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                   setCurrentPage(1);
                   setCardIndex(0);
                 }}
-                placeholder="Search words, Nepali meanings, or IPA (e.g. knight, doubt)..."
-                className="w-full min-h-[42px] pl-10 pr-9 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] placeholder:text-[#8E877E] focus:outline-none focus:border-[#9E2A2B] transition-colors"
+                aria-label="Search words"
+                placeholder="Search English, नेपाली or IPA…"
+                className="w-full h-12 pl-10 pr-9 rounded-[14px] bg-white dark:bg-[#1A1714] border border-[#DFD7C8] dark:border-[#3A332D] text-base md:text-[15px] text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8E877E] focus:outline-none focus:border-[#9E2A2B] focus:shadow-[0_0_0_4px_#F8E7E3] dark:focus:shadow-[0_0_0_4px_rgba(158,42,43,0.25)] transition-shadow"
               />
               {searchQuery && (
                 <button
@@ -1433,17 +1475,18 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                       setCardIndex(0);
                       setIsFlipped(false);
                     }}
-                    className={`min-h-[34px] px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
+                    aria-pressed={active}
+                    className={`min-h-[32px] px-3 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
                       active
-                        ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] font-semibold'
-                        : 'bg-[#FAF8F5] dark:bg-[#141210] text-[#5E5850] dark:text-[#A8A29E] border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B]/40 hover:text-[#1E1B18] dark:hover:text-[#F5F2EB]'
+                        ? 'bg-[#F8E7E3] border-[#EBC9C1] text-[#9E2A2B] dark:bg-red-950/40 dark:border-red-900/50 dark:text-[#FCA5A5]'
+                        : 'bg-white dark:bg-[#1F1C18] text-[#3D342B] dark:text-[#D6CFC4] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] hover:text-[#9E2A2B]'
                     }`}
                   >
                     <span>{pill.label}</span>
                     {pill.count !== undefined && (
                       <span
                         className={`text-[10px] font-ipa ${
-                          active ? 'text-white/85' : 'text-[#8E877E]'
+                          active ? 'text-[#9E2A2B]/80 dark:text-[#FCA5A5]/80' : 'text-[#8E877E]'
                         }`}
                       >
                         {pill.count}
@@ -3219,92 +3262,44 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
               </div>
             </div>
           ) : (
-            /* CLEAN EDITORIAL LEXICON CARDS GRID */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-              {paginatedWords.map((item) => {
+            /* .dc-list of .dc-w word cards (artifact). Phones: one bordered list. */
+            <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-0 md:gap-3 items-start bg-white dark:bg-[#1A1714] md:bg-transparent md:dark:bg-transparent border border-[#E6E0D4] dark:border-[#2E2924] md:border-0 rounded-[18px] md:rounded-none overflow-hidden md:overflow-visible">
+              {paginatedWords.map((item, cardIdx) => {
                 const isSaved = savedWordIds.includes(item.id);
                 const showMeaning = showMeaningsByDefault || Boolean(revealedIds[item.id]);
                 const mastery = getWordMasteryStatus(item.id);
+                const isOpen = Boolean(expandedCardIds[item.id]) || Boolean(aiWordExplanations[item.id]);
+                const statusTone = mastery.isMastered
+                  ? 't-sage'
+                  : /new/i.test(mastery.label)
+                  ? 't-ink'
+                  : 't-ochre';
+                const toggleOpen = () =>
+                  setExpandedCardIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
 
                 return (
-                  <div
+                  <article
                     key={item.id}
-                    className="bg-white dark:bg-[#191715] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#D5CBB8] dark:hover:border-[#3E3730] rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all"
+                    className={`card !p-0 overflow-hidden !rounded-none md:!rounded-[20px] !border-0 md:!border !shadow-none md:!shadow-[0_1px_2px_rgba(60,40,20,.04)] md:hover:!border-[#CDBFA8] md:hover:!shadow-[0_14px_30px_-20px_rgba(60,40,20,.35)] ${
+                      cardIdx > 0 ? 'border-t border-t-[#EFE9DD] dark:border-t-[#2E2924] md:border-t-[#E6E0D4]' : ''
+                    }`}
                   >
-                    <div>
-                      {/* Card Top Meta + Compact Icon Actions */}
-                      <div className="flex items-center justify-between gap-2 mb-2.5">
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#8E877E]">
-                          <button
-                            onClick={() => onOpenLecture(item.lectureId)}
-                            className="font-semibold text-[#9E2A2B] dark:text-[#F87171] hover:underline"
-                          >
-                            L{String(item.lectureNumber).padStart(2, '0')}
-                          </button>
-                          <span>·</span>
-                          <span>{item.level}</span>
-                          <span>·</span>
-                          <span className="italic">{item.partOfSpeech}</span>
-                          <span
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded border font-ipa text-[10px] font-semibold ${mastery.badgeClass}`}
-                          >
-                            {mastery.isMastered && <CheckCircle2 className="w-2.5 h-2.5" />}
-                            <span>{mastery.label}</span>
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() =>
-                              speechService.speak(item.word, { rate: preferredSpeechRate })
-                            }
-                            title="Listen (1.0x)"
-                            className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] inline-flex items-center justify-center transition-colors"
-                          >
-                            <Volume2 className="w-3.5 h-3.5 text-[#9E2A2B]" />
-                          </button>
-                          <button
-                            onClick={() => speechService.speak(item.word, { rate: 0.6 })}
-                            title="Slow pronunciation (0.6x)"
-                            className="w-8 h-8 rounded-lg bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#B8863B] inline-flex items-center justify-center transition-colors"
-                          >
-                            <Turtle className="w-3.5 h-3.5 text-[#B8863B]" />
-                          </button>
-                          {onToggleMasteredWord && (
-                            <button
-                              type="button"
-                              onClick={() => onToggleMasteredWord(item.id)}
-                              title={mastery.isMastered ? 'Mastered' : 'Mark as Mastered'}
-                              className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center transition-colors ${
-                                mastery.isMastered
-                                  ? 'border-[#2D6A4F] bg-[#2D6A4F] text-white'
-                                  : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E] hover:border-[#2D6A4F]'
-                              }`}
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => onToggleSaveWord(item.id)}
-                            title={isSaved ? 'Saved' : 'Save word'}
-                            className={`w-8 h-8 rounded-lg border inline-flex items-center justify-center transition-colors ${
-                              isSaved
-                                ? 'border-[#9E2A2B]/40 bg-[#F9E6E6] text-[#9E2A2B] dark:text-[#F87171]'
-                                : 'border-[#E8E0D2] dark:border-[#2C2621] text-[#8E877E] hover:border-[#9E2A2B]/40'
-                            }`}
-                          >
-                            {isSaved ? (
-                              <BookmarkCheck className="w-3.5 h-3.5" />
-                            ) : (
-                              <Bookmark className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Word Heading + IPA + Meaning */}
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1.5">
-                        <div className="flex items-baseline gap-2.5 flex-wrap">
+                    <div className="flex items-center md:items-start gap-2 pl-3.5 pr-2.5 py-3 md:pl-[18px] md:pr-3.5 md:pt-4 md:pb-3.5">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isOpen}
+                        aria-label={`${item.word} details`}
+                        onClick={toggleOpen}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleOpen();
+                          }
+                        }}
+                        className="flex-1 min-w-0 flex flex-col gap-1.5 cursor-pointer text-left"
+                      >
+                        <span className="flex items-baseline gap-2.5 flex-wrap">
                           <WordPhoneticsPopover
                             word={item.word}
                             ipa={item.ipa}
@@ -3320,14 +3315,12 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                             <button
                               type="button"
                               title="Tap for instant phonetics card"
-                              className="font-serif text-xl sm:text-2xl font-bold text-[#1E1B18] dark:text-[#F5F2EB] text-left hover:opacity-85 transition-opacity"
+                              onClick={(e) => e.stopPropagation()}
+                              className="serif text-[21px] md:text-[28px] leading-[1.15] text-[#1C1917] dark:text-[#F5F2EB] text-left hover:opacity-85"
                             >
                               {item.segments?.map((seg, idx) =>
                                 seg.silent ? (
-                                  <span
-                                    key={idx}
-                                    className="text-[#9E2A2B] dark:text-[#F87171] bg-[#9E2A2B]/10 underline decoration-dotted decoration-2 underline-offset-4 px-0.5 rounded"
-                                  >
+                                  <span key={idx} className="sil">
                                     {seg.text}
                                   </span>
                                 ) : (
@@ -3336,93 +3329,138 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                               )}
                             </button>
                           </WordPhoneticsPopover>
-                          <span className="font-ipa text-xs sm:text-sm text-[#8E877E]">
-                            {item.ipa}
+                          <span className="mono muted text-[11px] md:text-[13px]">{item.ipa}</span>
+                        </span>
+                        {showMeaning ? (
+                          <span className="np text-[13px] md:text-[15px] text-[#3D342B] dark:text-[#D6CFC4] truncate md:whitespace-normal">
+                            {item.nepaliMeaning}
                           </span>
-                        </div>
-
-                        {languageMode === 'english-only' && (
+                        ) : (
                           <button
-                            onClick={() =>
-                              setRevealedIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
-                            }
-                            className="px-2 py-0.5 rounded-md border border-[#E8E0D2] dark:border-[#2C2621] text-[11px] text-[#5E5850] inline-flex items-center gap-1"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRevealedIds((prev) => ({ ...prev, [item.id]: true }));
+                            }}
+                            className="self-start inline-flex items-center gap-1 text-xs font-semibold text-[#8C6527] dark:text-[#E9C77B]"
                           >
-                            {showMeaning ? (
-                              <EyeOff className="w-3 h-3" />
-                            ) : (
-                              <Eye className="w-3 h-3" />
-                            )}
-                            <span>{showMeaning ? 'Hide' : 'Meaning'}</span>
+                            <Eye className="w-3.5 h-3.5" />
+                            Show meaning
                           </button>
                         )}
+                        <span className="hidden md:flex gap-1.5 mt-0.5 flex-wrap items-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenLecture(item.lectureId);
+                            }}
+                            className="tag t-ink hover:!text-[#9E2A2B]"
+                            title="Open lecture"
+                          >
+                            L{String(item.lectureNumber).padStart(2, '0')}
+                          </button>
+                          <span className="tag t-ink">{item.level}</span>
+                          <span className={`tag ${statusTone}`}>
+                            {mastery.isMastered && <CheckCircle2 className="w-3 h-3" />}
+                            {mastery.label}
+                          </span>
+                        </span>
                       </div>
+                      <div className="flex flex-row md:flex-col gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          aria-label={`Play ${item.word}`}
+                          onClick={() => speechService.speak(item.word, { rate: preferredSpeechRate })}
+                          className="ibtn !w-[38px] !h-[38px] !rounded-full"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={isSaved ? 'Saved' : 'Save word'}
+                          aria-pressed={isSaved}
+                          onClick={() => onToggleSaveWord(item.id)}
+                          className="ibtn !w-[38px] !h-[38px] !rounded-full"
+                        >
+                          {isSaved ? (
+                            <BookmarkCheck className="w-4 h-4 text-[#9E2A2B] dark:text-[#F87171]" />
+                          ) : (
+                            <Bookmark className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
 
-                      {showMeaning && (
-                        <div className="font-nepali text-sm sm:text-base font-semibold text-[#2D6A4F] dark:text-emerald-400 mb-1.5">
-                          {item.nepaliMeaning}
+                    {isOpen && (
+                      <div className="flex flex-col gap-2.5 px-3.5 md:px-[18px] pt-3 pb-3.5 md:pb-4 border-t border-dashed border-[#E6E0D4] dark:border-[#2E2924] animate-fade-up">
+                        <span className="tag t-crim self-start !whitespace-normal">
+                          <Sparkles className="w-3 h-3 shrink-0" />
+                          {item.silentLettersSummary} · {item.partOfSpeech}
+                        </span>
+                        <div className="flex gap-2.5 items-center bg-[#FAF8F4] dark:bg-[#141210] rounded-xl py-2.5 pr-2.5 pl-3">
+                          <span className="flex-1 text-[13.5px] leading-[1.5] text-[#1C1917] dark:text-[#F5F2EB]">
+                            “{item.englishExample}”
+                            {isFullNepali && item.nepaliExampleTranslation && (
+                              <span className="np block text-xs muted mt-0.5">{item.nepaliExampleTranslation}</span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Play example"
+                            onClick={() => speechService.speak(item.englishExample, { rate: preferredSpeechRate })}
+                            className="ibtn !w-10 !h-10 !rounded-full !text-[#9E2A2B] dark:!text-[#F87171]"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
                         </div>
-                      )}
-
-                      <button
-                        type="button"
-                        aria-expanded={Boolean(expandedCardIds[item.id])}
-                        onClick={() =>
-                          setExpandedCardIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
-                        }
-                        className="sm:hidden mt-1 min-h-[36px] inline-flex items-center gap-1 text-[11px] font-semibold text-[#6E685F] dark:text-[#A8A29E]"
-                      >
-                        <span>{expandedCardIds[item.id] ? 'Hide example & phonics' : 'Example & phonics'}</span>
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform ${expandedCardIds[item.id] ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-
-                      <div className={expandedCardIds[item.id] ? 'block animate-fade-up' : 'hidden sm:block'}>
-                        <p className="text-xs sm:text-sm text-[#1E1B18] dark:text-[#F5F2EB] leading-relaxed">
-                          “{item.englishExample}”
-                        </p>
-                        {isFullNepali && (
-                          <p className="font-nepali text-xs text-[#5E5850] dark:text-[#A8A29E] mt-0.5">
-                            {item.nepaliExampleTranslation}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Clean Footer Strip: Phonics Summary + AI Explain */}
-                    <div
-                      className={`mt-3 pt-2.5 border-t border-[#F0EAE0] dark:border-[#2C2621] items-center justify-between gap-2 text-[11px] ${
-                        expandedCardIds[item.id] || aiWordExplanations[item.id] ? 'flex' : 'hidden sm:flex'
-                      }`}
-                    >
-                      <span className="text-[#9E2A2B] dark:text-[#F87171] font-medium truncate">
-                        {item.silentLettersSummary}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleExplainDictionaryWord(item)}
-                        disabled={aiWordLoadingId === item.id}
-                        className="px-2.5 py-1 rounded-full bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] hover:border-[#9E2A2B] text-[#9E2A2B] dark:text-[#F87171] font-medium inline-flex items-center gap-1 shrink-0 transition-colors"
-                      >
-                        {aiWordLoadingId === item.id ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Asking AI...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3" />
-                            <span>
-                              {aiWordExplanations[item.id] ? 'AI Guide ✓' : 'AI Guide'}
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => speechService.speak(item.word, { rate: 0.6 })}
+                            className="btn btn-g btn-sm"
+                          >
+                            <Turtle className="w-4 h-4" />
+                            0.65×
+                          </button>
+                          {onToggleMasteredWord && (
+                            <button
+                              type="button"
+                              aria-pressed={mastery.isMastered}
+                              onClick={() => onToggleMasteredWord(item.id)}
+                              className={`btn btn-sm ${mastery.isMastered ? '!bg-[#2D6A4F] !text-white' : 'btn-g'}`}
+                            >
+                              <Check className="w-4 h-4" />
+                              {mastery.isMastered ? 'Mastered' : 'Mark mastered'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleExplainDictionaryWord(item)}
+                            disabled={aiWordLoadingId === item.id}
+                            className="btn btn-g btn-sm"
+                          >
+                            {aiWordLoadingId === item.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="w-4 h-4" />
+                            )}
+                            {aiWordLoadingId === item.id
+                              ? 'Asking AI…'
+                              : aiWordExplanations[item.id]
+                              ? 'AI explained ✓'
+                              : 'AI explain'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenLecture(item.lectureId)}
+                            className="btn btn-g btn-sm md:hidden"
+                          >
+                            Lecture {String(item.lectureNumber).padStart(2, '0')}
+                          </button>
+                        </div>
                     {aiWordExplanations[item.id] && (
-                      <div className="mt-3 p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs space-y-1">
+                      <div className="p-3 rounded-xl bg-[#FAF8F4] dark:bg-[#141210] border border-[#E8E0D2] dark:border-[#2C2621] text-xs space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-bold uppercase tracking-wider text-[10px] text-[#9E2A2B]">
                             AI Phonetic Guide
@@ -3445,7 +3483,9 @@ export const DictionaryView: React.FC<DictionaryViewProps> = ({
                         </p>
                       </div>
                     )}
-                  </div>
+                      </div>
+                    )}
+                  </article>
                 );
               })}
             </div>

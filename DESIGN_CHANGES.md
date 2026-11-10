@@ -291,3 +291,18 @@ app intentionally has no prev/next tool navigation. Tool logic is unchanged.
 **Not ported:** the Settings "Advanced audio & voice studio" `<details>`
 cards and the reset dialog (the app already has both, with more features).
 The controls are unchanged (dropdowns, switches, sliders).
+
+## Session 6: Dictionary
+
+**Artifact read:** `project/Dictionary.dc.html`, lines 620–end (all of
+`<main>` plus the page script). The `.dc-*` CSS came from Main.
+
+| Artifact | Before | Change (`DictionaryView.tsx`) |
+|---|---|---|
+| `.ls-head` "Dictionary" + `btn-g` Commuter audio / Export (icon-only on phones) | Eyebrow with word count, long title, subtitle, pill buttons | Artifact head. Audio loop and the export menu work as before (print sheet, CSV). |
+| `.ls-stats`: Words / Learned / Saved | none | Real data: lexicon size, mastered words, saved words |
+| `.ls-resume` "DUE TODAY" strip | none | Espresso "SRS review" strip; opens SRS flashcards (reshuffled) |
+| `.ls-sfield` search | Small input inside a bordered filter card | Standalone 48px field with crimson focus ring. The section dropdown sits beside it; filter card chrome removed. |
+| `.ls-tabs` mode tabs with icons | Pill segmented buttons | Underline tabs (Lexicon cards, Vocab table, SRS flashcards, Match game, Audio dictation, Speed quiz, Mistakes) with count badges |
+| `.dc-chip` quick filters | Solid crimson active pill | Tinted crimson active chip |
+| `.dc-list` / `.dc-w` word cards: serif 28px headword with `.sil`, mono IPA, Nepali, level + status tags, round play/save buttons, dashed `.dc-more` panel (rule tag, example with play, 0.65×, AI explain) | Tall cards with everything always visible | Artifact cards (auto-fill 300px; one bordered list on phones). Tap a word to expand. The phonetics pop-up stays on the headword. Lecture link, meaning reveal (English-only mode), mastered toggle and AI explanation are all kept. |
