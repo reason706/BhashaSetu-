@@ -96,6 +96,7 @@ import { AILessonModal } from './components/AILessonModal';
 import { AIRoleplayModal } from './components/AIRoleplayModal';
 import { ProgressSettingsView } from './components/ProgressSettingsView';
 import { AboutView } from './components/AboutView';
+import { WelcomeOnboarding, WelcomeOnboardingResult } from './components/WelcomeOnboarding';
 import { DailyChallengeModal } from './components/DailyChallengeModal';
 import { PracticeArenaView, ArenaToolTab } from './components/PracticeArenaView';
 import {
@@ -1232,6 +1233,44 @@ export default function App() {
   const fullDisplayName =
     progress.userName || firebaseUser?.displayName || 'Anisha Sharma';
   const firstName = fullDisplayName.split(' ')[0] || 'Anisha';
+
+  // Welcome onboarding: only for brand-new learners who have not finished it yet
+  // (existing learners with study history are never interrupted)
+  const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
+  const hasStudyHistory =
+    progress.completedUnitIds.length > 0 ||
+    progress.savedWordIds.length > 0 ||
+    Boolean(progress.lastStudyDate) ||
+    Object.keys(progress.completedStepsByLecture || {}).length > 0;
+  const showWelcomeOnboarding =
+    !isInitialHydrating && !progress.onboardingComplete && !hasStudyHistory && !isWelcomeDismissed;
+  const firstCoreLecture = CORE_SYLLABUS[0];
+
+  const handleSkipWelcome = () => {
+    setIsWelcomeDismissed(true);
+    setProgress((prev) => completeOnboarding(prev, prev.selectedLevel, prev.dailyGoalMinutes));
+  };
+
+  const handleFinishWelcome = (result: WelcomeOnboardingResult, startFirstLesson: boolean) => {
+    setIsWelcomeDismissed(true);
+    setProgress((prev) =>
+      completeOnboarding(
+        {
+          ...prev,
+          currentLevel: result.level,
+          languageMode: result.languageMode,
+          dailyReminderEnabled: result.dailyReminderEnabled,
+        },
+        result.level,
+        result.dailyGoalMinutes
+      )
+    );
+    if (startFirstLesson && firstCoreLecture) {
+      openLecture(firstCoreLecture.id, 0);
+    } else {
+      navigateTab('home');
+    }
+  };
   const userInitials =
     fullDisplayName
       .split(' ')
@@ -4657,6 +4696,20 @@ export default function App() {
         onCompleteChallenge={handleCompleteDailyChallenge}
         onUpdateWordSRS={handleUpdateWordSRS}
         onRecordMistake={handleRecordMistake}
+      />
+
+      {/* First-run Welcome onboarding (level, daily goal, explanation language) */}
+      <WelcomeOnboarding
+        isOpen={showWelcomeOnboarding}
+        learnerFirstName={progress.userName?.trim().split(' ')[0] || undefined}
+        firstLessonTitle={firstCoreLecture?.title || ''}
+        firstLessonNumber={firstCoreLecture?.lectureNumber || 1}
+        defaultLevel={progress.selectedLevel}
+        defaultGoalMinutes={progress.dailyGoalMinutes || 15}
+        defaultLanguageMode={languageMode}
+        defaultReminder={progress.dailyReminderEnabled !== false}
+        onSkip={handleSkipWelcome}
+        onFinish={handleFinishWelcome}
       />
 
       {/* Image 3 Inspired: Level Up & Milestone Celebration Modal */}
