@@ -479,6 +479,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     'all' | 'earned' | 'streak' | 'learning' | 'practice' | 'mastery'
   >('all');
   const [showAll16Badges, setShowAll16Badges] = useState<boolean>(false);
+  // Badge detail pop-up (any badge, earned or still to come)
+  const [openBadgeId, setOpenBadgeId] = useState<string | null>(null);
+  useModalBehavior(Boolean(openBadgeId), () => setOpenBadgeId(null));
   const [achievementStatusFilter, setAchievementStatusFilter] = useState<
     'all' | 'unlocked' | 'locked'
   >('all');
@@ -3307,7 +3310,17 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 return (
                   <article
                     key={badge.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-haspopup="dialog"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOpenBadgeId(badge.id);
+                      }
+                    }}
                     onClick={() => {
+                      setOpenBadgeId(badge.id);
                       if (badge.earned) {
                         speechService.playCelebrationChime(
                           badge.tier === 'gold' ||
@@ -3321,9 +3334,9 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                     title={
                       badge.earned
                         ? `${badge.title} — Tap to celebrate with confetti!`
-                        : badge.title
+                        : `${badge.title} — Tap for details`
                     }
-                    className={`relative flex items-center gap-3.5 p-4 rounded-xl border transition-all hover:-translate-y-0.5 ${
+                    className={`relative cursor-pointer flex items-center gap-3.5 p-4 rounded-xl border transition-all hover:-translate-y-0.5 ${
                       badge.earned
                         ? 'cursor-pointer bg-gradient-to-br from-[#FFFEFA] to-[#FBF6EC] dark:from-[#2E2B26] dark:to-[#292725] border-[#EADCC4] dark:border-[#4B4233]'
                         : 'bg-[#F8F6F1] dark:bg-[#272624] border-[#EBE7DF] dark:border-[#383531]'
@@ -3392,6 +3405,81 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
                 <ChevronDown className="w-4 h-4" />
               )}
             </button>
+
+            {/* Badge Detail Pop-up: blurred backdrop, click outside / Escape to close */}
+            {(() => {
+              const badge = editorialBadges.find((b) => b.id === openBadgeId);
+              if (!badge) return null;
+              const pct = Math.min(100, Math.round((badge.current / Math.max(1, badge.target)) * 100));
+              return (
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="badge-detail-title"
+                  onMouseDown={backdropDismiss(() => setOpenBadgeId(null))}
+                  className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS} flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up`}
+                >
+                  <div className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl bg-white dark:bg-[#1F1C18] border border-[#E6E0D4] dark:border-[#2E2924] shadow-2xl px-6 pt-4 pb-7 sm:pt-7 flex flex-col items-center text-center gap-3">
+                    <span aria-hidden="true" className="sm:hidden w-10 h-1.5 rounded-full bg-[#DFD7C8] dark:bg-[#3A332D] mb-1" />
+                    <button
+                      type="button"
+                      onClick={() => setOpenBadgeId(null)}
+                      aria-label="Close badge details"
+                      className="absolute top-3 right-3 w-9 h-9 rounded-full bg-[#F2EEE6] dark:bg-[#141210] text-[#3D342B] dark:text-[#D6CFC4] flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div
+                      className={`relative w-[110px] h-[110px] rounded-full flex items-center justify-center shadow-[inset_0_0_0_5px_rgba(255,255,255,0.4),0_12px_24px_-10px_rgba(70,54,32,0.5)] [&>svg]:w-10 [&>svg]:h-10 ${
+                        badge.earned
+                          ? `bg-radial ${badge.artClass}`
+                          : 'bg-gradient-to-br from-[#E8E4DC] to-[#CFC9BE] text-[#8F897F] saturate-35'
+                      }`}
+                    >
+                      {renderBadgeIcon(badge.icon)}
+                      {!badge.earned && (
+                        <span className="absolute -right-1 bottom-1 w-8 h-8 rounded-full bg-white dark:bg-[#1F1C18] text-[#6E685F] flex items-center justify-center shadow-xs">
+                          <Lock className="w-4 h-4" />
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-extrabold tracking-[0.1em] uppercase text-[#9C704D]">
+                      {badge.tier} · {badge.category}
+                    </span>
+                    <h2 id="badge-detail-title" className="font-serif text-2xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+                      {badge.title}
+                    </h2>
+                    <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">{badge.desc}</p>
+                    <div className="w-full mt-1">
+                      <div className="flex justify-between text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                        <span>
+                          {badge.current} of {badge.target}
+                        </span>
+                        <span className={badge.earned ? 'text-[#2D6A4F]' : 'text-[#9E2A2B] dark:text-[#F87171]'}>
+                          {badge.earned ? 'Earned' : `${pct}%`}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[#EFE9DD] dark:bg-[#2E2924] overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${badge.earned ? 'bg-[#2D6A4F]' : 'bg-gradient-to-r from-[#C18447] to-[#F6D79F]'}`}
+                          style={{ width: `${Math.max(4, pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-[#6E685F] dark:text-[#A8A29E]">
+                      {badge.statusText}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOpenBadgeId(null)}
+                      className="mt-2 w-full min-h-[44px] rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-sm font-bold"
+                    >
+                      {badge.earned ? 'Nice!' : 'Keep going'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </section>
         )}
       </div>
