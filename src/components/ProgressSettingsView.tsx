@@ -4,6 +4,9 @@ import {
   CheckCircle2,
   BookmarkCheck,
   Download,
+  Compass,
+  Bell,
+  Waves,
   RefreshCw,
   Volume2,
   Sun,
@@ -1399,7 +1402,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     const examsCount = (progress.examHistory || []).length;
 
     return (
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-5">
+      <section className="card p-5 sm:p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div className="flex items-start sm:items-center gap-3.5">
             {firebaseUser?.photoURL ? (
@@ -2087,52 +2090,38 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
     const c1Track = trackStats.find((t) => t.level === 'C1') || { done: 0, total: 4, pct: 0 };
 
     return (
-      <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
-        {/* Top Eyebrow + Title + Progress / Achievements Toggle + Period Filter */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
-              YOUR LEARNING STORY
-            </div>
-            <h1 className="font-serif text-3xl sm:text-[34px] font-bold text-[#282522] dark:text-[#F1ECE4] tracking-tight mt-1">
-              Progress &amp; achievements
-            </h1>
-            <p className="text-xs sm:text-sm text-[#79736D] dark:text-[#A69F96] mt-1">
-              Every small step is building lasting confidence.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-end shrink-0">
-            {/* Segmented Toggle Button: Progress vs Achievements */}
-            <div className="inline-flex items-center p-1 rounded-xl bg-[#F0ECE5] dark:bg-[#262422] border border-[#E8E2D9] dark:border-[#3B3834]">
+      <div className="main w-full max-w-[1240px] mx-auto px-4 lg:px-10 pt-4 md:pt-7 pb-28 flex flex-col gap-5 md:gap-6">
+        {/* .pg-head: title + view switch + period dropdown on one line */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-3">
+          <h1 className="serif m-0 text-[26px] md:text-[34px] leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">
+            Your journey
+          </h1>
+          <div className="flex items-center justify-between md:justify-end gap-2">
+            <div className="seg flex-1 md:flex-none min-w-0" role="tablist" aria-label="View">
               <button
                 type="button"
+                role="tab"
+                aria-selected={progressSubView === 'overview'}
                 onClick={() => setProgressSubView('overview')}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-                  progressSubView === 'overview'
-                    ? 'bg-[#FFFDF9] dark:bg-[#1E1D1B] text-[#B7332C] dark:text-[#F0A59B] shadow-xs'
-                    : 'text-[#615C55] dark:text-[#C7C0B6] hover:text-[#282522]'
-                }`}
+                className={`flex-1 md:flex-none inline-flex items-center justify-center gap-1 md:gap-1.5 !px-2 md:!px-4 !text-xs md:!text-[13px] ${progressSubView === 'overview' ? 'on' : ''}`}
               >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Progress</span>
+                <BarChart3 className="w-4 h-4 hidden sm:block" />
+                Progress
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={progressSubView === 'achievements'}
                 onClick={() => setProgressSubView('achievements')}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
-                  progressSubView === 'achievements'
-                    ? 'bg-[#B7332C] text-white shadow-xs'
-                    : 'text-[#615C55] dark:text-[#C7C0B6] hover:text-[#282522]'
-                }`}
+                className={`flex-1 md:flex-none inline-flex items-center justify-center gap-1 md:gap-1.5 !px-2 md:!px-4 !text-xs md:!text-[13px] ${progressSubView === 'achievements' ? 'on' : ''}`}
               >
-                <Trophy className="w-3.5 h-3.5" />
-                <span>
-                  Achievements ({earnedEditorialCount}/{editorialBadges.length})
+                <Trophy className="w-4 h-4 hidden sm:block" />
+                Achievements
+                <span className="text-[10px] font-bold rounded-full px-1.5 bg-[#F8E7E3] text-[#9E2A2B] dark:bg-red-950/40 dark:text-[#FCA5A5]">
+                  {earnedEditorialCount}/{editorialBadges.length}
                 </span>
               </button>
             </div>
-
             <EditorialSelectDropdown
               ariaLabel="Select progress period"
               value={progressPeriod}
@@ -2147,64 +2136,83 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Hero Welcome Banner (Matching HTML .progress-welcome) */}
-        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#29231F] via-[#45352E] to-[#6F483B] text-white p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          {/* Decorative Concentric Background Rings */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-[10%] -top-32 w-68 h-68 rounded-full border border-white/10 shadow-[0_0_0_24px_rgba(255,255,255,0.03),0_0_0_50px_rgba(255,255,255,0.02)]"
-          />
-
-          <div className="relative z-10 max-w-xl space-y-2.5">
-            <div className="flex items-center gap-2 text-[#E7B979] text-[10px] font-bold tracking-[0.14em] uppercase">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>LOOK AT YOU GO</span>
+        {/* .banner.pg-banner: emblem left (orbiting rings + sparkles), copy, highlights, chips */}
+        <section className="banner pg-banner" aria-labelledby="pg-banner-title">
+          <div className="rings" aria-hidden="true" />
+          <div className="pg-glow" aria-hidden="true" />
+          <div className="emblem pg-emb" aria-label={`${streakDays} day streak`}>
+            <div className="o1 pg-orbit" aria-hidden="true" />
+            <div className="o2 pg-orbit2" aria-hidden="true" />
+            <div className="core">
+              <Flame className="w-5 h-5" />
+              <b className="serif text-[26px] leading-none mt-0.5">{streakDays}</b>
+              <small className="text-[8px] font-extrabold tracking-[0.12em] mt-[3px]">DAY STREAK</small>
             </div>
-            <h2 className="font-serif text-2xl sm:text-[30px] leading-[1.2] font-bold tracking-tight">
+            <span className="pg-spark top-2 right-3.5" aria-hidden="true">
+              <Sparkles className="w-4 h-4" />
+            </span>
+            <span className="pg-spark pg-spark2 bottom-2.5 left-2.5" aria-hidden="true">
+              <Sparkles className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <div className="pg-btext">
+            <div className="flex items-center gap-2 text-[#E7B979] text-[11px] font-bold tracking-[0.14em]">
+              <Sparkles className="w-3.5 h-3.5" />
+              LOOK AT YOU GO
+            </div>
+            <h2 id="pg-banner-title" className="serif pg-h">
               {streakDays} {streakDays === 1 ? 'day' : 'days'} of showing up.
               <br />
-              <em className="font-normal text-[#E8BD86] italic">
-                That’s something to be proud of.
-              </em>
+              <em>That’s something to be proud of.</em>
             </h2>
-            <p className="text-xs sm:text-sm text-[#E0D1C7] max-w-md leading-relaxed">
-              You’ve spent {studyTimeFormatted} learning{' '}
-              {progressPeriod === 'week'
-                ? 'this week'
-                : progressPeriod === 'month'
-                ? 'this month'
-                : 'so far'}
-              . Your steady practice is turning new words into natural confidence.
+            <p className="pg-sub">
+              You’ve spent <strong className="text-white">{studyTimeFormatted}</strong> learning{' '}
+              {progressPeriod === 'week' ? 'this week' : progressPeriod === 'month' ? 'this month' : 'so far'}. Your
+              steady practice is turning new words into natural confidence.
             </p>
-            <div className="flex flex-wrap gap-2 pt-1.5">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 text-[#F4E4D5] text-[11px]">
+            <div className="pg-mini" aria-label="Highlights">
+              <div>
+                <span className="pg-mi">
+                  <Clock className="w-3.5 h-3.5" />
+                </span>
+                <span>
+                  <b>{studyTimeFormatted}</b>
+                  <small>Study time</small>
+                </span>
+              </div>
+              <div>
+                <span className="pg-mi">
+                  <BookOpen className="w-3.5 h-3.5" />
+                </span>
+                <span>
+                  <b>{practicedWordsTotal}</b>
+                  <small>Words practised</small>
+                </span>
+              </div>
+              <div>
+                <span className="pg-mi">
+                  <Target className="w-3.5 h-3.5" />
+                </span>
+                <span>
+                  <b>{totalGoalMetDays}</b>
+                  <small>Goal days</small>
+                </span>
+              </div>
+            </div>
+            <div className="pg-chips">
+              <span className="bchip">
                 <Flame className="w-3.5 h-3.5 text-[#EFBF7A]" />
-                <span>Best streak · {bestStreak} days</span>
+                Best · {bestStreak} days
               </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 text-[#F4E4D5] text-[11px]">
+              <span className="bchip">
                 <Calendar className="w-3.5 h-3.5 text-[#EFBF7A]" />
-                <span>{activeDaysThisWeek} of 7 days this week</span>
+                {activeDaysThisWeek} of 7 this week
               </span>
+              <button type="button" className="bchip" onClick={() => setProgressSubView('achievements')}>
+                <Trophy className="w-3.5 h-3.5 text-[#EFBF7A]" />
+                {earnedEditorialCount} badges
+              </button>
             </div>
-          </div>
-
-          {/* Right Orbital Streak Emblem */}
-          <div className="relative w-36 h-36 sm:w-40 sm:h-40 shrink-0 flex items-center justify-center self-center sm:mr-4">
-            <div className="absolute w-34 h-26 rounded-full border border-[#F0CF9D]/35 -rotate-25" />
-            <div className="absolute w-26 h-34 rounded-full border border-[#F0CF9D]/20 rotate-35" />
-            <div className="relative w-22 h-22 rounded-full bg-radial from-[#F6D79F] to-[#C18447] shadow-[0_0_0_6px_rgba(215,166,107,0.16),0_9px_25px_rgba(16,10,8,0.45)] text-[#512F20] flex flex-col items-center justify-center">
-              <Flame className="w-5 h-5" />
-              <b className="font-serif text-2xl leading-none mt-0.5">{streakDays}</b>
-              <small className="text-[7px] font-bold tracking-[0.12em] mt-1">
-                DAY STREAK
-              </small>
-            </div>
-            <span className="absolute top-3 right-4 text-[#F1CB91] text-base select-none">
-              ✦
-            </span>
-            <span className="absolute bottom-2.5 left-3 text-[#F1CB91] text-lg select-none">
-              ✧
-            </span>
           </div>
         </section>
 
@@ -2427,7 +2435,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         {/* 4 KPI Summary Cards Row (Matching HTML .progress-kpis) */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* KPI 1: Study time */}
-          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+          <div className=" card p-4 flex flex-col justify-between">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-lg bg-[#F7E9E5] dark:bg-red-950/50 text-[#A94D43] dark:text-red-300 flex items-center justify-center shrink-0">
                 <Clock className="w-4 h-4" />
@@ -2443,7 +2451,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* KPI 2: Lessons finished */}
-          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+          <div className=" card p-4 flex flex-col justify-between">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-lg bg-[#E8F1EB] dark:bg-emerald-950/50 text-[#4D7A5B] dark:text-emerald-300 flex items-center justify-center shrink-0">
                 <BookOpen className="w-4 h-4" />
@@ -2465,7 +2473,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* KPI 3: Words practised */}
-          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+          <div className=" card p-4 flex flex-col justify-between">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-lg bg-[#F6EEDF] dark:bg-amber-950/50 text-[#A57735] dark:text-amber-300 flex items-center justify-center shrink-0">
                 <Globe className="w-4 h-4" />
@@ -2483,7 +2491,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* KPI 4: Daily goal met */}
-          <div className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-4 flex flex-col justify-between">
+          <div className=" card p-4 flex flex-col justify-between">
             <div className="flex items-center gap-2.5">
               <span className="w-8 h-8 rounded-lg bg-[#EAF0F4] dark:bg-sky-950/50 text-[#587992] dark:text-sky-300 flex items-center justify-center shrink-0">
                 <Target className="w-4 h-4" />
@@ -2510,7 +2518,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             {/* 2x2 Analytics Grid matching HTML .analytics-grid */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* Panel 1 (7 cols): Your learning rhythm (Study minutes each day) */}
-              <div className="lg:col-span-7 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+              <div className="lg:col-span-7 card p-5 sm:p-6 flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
@@ -2609,7 +2617,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               </div>
 
               {/* Panel 2 (5 cols): Weekly goal conic ring + 7 day circles */}
-              <div className="lg:col-span-5 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+              <div className="lg:col-span-5 card p-5 sm:p-6 flex flex-col justify-between">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
                     A HABIT THAT STICKS
@@ -2685,7 +2693,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               </div>
 
               {/* Panel 3 (6 cols): Learning balance (4 Skills) */}
-              <div className="lg:col-span-6 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+              <div className="lg:col-span-6 card p-5 sm:p-6 flex flex-col justify-between">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
@@ -2766,7 +2774,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
               </div>
 
               {/* Panel 4 (6 cols): Your CEFR journey */}
-              <div className="lg:col-span-6 rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 flex flex-col justify-between">
+              <div className="lg:col-span-6 card p-5 sm:p-6 flex flex-col justify-between">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
@@ -2938,7 +2946,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </section>
 
             {/* GitHub-Style Contribution Heatmap Card */}
-            <section className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6 space-y-4">
+            <section className=" card p-5 sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
@@ -3056,7 +3064,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
             </section>
 
             {/* Recent Activity Timeline (Matching HTML .recent-activity) */}
-            <section className="rounded-2xl bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] p-5 sm:p-6">
+            <section className=" card p-5 sm:p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#B7332C] dark:text-[#F87171]">
@@ -3523,10 +3531,12 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       />
 
       {/* Minimal Clean Title Only: Settings & preferences */}
-      <div>
-        <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
-          Settings &amp; preferences
-        </h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="serif m-0 text-[28px] md:text-[34px] leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">Settings</h1>
+        <span className="tag t-sage !text-xs !px-3 !py-1.5">
+          <Cloud className="w-3.5 h-3.5" />
+          {firebaseUser ? 'Synced to your Google account' : 'Saved on this device'}
+        </span>
       </div>
 
       {/* Backup / Restore Toast Notification if present */}
@@ -3552,7 +3562,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       {/* 2x2 Editorial Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CARD 1: User Info Card (Username, Email, Signout/Signin, Sync) + Learning Preferences */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+        <section className="card p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
           {/* Users Info Card Block */}
           <div className="pb-5 border-b border-[#EFEAE0] dark:border-[#2E2924] space-y-4">
             <div className="flex items-start justify-between gap-3">
@@ -3671,7 +3681,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 1: Learning level */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-crim shrink-0" aria-hidden="true"><Compass className="w-[18px] h-[18px]" /></span>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Learning level
@@ -3708,7 +3719,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 2: Daily study goal */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-sage shrink-0" aria-hidden="true"><Target className="w-[18px] h-[18px]" /></span>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Daily study goal
@@ -3736,7 +3748,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 3: Display language */}
-          <div className="pt-4 flex items-center justify-between gap-3">
+          <div className="pt-4 flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-ochre shrink-0" aria-hidden="true"><Globe className="w-[18px] h-[18px]" /></span>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Display language
@@ -3772,13 +3785,12 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </section>
 
         {/* CARD 2: Your study environment */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
-            YOUR STUDY ENVIRONMENT
-          </div>
+        <section className="card p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <h2 className="serif h2 mb-1.5 text-[#1C1917] dark:text-[#F5F2EB]">Your study environment</h2>
 
           {/* Row 1: Daily reminder */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-ochre shrink-0" aria-hidden="true"><Bell className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Daily reminder
@@ -3803,7 +3815,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 2: Dark appearance */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-ink shrink-0" aria-hidden="true"><Moon className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Dark appearance
@@ -3831,7 +3844,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 3: Haptic feedback */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-crim shrink-0" aria-hidden="true"><Smartphone className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -3875,7 +3889,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 4: Offline mode */}
-          <div className="pt-4 flex items-center justify-between gap-4">
+          <div className="pt-4 flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-sage shrink-0" aria-hidden="true"><Download className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Offline mode
@@ -3895,14 +3910,13 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </section>
 
         {/* CARD 3: Audio & pronunciation lab */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
-            AUDIO &amp; PRONUNCIATION LAB
-          </div>
+        <section className="card p-5 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <h2 className="serif h2 mb-1.5 text-[#1C1917] dark:text-[#F5F2EB]">Audio &amp; pronunciation lab</h2>
 
           {/* Row 1: Dialogue playback speed (Interactive Slider) */}
           <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] space-y-2.5">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+              <span className="ico sm i-sage shrink-0" aria-hidden="true"><Headphones className="w-[18px] h-[18px]" /></span>
               <div>
                 <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                   Dialogue playback speed
@@ -3973,7 +3987,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 2: Word playback speed (Default 1.0x first, then options) */}
-          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-crim shrink-0" aria-hidden="true"><Volume2 className="w-[18px] h-[18px]" /></span>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Word playback speed
@@ -4021,7 +4036,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 3: Voice pitch */}
-          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-3">
+          <div className="py-3.5 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-ochre shrink-0" aria-hidden="true"><Waves className="w-[18px] h-[18px]" /></span>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Voice pitch
@@ -4064,7 +4080,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 4: Test your pronunciation */}
-          <div className="pt-3.5 flex items-center justify-between gap-3">
+          <div className="pt-3.5 flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-3">
+            <span className="ico sm i-ink shrink-0" aria-hidden="true"><Mic className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-xs sm:text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Test your pronunciation
@@ -4089,13 +4106,12 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </section>
 
         {/* CARD 4: Your data, in your hands */}
-        <section className="bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] rounded-2xl p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9E2A2B] dark:text-[#F87171] mb-3">
-            YOUR DATA, IN YOUR HANDS
-          </div>
+        <section className="card p-6 sm:p-7 shadow-[0_1px_2px_rgba(28,25,23,0.03)] flex flex-col justify-between">
+          <h2 className="serif h2 mb-1.5 text-[#1C1917] dark:text-[#F5F2EB]">Your data, in your hands</h2>
 
           {/* Row 1: Export a backup */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-sage shrink-0" aria-hidden="true"><Download className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Export a backup
@@ -4124,7 +4140,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 2: Restore a backup */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-ochre shrink-0" aria-hidden="true"><Upload className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Restore a backup
@@ -4143,7 +4160,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 3: Sync status */}
-          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between gap-4">
+          <div className="py-4 border-b border-[#EFEAE0] dark:border-[#2E2924] flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-ink shrink-0" aria-hidden="true"><Cloud className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                 Sync status
@@ -4162,7 +4180,8 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           </div>
 
           {/* Row 4: Reset all progress (Local & Cloud) */}
-          <div className="pt-4 flex items-center justify-between gap-4">
+          <div className="pt-4 flex items-center justify-between [&>div:first-of-type]:flex-1 [&>div:first-of-type]:min-w-0 gap-4">
+            <span className="ico sm i-crim shrink-0" aria-hidden="true"><Trash2 className="w-[18px] h-[18px]" /></span>
             <div>
               <div className="text-sm font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                 Reset progress
@@ -4302,7 +4321,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
           {/* ===================================================================== */}
           {/* 1. DEDICATED AUDIO SPEED TEST & LONG-FORM DIALOGUE CALIBRATION CARD   */}
           {/* ===================================================================== */}
-          <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
+          <section className="card p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
@@ -4615,7 +4634,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       {/* ===================================================================== */}
       {/* 2. INTERACTIVE SOUND & VOICE PRACTICE LAB (SPEECH FEEDBACK STUDIO)    */}
       {/* ===================================================================== */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-6">
+      <section className="card p-6 space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
@@ -4928,7 +4947,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       {/* ===================================================================== */}
       {/* 3. PHONEME EAR-TRAINING & MINIMAL-PAIR CONTRAST LAB                   */}
       {/* ===================================================================== */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+      <section className="card p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
@@ -5084,7 +5103,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       </section>
 
       {/* 4. Language & Nepali Assistance Mode Selector */}
-      <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6">
+      <div className="card p-6">
         <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
           <Globe className="w-4 h-4" />
           <span>Language & Nepali Display Preference</span>
@@ -5155,7 +5174,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       {/* 5. Voice Accent & Speed Studio + Study Goal & Theme */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Voice & Audio Speed Studio */}
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+        <div className="card p-6 space-y-5">
           <div>
             <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Word Vocabulary Voice Profile
@@ -5256,7 +5275,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </div>
 
         {/* Target Level, Daily Goal & Theme Posture */}
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5 flex flex-col justify-between">
+        <div className="card p-6 space-y-5 flex flex-col justify-between">
           <div className="space-y-5">
             <div>
               <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
@@ -5346,7 +5365,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
       {/* 3. Data Backup Export/Restore + Offline PWA Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Data Backup Export & Restore */}
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+        <div className="card p-6 space-y-4 flex flex-col justify-between">
           <div className="space-y-2">
             <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
               Local Data Portability
@@ -5442,7 +5461,7 @@ export const ProgressSettingsView: React.FC<ProgressSettingsViewProps> = ({
         </div>
 
         {/* PWA Installation & Offline Sync Card */}
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 flex flex-col justify-between space-y-5">
+        <div className="card p-6 flex flex-col justify-between space-y-5">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">

@@ -269,3 +269,25 @@ classes came from the Main and Arena stylesheets.
 **Not ported:** the artifact's "Inside a tool" demo is an illustration, not
 a feature. Its tool-switcher tabs (`.pr-tabs`) weren't added, because the
 app intentionally has no prev/next tool navigation. Tool logic is unchanged.
+
+## Session 5: Progress / Achievements / Settings
+
+**Artifacts read:**
+- `project/Progress.dc.html`: lines 620–end (all of `<main>` plus the page
+  script). Lines 1–619 are the shared stylesheet; the `.pg-*` CSS came from
+  Main.
+- `project/Settings.dc.html`: lines 620–763 (all markup plus the script).
+
+| Artifact | Before | Change (`ProgressSettingsView.tsx`, `index.css`) |
+|---|---|---|
+| `.pg-head`: "Your journey" + `.seg` Progress / Achievements + period dropdown, one line | Eyebrow, title, subtitle, custom toggle | Artifact head. Achievements tab shows the earned/total badge count. Compact on phones (fixes a 21px phone overflow). |
+| `.banner.pg-banner`: emblem left with orbiting `.o1/.o2` rings (18s / 26s), twinkling `.pg-spark`, `.pg-glow`, `.pg-mini` highlights, `.bchip` chips | Emblem right, static rings, 2 chips | Artifact banner. Highlights: study time, words practised, goal days (real data). Chips: best streak, days this week, and a badges chip that opens Achievements. On phones the emblem stays left at 96px with compact highlights, as in the artifact. **Not ported:** the XP bar (this view has no XP value). |
+| `.card` containers | Mixed hand-rolled containers | 23 containers moved onto `.card` |
+| Settings `.ls-head` "Settings" + `.tag.t-sage` sync state | "Settings & preferences" | Artifact head. Tag reads "Synced to your Google account" or "Saved on this device". |
+| Settings rows: `.ico.sm` tinted icon tile per row | Text-only rows | 15 rows get tiles (level, goal, language, reminder, dark, haptics, offline, dialogue speed, word speed, pitch, pronunciation test, export, restore, sync, reset) |
+| Settings card headings: serif `.h2` | Crimson uppercase eyebrows | Serif headings |
+| Achievements | (badge pop-up added in pass 1) | Badge grid, filters and the pop-up keep the existing 16 badges |
+
+**Not ported:** the Settings "Advanced audio & voice studio" `<details>`
+cards and the reset dialog (the app already has both, with more features).
+The controls are unchanged (dropdowns, switches, sliders).
