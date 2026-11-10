@@ -225,7 +225,7 @@
   color: #F5F2EB;
 }
 
-:focus-visible {
+:where(a, button, summary, [role='button'], [role='tab'], [tabindex]:not([tabindex='-1'])):focus-visible {
   outline: 2px solid #9E2A2B;
   outline-offset: 2px;
 }

@@ -125,6 +125,8 @@ export default function App() {
   // Lessons Curriculum Filter ('ALL' | 'B1' | 'B2' | 'C1') & Topic Search
   const [levelFilter, setLevelFilter] = useState<'ALL' | CEFRLevel>('ALL');
   const [lessonTopicSearch, setLessonTopicSearch] = useState('');
+  // Phones: the full lesson/track progress card is collapsed behind a toggle
+  const [isLessonProgressExpanded, setIsLessonProgressExpanded] = useState(false);
   const [expandedLessonPreviewId, setExpandedLessonPreviewId] = useState<string | null>(null);
 
   // Global Top Search Bar State
@@ -1402,6 +1404,35 @@ export default function App() {
     };
   };
 
+  // Lessons page: one topic matcher shared by the level groups, pill counts and empty state
+  const lessonMatchesTopic = (l: LectureUnit, rawQuery: string) => {
+    const q = rawQuery.trim().toLowerCase();
+    if (!q) return true;
+    const { displayTitle, displaySub } = getEditorialLessonPresentation(l);
+    return (
+      displayTitle.toLowerCase().includes(q) ||
+      displaySub.toLowerCase().includes(q) ||
+      l.title.toLowerCase().includes(q) ||
+      l.subtitle.toLowerCase().includes(q) ||
+      l.category.toLowerCase().includes(q) ||
+      l.moduleC_spelling.ruleTitle.toLowerCase().includes(q) ||
+      l.moduleD_grammar.topicTitle.toLowerCase().includes(q) ||
+      l.moduleA_vocabulary.some(
+        (v) =>
+          v.word.toLowerCase().includes(q) || v.nepaliMeaning.toLowerCase().includes(q)
+      )
+    );
+  };
+  const lessonMatchCounts = (() => {
+    const matching = CORE_SYLLABUS.filter((l) => lessonMatchesTopic(l, lessonTopicSearch));
+    return {
+      ALL: matching.length,
+      B1: matching.filter((l) => l.level === 'B1').length,
+      B2: matching.filter((l) => l.level === 'B2').length,
+      C1: matching.filter((l) => l.level === 'C1').length,
+    } as Record<'ALL' | CEFRLevel, number>;
+  })();
+
   // Weak-Spot Mistake Radar computed from Mistake Notebook & SRS
   const mistakeRadarSummary = useMemo(() => {
     const mistakes = progress.mistakeNotebook || [];
@@ -2361,29 +2392,39 @@ export default function App() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
                   {/* Small Search Bar by Topic */}
-                  <div className="relative w-full sm:w-56 shrink-0">
+                  <div className="relative w-full sm:w-64 shrink-0">
                     <Search className="w-3.5 h-3.5 text-[#78716C] dark:text-[#A8A29E] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
-                      type="text"
+                      type="search"
+                      aria-label="Search lessons by topic"
                       value={lessonTopicSearch}
                       onChange={(e) => setLessonTopicSearch(e.target.value)}
-                      placeholder="Search lesson by topic..."
-                      className="w-full h-9 pl-8 pr-7 rounded-full bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] text-xs text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8C857B] focus:outline-none focus:border-[#A82020] transition-colors"
+                      placeholder="Search lessons — silent, modals, passive…"
+                      className={`w-full h-10 sm:h-9 pl-8 ${lessonTopicSearch ? 'pr-24' : 'pr-3'} rounded-full bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] text-base sm:text-xs text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8C857B] focus:outline-none focus:border-[#9E2A2B] focus:ring-4 focus:ring-[#F8E7E3] dark:focus:ring-[#9E2A2B]/25 transition-colors [&::-webkit-search-cancel-button]:hidden`}
                     />
                     {lessonTopicSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setLessonTopicSearch('')}
-                        aria-label="Clear topic search"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB]"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <span
+                          aria-live="polite"
+                          className="text-[10px] font-bold text-[#9E2A2B] dark:text-[#F87171] bg-[#F8E7E3] dark:bg-red-950/50 rounded-full px-2 py-0.5 whitespace-nowrap"
+                        >
+                          {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter])}{' '}
+                          {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 1 ? 'result' : 'results'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLessonTopicSearch('')}
+                          aria-label="Clear topic search"
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EEE6] dark:hover:bg-[#1F1C18]"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {/* Level Filter Pills */}
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
                     {(
                       [
                         { id: 'ALL', label: 'All levels' },
@@ -2398,13 +2439,23 @@ export default function App() {
                           key={pill.id}
                           type="button"
                           onClick={() => setLevelFilter(pill.id)}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          aria-pressed={isActive}
+                          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                             isActive
                               ? 'bg-[#F6E6E2] dark:bg-red-950/60 text-[#A82020] dark:text-red-300 font-semibold'
                               : 'bg-[#F2EFE9] dark:bg-[#1F1C18] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]'
                           }`}
                         >
                           {pill.label}
+                          <span
+                            className={`text-[10px] font-bold rounded-full px-1.5 ${
+                              isActive
+                                ? 'bg-white/70 dark:bg-black/30 text-[#9E2A2B] dark:text-red-300'
+                                : 'bg-[#E6E0D4]/70 dark:bg-[#2E2924] text-[#6E685F] dark:text-[#A8A29E]'
+                            }`}
+                          >
+                            {lessonMatchCounts[pill.id]}
+                          </span>
                         </button>
                       );
                     })}
@@ -2422,7 +2473,80 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Phones: compact progress strip + dark "continue" strip (full card one tap away) */}
+              {(() => {
+                const coreIds = new Set(CORE_SYLLABUS.map((l) => l.id));
+                const stepsDone = Object.entries(progress.completedStepsByLecture || {})
+                  .filter(([id]) => coreIds.has(id))
+                  .reduce((sum, [, arr]) => sum + (arr as number[]).length, 0);
+                const recSteps = progress.completedStepsByLecture?.[recommendedLecture.id] || [];
+                const nextStep = Math.min(4, recSteps.length) as ModuleStep;
+                return (
+                  <div className="sm:hidden space-y-2.5">
+                    <section
+                      aria-label="Course progress"
+                      className="flex items-center justify-between gap-2 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] px-3 py-2.5"
+                    >
+                      {[
+                        { v: courseStats.completedCount, of: courseStats.totalUnits, l: 'Lectures' },
+                        { v: stepsDone, of: CORE_SYLLABUS.length * 5, l: 'Steps' },
+                        { v: wordsLearnedDisplayCount, of: null, l: 'Words learned' },
+                      ].map((st, i) => (
+                        <React.Fragment key={st.l}>
+                          {i > 0 && <span aria-hidden="true" className="w-px h-7 bg-[#EAE4D8] dark:bg-[#2E2924]" />}
+                          <div className="min-w-0 text-center flex-1">
+                            <span className="block font-serif text-lg font-bold leading-tight text-[#1C1917] dark:text-[#F5F2EB]">
+                              {st.v}
+                              {st.of !== null && (
+                                <small className="text-xs font-semibold text-[#6E685F] dark:text-[#A8A29E]">/{st.of}</small>
+                              )}
+                            </span>
+                            <span className="block text-[10px] font-semibold text-[#6E685F] dark:text-[#A8A29E] whitespace-nowrap">
+                              {st.l}
+                            </span>
+                          </div>
+                        </React.Fragment>
+                      ))}
+                    </section>
+                    <button
+                      type="button"
+                      onClick={() => openLecture(recommendedLecture.id, nextStep)}
+                      className="w-full flex items-center gap-3 p-2.5 pr-3 rounded-2xl bg-[#1C1917] dark:bg-[#F5F2EB] text-[#F5F2EB] dark:text-[#1C1917] text-left shadow-[0_14px_28px_-18px_rgba(28,25,23,0.6)] active:scale-[0.99] transition-transform"
+                    >
+                      <span className="w-10 h-10 shrink-0 rounded-xl bg-[#9E2A2B] text-white font-serif font-bold flex items-center justify-center">
+                        {String(recommendedLecture.lectureNumber).padStart(2, '0')}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[10px] font-extrabold tracking-[0.1em] text-[#E9C77B] dark:text-[#9E2A2B]">
+                          {recSteps.length > 0 ? 'CONTINUE' : 'START'} · STEP {nextStep + 1} OF 5
+                        </span>
+                        <span className="block text-sm font-bold truncate">
+                          {getEditorialLessonPresentation(recommendedLecture).displayTitle}
+                        </span>
+                      </span>
+                      <span className="w-9 h-9 shrink-0 rounded-full bg-[#E9C77B] text-[#1C1917] flex items-center justify-center">
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-expanded={isLessonProgressExpanded}
+                      onClick={() => setIsLessonProgressExpanded((prev) => !prev)}
+                      className="w-full min-h-[40px] rounded-xl border border-dashed border-[#DFD7C8] dark:border-[#3A332D] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] inline-flex items-center justify-center gap-1.5"
+                    >
+                      {isLessonProgressExpanded ? 'Hide track details' : 'Show track & quiz details'}
+                      {isLessonProgressExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
+
               {/* Lesson & Track Progress Card (Step Completion + Track Quiz Accuracy) */}
+              <div className={isLessonProgressExpanded ? 'block' : 'hidden sm:block'}>
               <LessonProgressCard
                 lectures={CORE_SYLLABUS}
                 progress={progress}
@@ -2431,6 +2555,7 @@ export default function App() {
                 onSelectLevelFilter={(lvl) => setLevelFilter(lvl)}
                 onOpenLecture={(lectureId, step = 0) => openLecture(lectureId, step)}
               />
+              </div>
 
               {/* Level Group Containers (B1, B2, C1) */}
               <div className="space-y-6">
@@ -2458,26 +2583,9 @@ export default function App() {
                 )
                   .filter((grp) => levelFilter === 'ALL' || levelFilter === grp.level)
                   .map((grp) => {
-                    const topicQuery = lessonTopicSearch.trim().toLowerCase();
-                    const groupLessons = CORE_SYLLABUS.filter((l) => {
-                      if (l.level !== grp.level) return false;
-                      if (!topicQuery) return true;
-                      const { displayTitle, displaySub } = getEditorialLessonPresentation(l);
-                      const matchesText =
-                        displayTitle.toLowerCase().includes(topicQuery) ||
-                        displaySub.toLowerCase().includes(topicQuery) ||
-                        l.title.toLowerCase().includes(topicQuery) ||
-                        l.subtitle.toLowerCase().includes(topicQuery) ||
-                        l.category.toLowerCase().includes(topicQuery) ||
-                        l.moduleC_spelling.ruleTitle.toLowerCase().includes(topicQuery) ||
-                        l.moduleD_grammar.topicTitle.toLowerCase().includes(topicQuery) ||
-                        l.moduleA_vocabulary.some(
-                          (v) =>
-                            v.word.toLowerCase().includes(topicQuery) ||
-                            v.nepaliMeaning.toLowerCase().includes(topicQuery)
-                        );
-                      return matchesText;
-                    });
+                    const groupLessons = CORE_SYLLABUS.filter(
+                      (l) => l.level === grp.level && lessonMatchesTopic(l, lessonTopicSearch)
+                    );
 
                     if (groupLessons.length === 0) return null;
 
@@ -2831,25 +2939,7 @@ export default function App() {
 
                 {/* Empty search state if no lessons match */}
                 {lessonTopicSearch.trim() &&
-                  CORE_SYLLABUS.filter((l) => {
-                    if (levelFilter !== 'ALL' && l.level !== levelFilter) return false;
-                    const q = lessonTopicSearch.trim().toLowerCase();
-                    const { displayTitle, displaySub } = getEditorialLessonPresentation(l);
-                    return (
-                      displayTitle.toLowerCase().includes(q) ||
-                      displaySub.toLowerCase().includes(q) ||
-                      l.title.toLowerCase().includes(q) ||
-                      l.subtitle.toLowerCase().includes(q) ||
-                      l.category.toLowerCase().includes(q) ||
-                      l.moduleC_spelling.ruleTitle.toLowerCase().includes(q) ||
-                      l.moduleD_grammar.topicTitle.toLowerCase().includes(q) ||
-                      l.moduleA_vocabulary.some(
-                        (v) =>
-                          v.word.toLowerCase().includes(q) ||
-                          v.nepaliMeaning.toLowerCase().includes(q)
-                      )
-                    );
-                  }).length === 0 && (
+                  (levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 0 && (
                     <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-6 text-center space-y-2">
                       <p className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB]">
                         No lessons found for “{lessonTopicSearch}”
@@ -2877,8 +2967,19 @@ export default function App() {
                 </div>
 
                 {progress.customLectures.length === 0 ? (
-                  <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 text-sm text-[#78716C] dark:text-[#A8A29E]">
-                    AI-created lessons appear here and are saved for offline study.
+                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+                    <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 text-sm text-[#78716C] dark:text-[#A8A29E] flex items-center">
+                      AI-created lessons appear here and are saved for offline study.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAIModalOpen(true)}
+                      className="min-h-[7rem] rounded-2xl border-2 border-dashed border-[#DFD7C8] dark:border-[#3A332D] bg-transparent flex flex-col items-center justify-center gap-1.5 text-[#9E2A2B] dark:text-[#F87171] font-bold hover:border-[#9E2A2B] hover:bg-white/60 dark:hover:bg-[#1A1714] transition-colors"
+                    >
+                      <Sparkles className="w-5 h-5" />
+                      <span>Create AI lesson</span>
+                      <span className="text-xs font-medium text-[#6E685F] dark:text-[#A8A29E]">Any topic, your level</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
