@@ -2651,6 +2651,59 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   // LANDING VIEW: PRACTICE ARENA GRID (WHEN NO INDIVIDUAL PRACTICE IS OPEN)
   // =========================================================================
   if (activeTool === null) {
+    // Shared activity card (core + specialized labs). Phones: compact row with a
+    // one-line description and chevron. sm+: the original editorial card.
+    const arenaListContainerClass =
+      'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-0 sm:gap-3 rounded-[18px] sm:rounded-none overflow-hidden sm:overflow-visible bg-[#FFFDF9] dark:bg-[#292725] sm:bg-transparent sm:dark:bg-transparent border border-[#E8E2D9] dark:border-[#3B3834] sm:border-0 divide-y divide-[#EFE9DD] dark:divide-[#3B3834] sm:divide-y-0';
+    const renderArenaActivityCard = (act: (typeof filteredCoreActivities)[number], idx: number) => {
+      const colorType = idx % 3;
+      const iconTone =
+        colorType === 0
+          ? 'bg-[#EAF0F4] text-[#55738A] dark:bg-sky-950/50 dark:text-sky-300'
+          : colorType === 1
+          ? 'bg-[#F6EEDF] text-[#A27635] dark:bg-amber-950/50 dark:text-amber-300'
+          : 'bg-[#E8F1EB] text-[#3C705D] dark:bg-emerald-950/50 dark:text-emerald-300';
+
+      return (
+        <article
+          key={act.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`${act.title}: ${act.description}`}
+          onClick={() => handleSelectArenaTool(act.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSelectArenaTool(act.id);
+            }
+          }}
+          className="relative flex flex-row items-center gap-3 px-3.5 py-3 min-h-[64px] cursor-pointer transition-all duration-150 active:bg-[#F6F2EA] dark:active:bg-[#1E1D1B] sm:flex-col sm:items-stretch sm:justify-start sm:gap-0 sm:bg-[#FFFDF9] sm:dark:bg-[#292725] sm:border sm:border-[#E8E2D9] sm:dark:border-[#3B3834] sm:rounded-[13px] sm:p-[15px] sm:min-h-[140px] sm:hover:-translate-y-0.5 sm:hover:border-[#CDBEB0] sm:dark:hover:border-[#57524C] sm:hover:shadow-[0_14px_30px_-18px_rgba(60,40,20,0.35)] sm:shadow-[0_1px_1px_rgba(44,33,21,0.03)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9E2A2B]/40"
+        >
+          <span
+            className={`w-10 h-10 sm:w-[34px] sm:h-[34px] rounded-xl sm:rounded-[10px] flex items-center justify-center shrink-0 ${iconTone}`}
+          >
+            {act.icon}
+          </span>
+          <span
+            className="hidden sm:block absolute top-[15px] right-[15px] text-xs text-[#A49C92] dark:text-[#8C857E]"
+            aria-hidden="true"
+          >
+            ↗
+          </span>
+
+          <div className="flex-1 min-w-0 sm:mt-auto sm:pt-3 sm:flex-none">
+            <h3 className="text-sm sm:text-[13px] font-semibold text-[#282522] dark:text-[#F1ECE4] leading-snug">
+              {act.title}
+            </h3>
+            <p className="text-xs sm:text-[11px] text-[#79736D] dark:text-[#A69F96] mt-0.5 sm:mt-1 leading-[1.45] max-w-[270px] line-clamp-1 sm:line-clamp-none">
+              {act.description}
+            </p>
+          </div>
+          <ChevronRight className="sm:hidden w-4 h-4 shrink-0 text-[#9E8F7E]" aria-hidden="true" />
+        </article>
+      );
+    };
+
     return (
       <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24">
         <section id="page-practice">
@@ -2701,122 +2754,30 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
             </span>
           </div>
 
-          {/* 12 Core Practice Arena Cards Grid (Matching practice-arena.html) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 mt-4">
-            {filteredCoreActivities.map((act, idx) => {
-              const colorType = idx % 3;
-              const iconTone =
-                colorType === 0
-                  ? 'bg-[#EAF0F4] text-[#55738A] dark:bg-sky-950/50 dark:text-sky-300'
-                  : colorType === 1
-                  ? 'bg-[#F6EEDF] text-[#A27635] dark:bg-amber-950/50 dark:text-amber-300'
-                  : 'bg-[#E8F1EB] text-[#3C705D] dark:bg-emerald-950/50 dark:text-emerald-300';
-
-              return (
-                <article
-                  key={act.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSelectArenaTool(act.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleSelectArenaTool(act.id);
-                    }
-                  }}
-                  className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-[13px] p-3 sm:p-[15px] min-h-[136px] sm:min-h-[140px] flex flex-col justify-between cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:border-[#CDBEB0] dark:hover:border-[#57524C] shadow-[0_1px_1px_rgba(44,33,21,0.03)] focus:outline-none focus:ring-2 focus:ring-[#B7332C]/40"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`w-[34px] h-[34px] rounded-[10px] flex items-center justify-center shrink-0 ${iconTone}`}
-                    >
-                      {act.icon}
-                    </span>
-                    <span className="text-xs text-[#A49C92] dark:text-[#8C857E]" aria-hidden="true">
-                      ↗
-                    </span>
-                  </div>
-
-                  <div className="mt-3">
-                    <h3 className="text-xs sm:text-[13px] font-semibold text-[#282522] dark:text-[#F1ECE4] leading-snug">
-                      {act.title}
-                    </h3>
-                    <p className="text-[10px] sm:text-[11px] text-[#79736D] dark:text-[#A69F96] mt-1 leading-[1.45] max-w-[270px]">
-                      {act.description}
-                    </p>
-                  </div>
-                </article>
-              );
-            })}
+          {/* 12 Core Practice Arena Cards: card grid on tablet/desktop, scannable row list on phones */}
+          <div className={`mt-4 ${arenaListContainerClass}`}>
+            {filteredCoreActivities.map((act, idx) => renderArenaActivityCard(act, idx))}
           </div>
 
           {/* Optional Specialized Labs Drawer (Exam Simulator, Commuter Audio, Minimal Pairs, Writing Linter, IPA Guide, Dictation) */}
           <div className="mt-5 pt-4 border-t border-[#E8E2D9]/70 dark:border-[#3B3834]/70">
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setShowMoreStudios((prev) => !prev)}
-                className="text-[11px] sm:text-xs font-medium text-[#79736D] dark:text-[#A69F96] hover:text-[#282522] dark:hover:text-[#F1ECE4] inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>
-                  {showMoreStudios
-                    ? 'Hide specialized exam & pronunciation labs'
-                    : `Explore ${filteredExtraStudios.length} more specialized labs (IELTS/PTE exam, commuter audio, minimal pairs, writing linter)`}
-                </span>
-                <span aria-hidden="true">{showMoreStudios ? '↑' : '→'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-expanded={showMoreStudios}
+              onClick={() => setShowMoreStudios((prev) => !prev)}
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-xl border border-dashed border-[#D9D1C6] dark:border-[#3B3834] text-xs font-semibold text-[#57534E] dark:text-[#A69F96] hover:border-[#9E2A2B] hover:text-[#9E2A2B] dark:hover:text-[#F0A59B] inline-flex items-center justify-center gap-2 transition-colors cursor-pointer text-left"
+            >
+              <span>
+                {showMoreStudios
+                  ? 'Hide specialized exam & pronunciation labs'
+                  : `Explore ${filteredExtraStudios.length} more specialized labs (IELTS/PTE exam, commuter audio, minimal pairs, writing linter)`}
+              </span>
+              <span aria-hidden="true">{showMoreStudios ? '↑' : '→'}</span>
+            </button>
 
             {showMoreStudios && (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 mt-3">
-                {filteredExtraStudios.map((act, idx) => {
-                  const colorType = idx % 3;
-                  const iconTone =
-                    colorType === 0
-                      ? 'bg-[#EAF0F4] text-[#55738A] dark:bg-sky-950/50 dark:text-sky-300'
-                      : colorType === 1
-                      ? 'bg-[#F6EEDF] text-[#A27635] dark:bg-amber-950/50 dark:text-amber-300'
-                      : 'bg-[#E8F1EB] text-[#3C705D] dark:bg-emerald-950/50 dark:text-emerald-300';
-
-                  return (
-                    <article
-                      key={act.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleSelectArenaTool(act.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSelectArenaTool(act.id);
-                        }
-                      }}
-                      className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-[13px] p-3 sm:p-[15px] min-h-[136px] sm:min-h-[140px] flex flex-col justify-between cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:border-[#CDBEB0] dark:hover:border-[#57524C] shadow-[0_1px_1px_rgba(44,33,21,0.03)] focus:outline-none focus:ring-2 focus:ring-[#B7332C]/40"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`w-[34px] h-[34px] rounded-[10px] flex items-center justify-center shrink-0 ${iconTone}`}
-                        >
-                          {act.icon}
-                        </span>
-                        <span
-                          className="text-xs text-[#A49C92] dark:text-[#8C857E]"
-                          aria-hidden="true"
-                        >
-                          ↗
-                        </span>
-                      </div>
-
-                      <div className="mt-3">
-                        <h3 className="text-xs sm:text-[13px] font-semibold text-[#282522] dark:text-[#F1ECE4] leading-snug">
-                          {act.title}
-                        </h3>
-                        <p className="text-[10px] sm:text-[11px] text-[#79736D] dark:text-[#A69F96] mt-1 leading-[1.45] max-w-[270px]">
-                          {act.description}
-                        </p>
-                      </div>
-                    </article>
-                  );
-                })}
+              <div className={`mt-3 animate-fade-up ${arenaListContainerClass}`}>
+                {filteredExtraStudios.map((act, idx) => renderArenaActivityCard(act, idx))}
               </div>
             )}
           </div>
@@ -2835,24 +2796,25 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
   return (
     <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-4">
       {/* Clean Top Bar: ONLY Back to Practice Arena + Practice Title (No Prev / Next) */}
-      <div className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-4 sm:p-5 print:hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+      <div className="bg-[#FFFDF9] dark:bg-[#292725] border border-[#E8E2D9] dark:border-[#3B3834] rounded-2xl p-3 sm:p-5 print:hidden">
+        <div className="flex flex-row items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
               type="button"
+              aria-label="Back to Practice arena"
               onClick={() => handleSelectArenaTool(null)}
-              className="px-3.5 py-2 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="w-10 h-10 justify-center sm:w-auto sm:h-auto sm:justify-start sm:px-3.5 sm:py-2 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-xs font-semibold text-[#282522] dark:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
             >
-              <ArrowLeft className="w-3.5 h-3.5 text-[#B7332C] dark:text-[#F0A59B]" />
-              <span>Back to Practice arena</span>
+              <ArrowLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#B7332C] dark:text-[#F0A59B]" />
+              <span className="hidden sm:inline">Back to Practice arena</span>
             </button>
 
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B] flex items-center justify-center shrink-0">
+              <div className="hidden sm:flex w-9 h-9 rounded-xl bg-[#F8E9E5] dark:bg-[#492D29] text-[#B7332C] dark:text-[#F0A59B] items-center justify-center shrink-0">
                 {currentActivityMeta.icon}
               </div>
               <div className="min-w-0">
-                <h1 className="font-serif text-lg sm:text-xl font-medium text-[#282522] dark:text-[#F1ECE4] leading-snug truncate">
+                <h1 className="font-serif text-base sm:text-xl font-medium text-[#282522] dark:text-[#F1ECE4] leading-snug truncate">
                   {currentActivityMeta.title}
                 </h1>
                 <p className="text-[11px] text-[#79736D] dark:text-[#A69F96] truncate">
@@ -2865,10 +2827,12 @@ export const PracticeArenaView: React.FC<PracticeArenaViewProps> = ({
           <button
             type="button"
             onClick={handleReshuffleCurrentArenaTool}
-            className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-[11px] font-semibold text-[#6C665E] dark:text-[#BDB6AB] hover:text-[#282522] dark:hover:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            aria-label="Shuffle new practice set"
+            title="Shuffle new practice set"
+            className="w-10 h-10 justify-center sm:w-auto sm:h-auto sm:justify-start sm:px-3 sm:py-1.5 rounded-xl bg-[#F7F4EE] dark:bg-[#1E1D1B] border border-[#E8E2D9] dark:border-[#3B3834] hover:border-[#B7332C] text-[11px] font-semibold text-[#6C665E] dark:text-[#BDB6AB] hover:text-[#282522] dark:hover:text-[#F1ECE4] inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-[#B7332C]" />
-            <span>Shuffle new practice set</span>
+            <RotateCcw className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#B7332C]" />
+            <span className="hidden sm:inline">Shuffle new practice set</span>
           </button>
         </div>
       </div>
