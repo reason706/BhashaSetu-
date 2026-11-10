@@ -140,3 +140,59 @@ and feature is kept.
 - **About guide:** not added. `AboutView` already exists.
 - **Pop-ups:** no new pop-up types beyond the badge detail sheet. The existing
   modals were unified instead.
+
+---
+
+# Pass 2 — visual fidelity (the artifact is the source of truth for looks)
+
+## Session 1: shared design system + Home
+
+**Artifact read:** `project/Main.dc.html`, 100% of its 834 lines (CSS lines
+1–480 and Home markup lines 481–834, including inline styles).
+
+### Shared design system (`src/index.css`, `@layer components`)
+- Ported value-for-value from the artifact's `<style>` block:
+  - **Type and colour helpers:** `.serif`, `.np`, `.mono`, `.muted`, `.crim`,
+    `.sage`, `.ochre`, `.eyebrow`, `.h2`, `.h3`, `.sec`, `.sil`.
+  - **Cards and buttons:** `.card` (plus `.sand`, `.paper`, `.ink`), `.hov`,
+    `.btn`, `.btn-p`, `.btn-g`, `.btn-d`, `.btn-sm`, `.ibtn`.
+  - **Chips and controls:** `.chip`, `.pill`, `.pill.on`, `.seg`,
+    `.tag` (plus `.t-sage`, `.t-crim`, `.t-ochre`, `.t-ink`),
+    `.ico` (plus `.sm`, `.xs`, `.i-*`), `.track`, `.fill`, `.input`, `.kbd`.
+  - **Feature blocks:** `.hero` (plus `.art`, `.wm`, `.body`), `.step`,
+    `.step.sel`, `.steps5`, `.banner` (plus `.rings`, `.bchip`), `.emblem`
+    (plus `.o1`, `.o2`, `.core`), `.opt` (plus `.sel`, `.ok`, `.no`), `.kpi`.
+  - **Motion:** the `.main > *` page-load stagger.
+- Every class has a dark-mode variant.
+- **Breakpoints:** the artifact's ≤900px rules map to phones (below `md`).
+  The 8/4 split collapses below `xl`, because the artifact collapses it when
+  the content area (viewport minus the 240px sidebar) is under 1100px.
+- The existing `prefers-reduced-motion` rule also covers the new animations.
+
+### Home diff table (artifact → `src/App.tsx` → change)
+
+| Artifact section | Before | Change |
+|---|---|---|
+| `.ls-head` (eyebrow, serif 34px, crimson chip) | Bordered header with a subtitle and two small buttons | Eyebrow plus serif 28/34px greeting; crimson `.chip` "B1 · Foundation track". Syllabus kept as a `.chip`. Subtitle and divider dropped, as in the artifact. |
+| `.hero`: gradient 135° #EFEADE→#EAE1D2→#E2D6C3, 24px radius, 28/20px padding | 12-column split with a separate book medallion button and its own step grid | Real `.hero`: `.art` illustration underlay (340×320, faded and offset on phones), `.wm` Devanagari watermark, `.body` at most 62% wide, `btn-p` CTA and `btn-g` "Hear title", plus meta. |
+| `.steps5` / `.step(.sel)` with 4px progress bars and Done/Now/Next | Bordered tiles that opened the lecture at once | Artifact behaviour: tapping a tile selects it, the CTA becomes "Review / Resume / Start / Jump to step N" and the info line updates. Double-click opens the step directly. |
+| (no artifact equivalent) | B1/B2/C1 track buttons | Kept inside the hero as translucent `.chip` cards with `.track` bars. |
+| Quick tools `.card.hov` with `.ico` tiles (2 columns below xl) | Custom cards with decorative circles | `.card.hov` buttons with `.ico.i-sage/.i-crim/.i-ink/.i-ochre`. "All labs →" link added. Same four actions. |
+| Word of the day `.card` | Custom card | Eyebrow plus `.tag.t-sage` header, serif 36px word with `.sil` silent letters, mono IPA, Nepali line, `btn-p` Play, `.seg` 1.0×/0.5× (new, controls speed), `.ibtn` save word (new, uses `handleToggleSaveWord`). "Another word" moved to the header. |
+| Silent-letter spotlight `.card` | Custom card | Same pattern, paper tip box with info icon, dashed "recall then reveal" button (artifact recall pattern), `btn-g` Hear it / 0.5× / AI phonetic guide, Mastered, Next. |
+| Mistake radar `.card` plus `.card.paper.hov` tiles | Custom card | Eyebrow and serif "Your mistake radar", `btn-p btn-sm` Targeted fix, three `.card.paper.hov` tiles with `.ico.sm` and coloured counts. Focus area and key targets kept as a muted line. |
+| Sentence coach `.card` with `.ico` header, `.input`, `.pill` samples | Custom card | `.ico.i-crim` header, eyebrow plus serif title, `.input` and `btn-p` Check, `.pill` samples, result box with `.tag.t-sage` and serif 20px correction. Live roleplay, Listen, Reset and all AI fields kept. |
+| Today's goal (`#F2EBDC` header strip) | Sand header with a pill count | Artifact header "Today's goal · N min target" (links to Settings), 96px ochre ring (sage when met), serif "N min to go", streak, XP and `.tag.t-ochre` level. |
+| Your week (7 bars, 120px tall, crimson ring on the selected day, footer tag) | Capsule bars with goal threshold, legend and dots | Artifact bars: sage when the goal is met, `#D9D1C3` otherwise, double-ring selection, footer with day total and `.tag` (met / short / target). Details link kept in the header. |
+| Daily challenge `.card.ink` | Light paper row | Espresso `.card.ink`: gold `.ico`, cream full-width button on desktop, compact row on phones. |
+| Snapshot `.card.kpi` with `.ico.xs` | Plain stat buttons | `.card.kpi.hov` tiles. Real app data is kept (lectures, words learned, best streak, SRS due); the artifact's "quiz accuracy" number was not invented. |
+| `.main` stagger, 1240px max width, 28/40px padding | 82rem container with `space-y` | The `.main` container gets the artifact spacing and the page-load stagger. |
+
+**Intentionally unchanged on Home:** all data and handlers, phone card order
+(already matched the artifact), the sidebar and the bottom bar.
+
+**Still different from the artifact:**
+- The goal-ring SVG markup wasn't found in the artifact export, so the ring
+  sizes and colours follow its CSS tokens instead.
+- The Word of the day row has one extra button (Another word, an existing
+  feature).
