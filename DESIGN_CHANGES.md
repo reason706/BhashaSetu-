@@ -223,3 +223,25 @@ Vocabulary, Pronunciation, Spelling, Grammar, Dialogue.
 
 **Intentionally unchanged:** unlock rules, search matching (`lessonMatchesTopic`),
 level filter state, AI lesson modal, LessonProgressCard contents.
+
+## Session 3: Lecture player (all 5 steps)
+
+**Artifact read:** `project/LectureMobile.dc.html`, lines 560–1177: head,
+stepper, all 5 steps, desktop rail, bottom bar, sheets, completion, intro and
+mastery-quiz overlays. Lines 1–559 are the shared stylesheet.
+
+| Artifact | Before | Change (`LecturePlayer.tsx`) |
+|---|---|---|
+| `.lm-head`: round back `ibtn`, crimson eyebrow "LECTURE 01 · B1 FOUNDATION", serif title, Cheat sheet `btn-g`, 46px sage progress ring, phone kebab | "Back to all lectures" text row, progress bar, three desktop buttons, separate large title block | Artifact head. Title, Nepali title or subtitle, and Completed state merged in. Notes and mistakes buttons stay on lg screens. |
+| Phone SHEETS: bottom sheet with grab handle and `.ico.sm` rows | Small dropdown | Bottom sheet in the shared modal stack (blurred backdrop, tap outside or Escape). Opens notes, mistakes or cheat sheet. |
+| `.lm-steps` | (ported in pass 1) | Unchanged |
+| `.lm-body` + 330px sticky `.lm-rail` | Notes and mistakes only as drawers | On xl: sticky rail with lecture notes textarea (same auto-save), compact mistake-notes card (latest 3 with 2/2 drill progress, "Re-drill & add notes" opens the full panel), espresso cheat-sheet card (opens the existing printable sheet). Below xl the drawers work as before. |
+| `.lm-foot`: white bar, `btn-g` Previous, step dots + "Step N of 5", `btn-p` "Continue to step N" / "Finish lecture" | Cream bar with text and a thin progress bar | Artifact footer. Same handlers (step-complete toast, finish chime). |
+| Step 2 dark "SAY THIS WORD" card, `.syl` syllable buttons | Light word header | Espresso card: gold eyebrow, serif 40/48px word, mono IPA + syllable count, cream "Normal" / dark "Slow 0.6×" buttons. Syllables are 44px tiles with the stressed one in crimson. |
+| Step 5 dark dialogue player | Light header card | Espresso card, gold eyebrow, stacked header, gold active-speed and dark inactive buttons. Playback, shadowing and Nepali toggle unchanged. |
+| Step containers `.card` | 17 hand-rolled white containers | Now `.card` (20px radius, artifact border, shadow, dark variant) |
+
+**Not ported:** the artifact's per-word swipe carousel for steps 1 and 3,
+and its intro / completion overlays. The app's existing grid of word cards,
+dictation bee and completion flow stay. Porting those would replace working
+features rather than restyle them.

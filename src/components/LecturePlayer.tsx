@@ -34,6 +34,7 @@ import {
   BookOpen,
   PenLine,
   Shuffle,
+  ChevronRight,
 } from 'lucide-react';
 import {
   LectureUnit,
@@ -56,7 +57,12 @@ import { getMassiveLexicon } from '../data/massiveLexicon';
 import { CORE_SYLLABUS } from '../data/syllabus';
 import { WordPhoneticsPopover } from './ui/ResponsivePrimitives';
 import { toast } from 'sonner';
-import { scrollBehavior } from '../hooks/useModalBehavior';
+import {
+  scrollBehavior,
+  useModalBehavior,
+  backdropDismiss,
+  MODAL_BACKDROP_CLASS,
+} from '../hooks/useModalBehavior';
 
 interface LecturePlayerProps {
   lecture: LectureUnit;
@@ -192,6 +198,8 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
   // Responsive Top Bar 3-Dot Menu, Personal Scratchpad Drawer, Mistake Notes Drawer & Printable Cheat Sheet state
   const [showMobileOverflowMenu, setShowMobileOverflowMenu] = useState(false);
+  // Phone lecture menu is a bottom sheet in the shared modal stack (artifact pattern)
+  useModalBehavior(showMobileOverflowMenu, () => setShowMobileOverflowMenu(false));
   const [showScratchpadDrawer, setShowScratchpadDrawer] = useState(false);
   const [scratchpadDraft, setScratchpadDraft] = useState(lectureNote);
   const [scratchpadSavedAt, setScratchpadSavedAt] = useState<string | null>(null);
@@ -762,7 +770,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
   // Shared Renderer for the Interactive Mistake Notes Section
   const renderMistakeNotesSection = () => (
-    <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-5">
+    <div className="card p-5 sm:p-6 space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
@@ -1182,7 +1190,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
     return (
       <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6">
-        <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-10 text-center">
+        <div className="card p-6 sm:p-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-[#2D6A4F]/10 text-[#2D6A4F] dark:text-emerald-400 flex items-center justify-center mx-auto mb-5">
             <Award className="w-8 h-8" />
           </div>
@@ -1260,146 +1268,168 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
     <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24">
       {/* Top Action Bar: Back to All Lectures (Left) + Lecture Progress % Bar & Responsive Mistake Notes / Cheat Sheet (Right) */}
       <div className="mb-4 sm:mb-5">
-        <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-[#E7E0D6] dark:border-[#2E2924]">
-          <button
-            onClick={onBackToDashboard}
-            className="min-h-[40px] inline-flex items-center gap-2 text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] transition-colors shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to All Lectures</span>
-          </button>
-
-          {(() => {
-            const uniqueDoneSteps = new Set(completedSteps);
-            const lectureProgressPercent = isCompleted
-              ? 100
-              : Math.min(100, Math.round((uniqueDoneSteps.size / 5) * 100));
-
-            return (
-              <div className="flex items-center gap-3">
-                {/* Live Lecture Progress % Bar */}
-                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924]">
-                  <span className="text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hidden sm:inline">
-                    Lecture Progress:
-                  </span>
-                  <div className="w-16 sm:w-24 h-2 rounded-full bg-[#F2ECE1] dark:bg-[#141210] overflow-hidden">
-                    <div
-                      className="h-full bg-[#2D6A4F] rounded-full transition-all duration-300"
-                      style={{ width: `${Math.max(6, lectureProgressPercent)}%` }}
-                    />
-                  </div>
-                  <span className="font-ipa text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                    {lectureProgressPercent}%
-                  </span>
+        {/* .lm-head: back · eyebrow + serif title · tools · progress ring · phone menu */}
+        {(() => {
+          const uniqueDoneSteps = new Set(completedSteps);
+          const lectureProgressPercent = isCompleted
+            ? 100
+            : Math.min(100, Math.round((uniqueDoneSteps.size / 5) * 100));
+          const ringLen = 2 * Math.PI * 14;
+          const levelName =
+            lecture.level === 'C1' ? 'Advanced' : lecture.level === 'B2' ? 'Workplace' : 'Foundation';
+          return (
+            <header className="flex items-center gap-2.5 md:gap-3.5 mb-3 md:mb-4">
+              <button
+                type="button"
+                onClick={onBackToDashboard}
+                aria-label="Back to all lectures"
+                title="Back to all lectures"
+                className="ibtn !rounded-full"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#9E2A2B] dark:text-[#F87171] truncate">
+                  Lecture {String(lecture.lectureNumber).padStart(2, '0')} · {lecture.level} {levelName}
+                  {isCompleted && <span className="text-[#2D6A4F] dark:text-emerald-400"> · Completed</span>}
                 </div>
-
-                {/* Desktop (>= lg): Direct My Notes, Mistake Notes & Study Cheat Sheet Buttons */}
-                <div className="hidden lg:flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowScratchpadDrawer((prev) => !prev)}
-                    className={`min-h-[40px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
-                      showScratchpadDrawer || scratchpadDraft.trim()
-                        ? 'border-[#2D6A4F] bg-[#2D6A4F]/10 text-[#2D6A4F] dark:text-emerald-400'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB]'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5 text-[#2D6A4F]" />
-                    <span>My Notes {scratchpadDraft.trim() ? '✓' : ''}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowMistakeNotesDrawer((prev) => !prev)}
-                    className={`min-h-[40px] px-3.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
-                      showMistakeNotesDrawer
-                        ? 'border-[#9E2A2B] bg-[#9E2A2B]/10 text-[#9E2A2B] dark:text-[#F87171]'
-                        : 'border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB]'
-                    }`}
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#9E2A2B]" />
-                    <span>Mistake Notes ({lectureMistakes.length})</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowCheatSheet(true)}
-                    className="min-h-[40px] px-3.5 py-1.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] hover:border-[#9E2A2B] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <Printer className="w-3.5 h-3.5 text-[#9E2A2B]" />
-                    <span>Study Cheat Sheet</span>
-                  </button>
-                </div>
-
-                {/* Mobile & Tablet (< lg): 3-Dot Overflow Menu Button */}
-                <div className="relative lg:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowMobileOverflowMenu((prev) => !prev)}
-                    aria-label="More lecture options"
-                    className="min-h-[40px] min-w-[40px] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] flex items-center justify-center text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-
-                  {showMobileOverflowMenu && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] shadow-lg p-2 z-30 space-y-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowScratchpadDrawer((prev) => !prev);
-                          setShowMobileOverflowMenu(false);
-                        }}
-                        className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center justify-between"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-[#2D6A4F]" />
-                          <span>My Personal Notes</span>
-                        </span>
-                        {scratchpadDraft.trim() && (
-                          <span className="text-[#2D6A4F] font-ipa">Saved</span>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMistakeNotesDrawer((prev) => !prev);
-                          setShowMobileOverflowMenu(false);
-                        }}
-                        className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center justify-between"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-[#9E2A2B]" />
-                          <span>Mistake Notes</span>
-                        </span>
-                        <span className="font-ipa text-[#9E2A2B] dark:text-[#F87171]">
-                          ({lectureMistakes.length})
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCheatSheet(true);
-                          setShowMobileOverflowMenu(false);
-                        }}
-                        className="w-full min-h-[42px] px-3 py-2 rounded-xl text-left text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:bg-[#FAF7F2] dark:hover:bg-[#141210] flex items-center gap-2"
-                      >
-                        <Printer className="w-4 h-4 text-[#9E2A2B]" />
-                        <span>Study Cheat Sheet</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <h1 className="serif m-0 text-[17px] md:text-2xl leading-[1.2] text-[#1C1917] dark:text-[#F5F2EB] truncate">
+                  {lecture.title}
+                </h1>
+                <p
+                  className={`hidden md:block m-0 text-sm muted truncate ${isFullNepali ? 'np' : ''}`}
+                >
+                  {isFullNepali ? lecture.nepaliTitle : lecture.subtitle}
+                </p>
               </div>
-            );
-          })()}
-        </div>
+
+              <div className="hidden lg:flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScratchpadDrawer((prev) => !prev)}
+                  aria-pressed={showScratchpadDrawer}
+                  className={`btn btn-g btn-sm xl:hidden ${showScratchpadDrawer ? '!border-[#2D6A4F] !text-[#1F5C3D]' : ''}`}
+                >
+                  <FileText className="w-4 h-4" />
+                  My notes{scratchpadDraft.trim() ? ' ✓' : ''}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMistakeNotesDrawer((prev) => !prev)}
+                  aria-pressed={showMistakeNotesDrawer}
+                  className={`btn btn-g btn-sm ${showMistakeNotesDrawer ? '!border-[#9E2A2B] !text-[#9E2A2B]' : ''}`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  Mistakes ({lectureMistakes.length})
+                </button>
+                <button type="button" onClick={() => setShowCheatSheet(true)} className="btn btn-g btn-sm">
+                  <Printer className="w-4 h-4" />
+                  Cheat sheet
+                </button>
+              </div>
+
+              <svg
+                width="46"
+                height="46"
+                viewBox="0 0 36 36"
+                role="img"
+                aria-label={`Lecture progress ${lectureProgressPercent}%`}
+                className="shrink-0"
+              >
+                <circle cx="18" cy="18" r="14" fill="none" strokeWidth="4" className="stroke-[#EFE9DD] dark:stroke-[#2E2924]" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="#2D6A4F"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(lectureProgressPercent / 100) * ringLen} ${ringLen}`}
+                  transform="rotate(-90 18 18)"
+                  style={{ transition: 'stroke-dasharray .4s' }}
+                />
+                <text x="18" y="21.5" textAnchor="middle" fontSize="9" fontWeight="700" className="fill-[#1C1917] dark:fill-[#F5F2EB]">
+                  {lectureProgressPercent}%
+                </text>
+              </svg>
+
+              <button
+                type="button"
+                onClick={() => setShowMobileOverflowMenu(true)}
+                aria-label="Notes, mistakes and cheat sheet"
+                aria-haspopup="dialog"
+                className="ibtn !rounded-full lg:hidden"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+            </header>
+          );
+        })()}
+
+        {/* Phone menu: bottom sheet with blurred backdrop (artifact SHEETS) */}
+        {showMobileOverflowMenu && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Lecture tools"
+            onMouseDown={backdropDismiss(() => setShowMobileOverflowMenu(false))}
+            className={`fixed inset-0 z-50 flex flex-col justify-end items-center ${MODAL_BACKDROP_CLASS} animate-fade-up`}
+          >
+            <div className="w-full max-w-[560px] bg-white dark:bg-[#1A1714] rounded-t-[26px] px-[18px] pt-2.5 pb-7 flex flex-col gap-1">
+              <span aria-hidden="true" className="w-10 h-[5px] rounded-full bg-[#DFD7C8] dark:bg-[#3A332D] self-center mb-1" />
+              {[
+                {
+                  key: 'notes',
+                  tone: 'i-ochre',
+                  Icon: FileText,
+                  title: 'My notes',
+                  sub: scratchpadDraft.trim() ? 'Saved · personal scratchpad for this lecture' : 'Personal scratchpad for this lecture',
+                  onClick: () => setShowScratchpadDrawer((prev) => !prev),
+                },
+                {
+                  key: 'mist',
+                  tone: 'i-crim',
+                  Icon: AlertTriangle,
+                  title: 'Mistake notes',
+                  sub: `${lectureMistakes.length} to re-drill · add your own`,
+                  onClick: () => setShowMistakeNotesDrawer((prev) => !prev),
+                },
+                {
+                  key: 'cheat',
+                  tone: 'i-sage',
+                  Icon: Printer,
+                  title: 'Study cheat sheet',
+                  sub: 'Printable one-page summary',
+                  onClick: () => setShowCheatSheet(true),
+                },
+              ].map(({ key, tone, Icon, title, sub, onClick }, i) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    onClick();
+                    setShowMobileOverflowMenu(false);
+                  }}
+                  className={`flex items-center gap-3.5 min-h-[64px] text-left ${i > 0 ? 'border-t border-[#EFE9DD] dark:border-[#2E2924]' : ''}`}
+                >
+                  <span className={`ico sm ${tone}`}>
+                    <Icon className="w-[18px] h-[18px]" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <strong className="block text-[15px] text-[#1C1917] dark:text-[#F5F2EB]">{title}</strong>
+                    <span className="muted block text-xs">{sub}</span>
+                  </span>
+                  <ChevronRight className="w-[18px] h-[18px] muted" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Persistent Personal Lecture Notes Scratchpad Drawer */}
         {showScratchpadDrawer && (
-          <div className="mb-5 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 space-y-3">
+          <div className="mb-5 card p-5 space-y-3 xl:hidden">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#2D6A4F] dark:text-emerald-400">
@@ -1447,41 +1477,6 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
         {showMistakeNotesDrawer && (
           <div className="mb-5">{renderMistakeNotesSection()}</div>
         )}
-
-        <div className="pb-4 sm:pb-5">
-          <div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-              <span className="font-ipa font-semibold text-[#9E2A2B] dark:text-[#F87171]">
-                Lecture {String(lecture.lectureNumber).padStart(2, '0')}
-              </span>
-              <span className="mx-2" aria-hidden="true">·</span>
-              <span>Level {lecture.level}</span>
-              <span className="mx-2" aria-hidden="true">·</span>
-              <span>{lecture.category}</span>
-              {isCompleted && (
-                <>
-                  <span className="mx-2" aria-hidden="true">·</span>
-                  <span className="text-[#2D6A4F] dark:text-emerald-400 font-medium">
-                    Completed
-                  </span>
-                </>
-              )}
-            </div>
-            <h1 className="fluid-title-xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
-              {lecture.title}
-            </h1>
-            {isFullNepali ? (
-              <p className="font-nepali text-[0.875rem] sm:text-[1.0625rem] leading-snug text-[#57534E] dark:text-[#A8A29E] mt-1">
-                {lecture.nepaliTitle}
-              </p>
-            ) : (
-              <p className="text-[0.8125rem] sm:text-[0.9375rem] leading-snug text-[#57534E] dark:text-[#A8A29E] mt-1">
-                {lecture.subtitle}
-              </p>
-            )}
-          </div>
-
-        </div>
 
         {/* 5-Step Stepper: icon dots joined by a progress line; Done / Now / Next on wider screens */}
         {(() => {
@@ -1566,12 +1561,15 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
         })()}
       </div>
 
+      {/* .lm-body: step content + 330px sticky rail on wide screens */}
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_330px] xl:gap-7 xl:items-start">
+      <div className="min-w-0">
       {/* ===================================================================== */}
       {/* MODULE A: VOCABULARY & SILENT-LETTER PHONICS (10 WORDS PER BATCH)     */}
       {/* ===================================================================== */}
       {activeModule === 0 && (
         <div className="space-y-6 animate-fade-up">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.25rem]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 card p-[1rem] sm:p-[1.25rem]">
             <div>
               <h2 className="fluid-title-lg font-bold text-[#1C1917] dark:text-[#F5F2EB]">
                 01. Vocabulary & Silent-Letter Phonics
@@ -1614,7 +1612,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               return (
                 <article
                   key={item.id}
-                  className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-2.5"
+                  className="card p-4 sm:p-5 flex flex-col justify-between gap-2.5"
                 >
                   <div className="space-y-2.5">
                     {/* Compact Header Row: Word Number · POS · Silent Rule + Mastered Checkmark & Icon-Only Bookmark */}
@@ -1862,7 +1860,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           )}
 
           {/* Clean Section Vocabulary Bank Card */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6 space-y-4">
+          <div className="card p-5 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
@@ -2025,7 +2023,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* ===================================================================== */}
       {activeModule === 1 && (
         <div className="space-y-6 animate-fade-up">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.25rem]">
+          <div className="card p-[1rem] sm:p-[1.25rem]">
             <h2 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
               02. Syllable Breakdown, Simplified Phonetics & Voice Check ({lecture.moduleB_pronunciation.length} Words)
             </h2>
@@ -2049,43 +2047,40 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
               return (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 sm:p-6"
+                  className="card p-5 sm:p-6"
                 >
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <div className="lg:col-span-7 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="flex items-baseline gap-3">
-                            <h3 className="text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                              {item.word}
-                            </h3>
-                            <span className="font-ipa text-sm text-[#57534E] dark:text-[#A8A29E]">
-                              {item.ipa}
-                            </span>
-                            <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                              · {item.syllables.length}{' '}
-                              {item.syllables.length === 1 ? 'Syllable' : 'Syllables'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
+                      {/* Artifact "SAY THIS WORD" dark card */}
+                      <section className="relative overflow-hidden rounded-[22px] bg-[#1C1917] text-[#F5F2EB] dark:bg-[#F5F2EB] dark:text-[#1C1917] px-[18px] py-[22px] flex flex-col items-center gap-3 text-center">
+                        <div
+                          aria-hidden="true"
+                          className="absolute w-[260px] h-[260px] rounded-full border border-white/10 shadow-[0_0_0_30px_rgba(255,255,255,0.03)] -top-[120px] -right-[90px] dark:border-black/10"
+                        />
+                        <span className="text-[11px] font-bold tracking-[0.12em] text-[#E9C77B] dark:text-[#8C6527]">SAY THIS WORD</span>
+                        <h3 className="serif m-0 text-[40px] md:text-[48px] leading-[1.1]">{item.word}</h3>
+                        <span className="mono text-[#C9C1B4] dark:text-[#57534E]">
+                          {item.ipa} · {item.syllables.length} {item.syllables.length === 1 ? 'syllable' : 'syllables'}
+                        </span>
+                        <div className="grid grid-cols-2 gap-2 w-full max-w-[420px]">
                           <button
+                            type="button"
                             onClick={() => handleSpeak(item.word, `${item.id}-pron-norm`, preferredSpeechRate)}
-                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                            className="btn !min-h-[50px] bg-[#F5F2EB] text-[#1C1917] hover:bg-white dark:bg-[#1C1917] dark:text-[#F5F2EB]"
                           >
-                            <Volume2 className="w-4 h-4 text-[#9E2A2B]" />
-                            <span>Normal</span>
+                            <Volume2 className="w-[18px] h-[18px]" />
+                            Normal
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleSpeak(item.word, `${item.id}-pron-slow`, 0.55)}
-                            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                            className="btn !min-h-[50px] bg-[#2A2520] text-[#F5F2EB] hover:bg-[#3A332C] dark:bg-[#E6E0D4] dark:text-[#1C1917]"
                           >
-                            <Turtle className="w-4 h-4 text-[#D97706]" />
-                            <span>Slow (0.6x)</span>
+                            <Turtle className="w-[18px] h-[18px]" />
+                            Slow 0.6×
                           </button>
                         </div>
-                      </div>
+                      </section>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924]">
                         <div>
@@ -2099,10 +2094,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                                 <React.Fragment key={sIdx}>
                                   <button
                                     onClick={() => handleSpeak(item.word, `${item.id}-syl-${sIdx}`, 0.65)}
-                                    className={`min-h-[40px] px-3 py-1.5 rounded-lg font-ipa text-sm transition-transform active:scale-95 ${
+                                    className={`min-h-[44px] px-3.5 rounded-xl text-[15px] border transition-transform active:scale-95 ${
                                       isStressed
-                                        ? 'bg-[#9E2A2B] text-white font-semibold'
-                                        : 'bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
+                                        ? 'bg-[#9E2A2B] border-[#9E2A2B] text-white font-bold'
+                                        : 'bg-white dark:bg-[#1F1C18] border-[#E6E0D4] dark:border-[#2E2924] text-[#1C1917] dark:text-[#F5F2EB]'
                                     }`}
                                   >
                                     {isStressed ? syl.toUpperCase() : syl}
@@ -2215,7 +2210,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {activeModule === 2 && (
         <div className="space-y-6 animate-fade-up">
           {/* Spelling Rule Master Card */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
+          <div className="card p-[1rem] sm:p-[1.5rem]">
             <div className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] mb-1">
               03. Core Orthographic Rule
             </div>
@@ -2306,7 +2301,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* INTERACTIVE AUDIO DICTATION & SPELLING BEE LAB (IN LECTUREPLAYER) */}
           {/* ================================================================= */}
           {currentDictationWord && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
+            <div className="card p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
@@ -2615,7 +2610,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           )}
 
           {/* Interactive Spelling Mini-Quizzes */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
+          <div className="card p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
               <div>
                 <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -2728,7 +2723,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* ===================================================================== */}
       {activeModule === 3 && (
         <div className="space-y-6 animate-fade-up">
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
+          <div className="card p-[1rem] sm:p-[1.5rem]">
             <div className="flex items-center gap-2 text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] mb-1">
               <Languages className="w-4 h-4" />
               <span>04. Practical Grammar Capstone & Sentence Builder</span>
@@ -2776,7 +2771,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           </div>
 
           {/* Interactive Sentence Structure Mapper */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
+          <div className="card p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
                 <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -2926,7 +2921,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* INTERACTIVE SENTENCE BUILDER (REORDER PHRASE TILES)               */}
           {/* ================================================================= */}
           {scrambledBuilders.length > 0 && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
+            <div className="card p-[1rem] sm:p-[1.5rem] space-y-5">
               <div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
                   <Puzzle className="w-4 h-4" />
@@ -3086,7 +3081,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           )}
 
           {/* Capstone Synthesis Exercises */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
+          <div className="card p-[1rem] sm:p-[1.5rem]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
               <div>
                 <h3 className="fluid-title-lg font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
@@ -3193,11 +3188,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
       {/* ===================================================================== */}
       {activeModule === 4 && (
         <div className="space-y-6 animate-fade-up">
-          {/* Dialogue Header + "Listen to Dialogue" Audio Bar */}
-          <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem]">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#E7E0D6] dark:border-[#2E2924]">
+          {/* Dialogue header + player: artifact dark espresso card */}
+          <div className="rounded-[22px] bg-[#1C1917] dark:bg-[#0F0D0B] dark:border dark:border-[#2E2924] text-[#F5F2EB] p-4 sm:p-6 [&_h2]:!text-[#F5F2EB] [&_h2]:font-serif [&_p]:!text-[#C9C1B4] [&_strong]:!text-[#F5F2EB]">
+            <div className="flex flex-col gap-4 pb-5 border-b border-[#3A332C]">
               <div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-1">
+                <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.12em] uppercase text-[#E9C77B] mb-1">
                   <MessageSquare className="w-4 h-4" />
                   <span>05. Real-Life Conversation Dialogue & Comprehension</span>
                 </div>
@@ -3239,10 +3234,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                           onClick={() => handlePlayFullDialogue(btn.rate)}
                           className={`min-h-[42px] px-3.5 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${
                             activeThisSpeed
-                              ? 'bg-[#D97706] text-white border-[#D97706]'
+                              ? 'bg-[#9E2A2B] text-white border-[#9E2A2B]'
                               : btn.rate === dialoguePlaybackRate && !isPlayingFullDialogue
-                              ? 'bg-[#9E2A2B] text-white border-[#9E2A2B] hover:bg-[#872223]'
-                              : 'border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B]'
+                              ? 'bg-[#E9C77B] text-[#1C1917] border-[#E9C77B] hover:bg-[#F1D592]'
+                              : 'border-[#3A332C] bg-[#2A2520] text-[#F5F2EB] hover:border-[#E9C77B]'
                           }`}
                         >
                           {activeThisSpeed ? (
@@ -3269,7 +3264,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
 
                 <button
                   onClick={() => setShowDialogueNepali((prev) => !prev)}
-                  className="min-h-[44px] px-3.5 py-2 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EB] inline-flex items-center gap-1.5"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl border border-[#3A332C] bg-[#2A2520] text-xs font-medium text-[#F5F2EB] hover:border-[#E9C77B] inline-flex items-center gap-1.5"
                 >
                   {showDialogueNepali ? (
                     <>
@@ -3550,7 +3545,7 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
           {/* DIALOGUE COMPREHENSION QUESTIONS SECTION                          */}
           {/* ================================================================= */}
           {dialogueQuestions.length > 0 && (
-            <div className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-[1rem] sm:p-[1.5rem] space-y-5">
+            <div className="card p-[1rem] sm:p-[1.5rem] space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
                 <div>
                   <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-0.5">
@@ -3686,50 +3681,160 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
         </div>
       )}
 
+      </div>
+
+      {/* .lm-rail (desktop): notes, mistake notes, study cheat sheet */}
+      <aside className="hidden xl:flex flex-col gap-3.5 sticky top-20 self-start" aria-label="Notes and tools">
+        <section className="card !p-4 flex flex-col gap-2.5">
+          <div className="sec">
+            <h2 className="h3 inline-flex gap-2 items-center text-[#1C1917] dark:text-[#F5F2EB]">
+              <span className="ico xs i-ochre">
+                <FileText className="w-3.5 h-3.5" />
+              </span>
+              My lecture notes
+            </h2>
+            <span className="muted text-[11px]">{scratchpadDraft.trim().length} chars</span>
+          </div>
+          <textarea
+            rows={5}
+            aria-label="Lecture notes"
+            value={scratchpadDraft}
+            onChange={(e) => {
+              const val = e.target.value;
+              setScratchpadDraft(val);
+              if (onUpdateLectureNote) {
+                onUpdateLectureNote(lecture.id, val);
+                setScratchpadSavedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+              }
+            }}
+            placeholder="Your own reminders, memory tricks, pronunciation cues…"
+            className="w-full text-sm border border-[#DFD7C8] dark:border-[#3A332D] rounded-[14px] p-3 bg-[#FAF8F4] dark:bg-[#141210] text-[#1C1917] dark:text-[#F5F2EB] resize-y focus:outline-none focus:border-[#9E2A2B]"
+          />
+          <span className="muted text-xs inline-flex gap-1.5 items-center">
+            <Check className="w-3.5 h-3.5" />
+            {scratchpadSavedAt ? `Auto-saved ${scratchpadSavedAt}` : 'Auto-saved'} · printed on your study sheet
+          </span>
+        </section>
+        <section className="card !p-4 flex flex-col gap-2.5">
+          <div className="sec">
+            <h2 className="h3 inline-flex gap-2 items-center text-[#1C1917] dark:text-[#F5F2EB]">
+              <span className="ico xs i-crim">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+              Mistake notes
+            </h2>
+            <span className="tag t-crim">{lectureMistakes.length}</span>
+          </div>
+          {lectureMistakes.length === 0 ? (
+            <div className="tag t-sage !px-3 !py-2.5 !text-[13px] !whitespace-normal">
+              <CheckCircle2 className="w-4 h-4" />
+              No mistakes logged for this lecture yet
+            </div>
+          ) : (
+            lectureMistakes.slice(0, 3).map((m) => (
+              <div
+                key={m.id}
+                className="border border-[#EFE9DD] dark:border-[#2E2924] rounded-[14px] px-3 py-2.5 flex flex-col gap-2 bg-white dark:bg-[#141210]"
+              >
+                <div className="flex justify-between gap-2">
+                  <span className="min-w-0">
+                    <strong className="block text-sm text-[#1C1917] dark:text-[#F5F2EB] truncate">{m.correctAnswer}</strong>
+                    <span className="muted block text-xs line-clamp-2">{m.userNote || m.explanation}</span>
+                  </span>
+                  <span className="muted text-[11px] whitespace-nowrap">{m.consecutiveCorrect}/2</span>
+                </div>
+                <span className="track !h-1">
+                  <span className="fill" style={{ width: `${Math.min(100, (m.consecutiveCorrect / 2) * 100)}%`, background: '#2D6A4F' }} />
+                </span>
+              </div>
+            ))
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setShowMistakeNotesDrawer(true);
+              window.scrollTo({ top: 0, behavior: scrollBehavior() });
+            }}
+            className="btn btn-g btn-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Re-drill & add notes
+          </button>
+        </section>
+        <section className="card ink !p-4 flex flex-col gap-2.5">
+          <h2 className="h3 inline-flex gap-2 items-center">
+            <span className="ico xs bg-[#3A2F22] text-[#E9C77B] dark:bg-[#F2EBDC] dark:text-[#8C6527]">
+              <Printer className="w-3.5 h-3.5" />
+            </span>
+            Study cheat sheet
+          </h2>
+          <div className="flex flex-col gap-1.5 text-[12.5px] leading-[1.5] text-[#C9C1B4] dark:text-[#57534E]">
+            <span>
+              <strong className="text-[#F5F2EB] dark:text-[#1C1917]">{lecture.moduleA_vocabulary.length} core words</strong> ·{' '}
+              {lecture.moduleA_vocabulary.slice(0, 5).map((v) => v.word.toLowerCase()).join(', ')}…
+            </span>
+            <span>
+              <strong className="text-[#F5F2EB] dark:text-[#1C1917]">Spelling</strong> · {lecture.moduleC_spelling.ruleTitle}
+            </span>
+            <span>
+              <strong className="text-[#F5F2EB] dark:text-[#1C1917]">Grammar</strong> · {lecture.moduleD_grammar.topicTitle}
+            </span>
+            <span>
+              <strong className="text-[#F5F2EB] dark:text-[#1C1917]">Your notes</strong> · {scratchpadDraft.trim() ? 'included' : 'none yet'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCheatSheet(true)}
+            className="btn bg-[#F5F2EB] text-[#1C1917] hover:bg-white dark:bg-[#1C1917] dark:text-[#F5F2EB]"
+          >
+            <Printer className="w-4 h-4" />
+            Print / save PDF
+          </button>
+        </section>
+      </aside>
+      </div>
+
       {/* ===================================================================== */}
       {/* UNIFIED STICKY BOTTOM ACTION BAR (Mobile & Desktop Safe-Area Footer)  */}
       {/* ===================================================================== */}
-      <div className="sticky bottom-16 md:bottom-0 z-30 -mx-[0.625rem] sm:-mx-[1rem] px-[0.625rem] sm:px-[1rem] py-[0.625rem] bg-[#FAF8F4]/95 dark:bg-[#141210]/95 backdrop-blur-md border-t border-[#E7E0D6] dark:border-[#2E2924]">
-        <div className="w-full max-w-[82rem] mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
-          {/* Left: Previous Step Button */}
-          {activeModule > 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                speechService.triggerHaptic('light');
-                goToModule((activeModule - 1) as ModuleStep);
-              }}
-              className="min-h-[2.75rem] px-[0.75rem] sm:px-[1rem] py-[0.5rem] rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-white dark:bg-[#1F1C18] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] transition-colors inline-flex items-center gap-1.5 shrink-0"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">
-                Step {MODULE_TABS[activeModule - 1]?.number}: {MODULE_TABS[activeModule - 1]?.shortLabel}
-              </span>
-              <span className="sm:hidden">Prev</span>
-            </button>
-          ) : (
-            <div className="text-xs font-ipa text-[#57534E] dark:text-[#A8A29E]">
-              Start of lesson
-            </div>
-          )}
+      <div className="sticky bottom-16 md:bottom-0 z-30 -mx-[0.625rem] sm:-mx-[1rem] lg:-mx-[1.5rem] mt-6 bg-white dark:bg-[#1A1714] border-t border-[#EAE4D8] dark:border-[#2E2924] shadow-[0_-10px_24px_-18px_rgba(28,25,23,0.4)]">
+        <div className="flex items-center gap-2.5 px-3.5 md:px-8 pt-2.5 pb-3 md:py-3 max-w-[1180px] mx-auto">
+          <button
+            type="button"
+            aria-label="Previous step"
+            disabled={activeModule === 0}
+            onClick={() => {
+              if (activeModule === 0) return;
+              speechService.triggerHaptic('light');
+              goToModule((activeModule - 1) as ModuleStep);
+            }}
+            className={`btn btn-g !min-h-[50px] !rounded-2xl !px-3.5 ${activeModule === 0 ? 'opacity-45 cursor-default' : ''}`}
+          >
+            <ArrowLeft className="w-[18px] h-[18px]" />
+            <span className="hidden md:inline">Previous</span>
+          </button>
 
-          {/* Center: Compact Step Progress Indicator */}
-          <div className="text-center min-w-0">
-            <div className="font-ipa text-[0.6875rem] sm:text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
-              Step {MODULE_TABS[activeModule].number} of 05 ·{' '}
-              <span className="text-[#9E2A2B] dark:text-[#F87171]">
-                {MODULE_TABS[activeModule].shortLabel}
-              </span>
-            </div>
-            <div className="w-24 sm:w-36 h-1.5 rounded-full bg-[#E7E0D6] dark:bg-[#2E2924] mx-auto mt-1 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#9E2A2B] transition-all duration-300"
-                style={{ width: `${((activeModule + 1) / 5) * 100}%` }}
-              />
-            </div>
+          <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+            <span className="flex gap-[5px] items-center" aria-hidden="true">
+              {MODULE_TABS.map((t) => {
+                const done = isCompleted || completedSteps.includes(t.step);
+                const cur = t.step === activeModule;
+                return (
+                  <span
+                    key={t.step}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      cur ? 'w-[22px] bg-[#9E2A2B]' : done ? 'w-2 bg-[#2D6A4F]' : 'w-2 bg-[#E6E0D4] dark:bg-[#3A332D]'
+                    }`}
+                  />
+                );
+              })}
+            </span>
+            <span className="muted text-[11px] font-semibold truncate">
+              Step {activeModule + 1} of 5 · {MODULE_TABS[activeModule].shortLabel}
+            </span>
           </div>
 
-          {/* Right: Responsive Continue / Finish Lecture Button */}
           {activeModule < 4 ? (
             <button
               type="button"
@@ -3740,13 +3845,11 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 });
                 goToModule((activeModule + 1) as ModuleStep, true);
               }}
-              className="min-h-[2.75rem] px-[1rem] sm:px-[1.25rem] py-[0.625rem] rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+              className="btn btn-p !min-h-[50px] !rounded-2xl"
             >
-              <span className="sm:hidden">Continue</span>
-              <span className="hidden sm:inline">
-                Continue to {MODULE_TABS[activeModule + 1]?.shortLabel}
-              </span>
-              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="md:hidden">Continue</span>
+              <span className="hidden md:inline">Continue to step {activeModule + 2}</span>
+              <ArrowRight className="w-[18px] h-[18px]" />
             </button>
           ) : (
             <button
@@ -3758,11 +3861,10 @@ export const LecturePlayer: React.FC<LecturePlayerProps> = ({
                 });
                 handleFinishLecture();
               }}
-              className="min-h-[2.75rem] px-[1rem] sm:px-[1.5rem] py-[0.625rem] rounded-xl bg-[#2D6A4F] hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+              className="btn btn-p !min-h-[50px] !rounded-2xl"
             >
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span className="sm:hidden">Finish</span>
-              <span className="hidden sm:inline">Complete Lecture</span>
+              <span>Finish lecture</span>
+              <CheckCircle2 className="w-[18px] h-[18px]" />
             </button>
           )}
         </div>
