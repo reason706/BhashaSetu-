@@ -196,3 +196,30 @@ and feature is kept.
   sizes and colours follow its CSS tokens instead.
 - The Word of the day row has one extra button (Another word, an existing
   feature).
+
+## Session 2: Lessons
+
+**Artifact read:** `project/Lessons.dc.html`, lines 470–803 (all markup,
+inline styles and the page script). The `.ls-*` CSS was taken from
+`Main.dc.html`. I didn't re-read lines 1–469 (the shared `<style>` block).
+
+| Artifact section | Before | Change |
+|---|---|---|
+| `.ls-head`: "Lessons" serif 34/28px + `btn-p` Create AI lesson ("AI lesson" on phones) | Eyebrow, long title and subtitle; filter row with a separate AI button | Artifact head, one line |
+| `.ls-stats` strip on every screen: Lectures / Steps / Quiz accuracy, `.ico.xs` (hidden on phones), separators | Phone-only strip with words learned | Artifact strip on all sizes. Quiz accuracy is real data (spelling + grammar + dialogue `moduleScores`, same source as LessonProgressCard), "—" when no quizzes yet. Steps count completed lessons as 5. |
+| `.ls-resume` dark strip on every screen | Phone only | Espresso strip, crimson number tile, gold "CONTINUE/START · STEP N OF 5", gold play disc. Opens the next step. |
+| `.ls-sfield`: 48px field, crimson focus ring, result count + clear | Small pill input | Artifact field; count and clear button only while typing |
+| `.ls-tabs`: underline tabs with count badges | Rounded pills with counts | Artifact underline tabs (animated crimson underline, `aria-selected`) |
+| (not in artifact) LessonProgressCard | Desktop always; phones behind a toggle | Kept, behind a "Track & quiz details" pill on all sizes |
+| Groups: one `.card` per level, `.ls-gh` sand header (tag, serif 18px name, progress `.track` and count) | Sand container with separate bordered cards per lesson | Artifact group cards: Foundation (sage), Workplace (ochre), Advanced (crimson) |
+| Rows: `.ls-num` state tile, title, sub, 5 step dots, state tag, lock or chevron, locked rows at 60% opacity | Coloured-border cards with action buttons | Artifact row list. Same unlock rules; tapping a locked row shows the existing "finish lecture N first" toast with its open-previous action. |
+| `.lx` panel: Nepali line, `.steps5` step buttons, key-word `.pill`s with mono IPA, `btn-p` CTA | Folded panel | Artifact panel. Key words still open the phonetics pop-up (save, audio). Step buttons show done (sage) and current (crimson ring) and open that step. |
+| Empty state `.card.paper` | Plain card | Artifact empty state plus a "Create AI lesson" button |
+| Custom lessons: `.g3` of `.card.hov` (`.ico.sm.i-ochre`, "AI · level" tag) + dashed create card | List rows and a separate empty card | Artifact grid. The dashed create card is always there. |
+
+**Logic fix:** the step labels in the expanded panel used the wrong names
+("Silent Phonics", "Mastery Quiz"). They now match the real five steps:
+Vocabulary, Pronunciation, Spelling, Grammar, Dialogue.
+
+**Intentionally unchanged:** unlock rules, search matching (`lessonMatchesTopic`),
+level filter state, AI lesson modal, LessonProgressCard contents.

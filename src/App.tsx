@@ -46,6 +46,8 @@ import {
   Lightbulb,
   Target,
   Compass,
+  Type,
+  Plus,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { CORE_SYLLABUS } from './data/syllabus';
@@ -2422,246 +2424,230 @@ export default function App() {
             /* =============================================================== */
             /* LESSONS VIEW (Exact Editorial Match to Screenshot 2)            */
             /* =============================================================== */
-            <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-5">
-              {/* Top Heading */}
-              <div>
-                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.12em] text-[#9E2A2B] dark:text-[#F87171] mb-1.5">
-                  YOUR CURRICULUM
-                </div>
-                <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#1C1917] dark:text-[#F5F2EB] tracking-tight">
-                  Lessons for your next step
+            <div className="main w-full max-w-[1240px] mx-auto px-4 lg:px-10 pt-4 md:pt-7 pb-28 flex flex-col gap-5 md:gap-6">
+              {/* .ls-head: title + Create AI lesson on one line */}
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="serif m-0 text-[28px] md:text-[34px] leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">
+                  Lessons
                 </h1>
-                <p className="text-xs sm:text-sm md:text-base text-[#6E685F] dark:text-[#A8A29E] mt-1">
-                  A guided path from everyday fluency to confident expression.
-                </p>
-              </div>
-
-              {/* Search Bar + Filter Pills + "+ Create AI lesson" Button on opposite side */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
-                  {/* Small Search Bar by Topic */}
-                  <div className="relative w-full sm:w-64 shrink-0">
-                    <Search className="w-3.5 h-3.5 text-[#78716C] dark:text-[#A8A29E] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="search"
-                      aria-label="Search lessons by topic"
-                      value={lessonTopicSearch}
-                      onChange={(e) => setLessonTopicSearch(e.target.value)}
-                      placeholder="Search lessons — silent, modals, passive…"
-                      className={`w-full h-10 sm:h-9 pl-8 ${lessonTopicSearch ? 'pr-24' : 'pr-3'} rounded-full bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] text-base sm:text-xs text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8C857B] focus:outline-none focus:border-[#9E2A2B] focus:ring-4 focus:ring-[#F8E7E3] dark:focus:ring-[#9E2A2B]/25 transition-colors [&::-webkit-search-cancel-button]:hidden`}
-                    />
-                    {lessonTopicSearch && (
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        <span
-                          aria-live="polite"
-                          className="text-[10px] font-bold text-[#9E2A2B] dark:text-[#F87171] bg-[#F8E7E3] dark:bg-red-950/50 rounded-full px-2 py-0.5 whitespace-nowrap"
-                        >
-                          {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter])}{' '}
-                          {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 1 ? 'result' : 'results'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setLessonTopicSearch('')}
-                          aria-label="Clear topic search"
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] hover:bg-[#F2EEE6] dark:hover:bg-[#1F1C18]"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Level Filter Pills */}
-                  <div className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
-                    {(
-                      [
-                        { id: 'ALL', label: 'All levels' },
-                        { id: 'B1', label: 'B1 Foundation' },
-                        { id: 'B2', label: 'B2 Workplace' },
-                        { id: 'C1', label: 'C1 Advanced' },
-                      ] as { id: 'ALL' | CEFRLevel; label: string }[]
-                    ).map((pill) => {
-                      const isActive = levelFilter === pill.id;
-                      return (
-                        <button
-                          key={pill.id}
-                          type="button"
-                          onClick={() => setLevelFilter(pill.id)}
-                          aria-pressed={isActive}
-                          className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                            isActive
-                              ? 'bg-[#F6E6E2] dark:bg-red-950/60 text-[#9E2A2B] dark:text-red-300 font-semibold'
-                              : 'bg-[#F2EFE9] dark:bg-[#1F1C18] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917]'
-                          }`}
-                        >
-                          {pill.label}
-                          <span
-                            className={`text-[10px] font-bold rounded-full px-1.5 ${
-                              isActive
-                                ? 'bg-white/70 dark:bg-black/30 text-[#9E2A2B] dark:text-red-300'
-                                : 'bg-[#E6E0D4]/70 dark:bg-[#2E2924] text-[#6E685F] dark:text-[#A8A29E]'
-                            }`}
-                          >
-                            {lessonMatchCounts[pill.id]}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Right Side: Create AI Lesson */}
                 <button
                   type="button"
                   onClick={() => setIsAIModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] active:scale-[0.98] text-white text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 self-start lg:self-auto"
+                  className="btn btn-p !min-h-[40px] md:!min-h-[44px] !px-3.5 md:!px-[18px] !text-[13px] md:!text-sm !rounded-xl md:!rounded-[14px]"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Create AI lesson</span>
+                  <span className="hidden md:inline">Create AI lesson</span>
+                  <span className="md:hidden">AI lesson</span>
                 </button>
               </div>
 
-              {/* Phones: compact progress strip + dark "continue" strip (full card one tap away) */}
+              {/* .ls-stats: compact progress strip (one row on every screen) */}
               {(() => {
                 const coreIds = new Set(CORE_SYLLABUS.map((l) => l.id));
-                const stepsDone = Object.entries(progress.completedStepsByLecture || {})
-                  .filter(([id]) => coreIds.has(id))
-                  .reduce((sum, [, arr]) => sum + (arr as number[]).length, 0);
-                const recSteps = progress.completedStepsByLecture?.[recommendedLecture.id] || [];
-                const nextStep = Math.min(4, recSteps.length) as ModuleStep;
+                const stepsDone = CORE_SYLLABUS.reduce((sum, l) => {
+                  if (progress.completedUnitIds.includes(l.id)) return sum + 5;
+                  const raw = progress.completedStepsByLecture?.[l.id] || [];
+                  return sum + new Set(raw.filter((x) => x >= 0 && x <= 4)).size;
+                }, 0);
+                let qc = 0;
+                let qt = 0;
+                Object.entries(progress.moduleScores || {}).forEach(([id, rec]) => {
+                  if (!coreIds.has(id) || !rec) return;
+                  qc += (rec.spellingScore || 0) + (rec.grammarScore || 0) + (rec.dialogueScore || 0);
+                  qt += (rec.spellingTotal || 0) + (rec.grammarTotal || 0) + (rec.dialogueTotal || 0);
+                });
+                const quizAcc = qt > 0 ? `${Math.round((qc / qt) * 100)}%` : '—';
+                const stats = [
+                  { key: 'lec', tone: 'i-crim', Icon: BookOpen, v: courseStats.completedCount, of: courseStats.totalUnits, l: 'Lectures' },
+                  { key: 'steps', tone: 'i-sage', Icon: CheckCircle2, v: stepsDone, of: CORE_SYLLABUS.length * 5, l: 'Steps' },
+                  { key: 'quiz', tone: 'i-ochre', Icon: Target, v: quizAcc, of: null, l: 'Quiz accuracy' },
+                ];
                 return (
-                  <div className="sm:hidden space-y-2.5">
-                    <section
-                      aria-label="Course progress"
-                      className="flex items-center justify-between gap-2 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] px-3 py-2.5"
-                    >
-                      {[
-                        { v: courseStats.completedCount, of: courseStats.totalUnits, l: 'Lectures' },
-                        { v: stepsDone, of: CORE_SYLLABUS.length * 5, l: 'Steps' },
-                        { v: wordsLearnedDisplayCount, of: null, l: 'Words learned' },
-                      ].map((st, i) => (
-                        <React.Fragment key={st.l}>
-                          {i > 0 && <span aria-hidden="true" className="w-px h-7 bg-[#EAE4D8] dark:bg-[#2E2924]" />}
-                          <div className="min-w-0 text-center flex-1">
-                            <span className="block font-serif text-lg font-bold leading-tight text-[#1C1917] dark:text-[#F5F2EB]">
+                  <section
+                    aria-label="Course progress"
+                    className="card !px-3 !py-2.5 md:!px-5 md:!py-3 !rounded-2xl md:!rounded-[20px] flex items-center justify-between gap-2"
+                  >
+                    {stats.map((st, i) => (
+                      <React.Fragment key={st.key}>
+                        {i > 0 && <span aria-hidden="true" className="w-px h-7 bg-[#EAE4D8] dark:bg-[#2E2924]" />}
+                        <div className="flex items-center gap-[7px] md:gap-2.5 min-w-0">
+                          <span className={`ico xs ${st.tone} hidden md:flex`}>
+                            <st.Icon className="w-3.5 h-3.5" />
+                          </span>
+                          <span>
+                            <span className="serif block text-lg md:text-xl leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">
                               {st.v}
-                              {st.of !== null && (
-                                <small className="text-xs font-semibold text-[#6E685F] dark:text-[#A8A29E]">/{st.of}</small>
-                              )}
+                              {st.of !== null && <small className="muted text-xs font-semibold font-sans">/{st.of}</small>}
                             </span>
-                            <span className="block text-[10px] font-semibold text-[#6E685F] dark:text-[#A8A29E] whitespace-nowrap">
-                              {st.l}
-                            </span>
-                          </div>
-                        </React.Fragment>
-                      ))}
-                    </section>
-                    <button
-                      type="button"
-                      onClick={() => openLecture(recommendedLecture.id, nextStep)}
-                      className="w-full flex items-center gap-3 p-2.5 pr-3 rounded-2xl bg-[#1C1917] dark:bg-[#F5F2EB] text-[#F5F2EB] dark:text-[#1C1917] text-left shadow-[0_14px_28px_-18px_rgba(28,25,23,0.6)] active:scale-[0.99] transition-transform"
-                    >
-                      <span className="w-10 h-10 shrink-0 rounded-xl bg-[#9E2A2B] text-white font-serif font-bold flex items-center justify-center">
-                        {String(recommendedLecture.lectureNumber).padStart(2, '0')}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[10px] font-extrabold tracking-[0.1em] text-[#E9C77B] dark:text-[#9E2A2B]">
-                          {recSteps.length > 0 ? 'CONTINUE' : 'START'} · STEP {nextStep + 1} OF 5
-                        </span>
-                        <span className="block text-sm font-bold truncate">
-                          {getEditorialLessonPresentation(recommendedLecture).displayTitle}
-                        </span>
-                      </span>
-                      <span className="w-9 h-9 shrink-0 rounded-full bg-[#E9C77B] text-[#1C1917] flex items-center justify-center">
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-expanded={isLessonProgressExpanded}
-                      onClick={() => setIsLessonProgressExpanded((prev) => !prev)}
-                      className="w-full min-h-[40px] rounded-xl border border-dashed border-[#DFD7C8] dark:border-[#3A332D] text-xs font-semibold text-[#57534E] dark:text-[#A8A29E] inline-flex items-center justify-center gap-1.5"
-                    >
-                      {isLessonProgressExpanded ? 'Hide track details' : 'Show track & quiz details'}
-                      {isLessonProgressExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
+                            <span className="muted block text-[10px] md:text-[11px] font-semibold whitespace-nowrap">{st.l}</span>
+                          </span>
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </section>
                 );
               })()}
 
-              {/* Lesson & Track Progress Card (Step Completion + Track Quiz Accuracy) */}
-              <div className={isLessonProgressExpanded ? 'block' : 'hidden sm:block'}>
-              <LessonProgressCard
-                lectures={CORE_SYLLABUS}
-                progress={progress}
-                recommendedLecture={recommendedLecture}
-                activeLevelFilter={levelFilter}
-                onSelectLevelFilter={(lvl) => setLevelFilter(lvl)}
-                onOpenLecture={(lectureId, step = 0) => openLecture(lectureId, step)}
-              />
+              {/* .ls-resume: dark continue strip (all sizes) */}
+              {(() => {
+                const recSteps = progress.completedStepsByLecture?.[recommendedLecture.id] || [];
+                const nextStep = Math.min(4, recSteps.length) as ModuleStep;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => openLecture(recommendedLecture.id, nextStep)}
+                    className="flex items-center gap-3 p-2.5 pr-3 rounded-[18px] bg-[#1C1917] dark:bg-[#F5F2EB] text-[#F5F2EB] dark:text-[#1C1917] text-left shadow-[0_14px_28px_-18px_rgba(28,25,23,0.6)] hover:-translate-y-px transition-transform"
+                  >
+                    <span className="serif w-10 h-10 shrink-0 rounded-xl bg-[#9E2A2B] text-white flex items-center justify-center text-[15px]">
+                      {String(recommendedLecture.lectureNumber).padStart(2, '0')}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[11px] font-extrabold tracking-[0.1em] text-[#E9C77B] dark:text-[#9E2A2B]">
+                        {recSteps.length > 0 ? 'CONTINUE' : 'START'} · STEP {nextStep + 1} OF 5
+                      </span>
+                      <span className="block text-sm font-bold truncate">
+                        {getEditorialLessonPresentation(recommendedLecture).displayTitle}
+                      </span>
+                    </span>
+                    <span className="w-10 h-10 shrink-0 rounded-full bg-[#E9C77B] text-[#1C1917] flex items-center justify-center">
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </span>
+                  </button>
+                );
+              })()}
+
+              {/* .ls-sfield search (always visible) */}
+              <div className="flex items-center gap-2.5 h-12 pl-3.5 pr-1.5 rounded-[14px] bg-white dark:bg-[#1A1714] border border-[#DFD7C8] dark:border-[#3A332D] w-full max-w-[560px] focus-within:border-[#9E2A2B] focus-within:shadow-[0_0_0_4px_#F8E7E3] dark:focus-within:shadow-[0_0_0_4px_rgba(158,42,43,0.25)] transition-shadow">
+                <Search className="w-[18px] h-[18px] muted shrink-0" />
+                <label htmlFor="ls-q" className="sr-only">
+                  Search lessons by topic
+                </label>
+                <input
+                  id="ls-q"
+                  type="search"
+                  value={lessonTopicSearch}
+                  onChange={(e) => setLessonTopicSearch(e.target.value)}
+                  placeholder="Search lessons — silent, modals, passive…"
+                  className="flex-1 min-w-0 border-0 outline-none bg-transparent text-base md:text-[15px] text-[#1C1917] dark:text-[#F5F2EB] placeholder:text-[#8C857B] [&::-webkit-search-cancel-button]:hidden"
+                />
+                {lessonTopicSearch.trim() && (
+                  <>
+                    <span aria-live="polite" className="shrink-0 text-[11px] font-bold text-[#9E2A2B] dark:text-[#FCA5A5] bg-[#F8E7E3] dark:bg-red-950/40 rounded-full px-2 py-[3px]">
+                      {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter])}{' '}
+                      {(levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 1 ? 'result' : 'results'}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      onClick={() => setLessonTopicSearch('')}
+                      className="w-9 h-9 shrink-0 rounded-[10px] bg-[#F2EEE6] dark:bg-[#2E2924] text-[#3D342B] dark:text-[#D6CFC4] flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
 
-              {/* Level Group Containers (B1, B2, C1) */}
-              <div className="space-y-6">
+              {/* .ls-tabs: underline level tabs with counts */}
+              <div className="flex gap-5 overflow-x-auto no-scrollbar border-b border-[#EAE4D8] dark:border-[#2E2924] -mt-1" role="tablist" aria-label="Filter by level">
                 {(
                   [
-                    {
-                      level: 'B1' as CEFRLevel,
-                      badgeBg: 'bg-[#DCECE2] text-[#1F5C3D]',
-                      title: 'Foundation · Everyday confidence',
-                      rangeLabel: 'Lessons 01–04',
-                    },
-                    {
-                      level: 'B2' as CEFRLevel,
-                      badgeBg: 'bg-[#DCE6F2] text-[#284B7A]',
-                      title: 'Workplace · Clear communication',
-                      rangeLabel: 'Lessons 05–08',
-                    },
-                    {
-                      level: 'C1' as CEFRLevel,
-                      badgeBg: 'bg-[#F6E3DF] text-[#9E2A2B]',
-                      title: 'Advanced · Academic & leadership',
-                      rangeLabel: 'Lessons 09–12',
-                    },
-                  ]
-                )
-                  .filter((grp) => levelFilter === 'ALL' || levelFilter === grp.level)
-                  .map((grp) => {
-                    const groupLessons = CORE_SYLLABUS.filter(
-                      (l) => l.level === grp.level && lessonMatchesTopic(l, lessonTopicSearch)
-                    );
-
-                    if (groupLessons.length === 0) return null;
-
-                    return (
-                      <section
-                        key={grp.level}
-                        className="rounded-2xl bg-[#F5F2EB] dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-3.5 sm:p-5 space-y-3"
+                    { id: 'ALL', label: 'All' },
+                    { id: 'B1', label: 'B1 Foundation' },
+                    { id: 'B2', label: 'B2 Workplace' },
+                    { id: 'C1', label: 'C1 Advanced' },
+                  ] as { id: 'ALL' | CEFRLevel; label: string }[]
+                ).map((tab) => {
+                  const on = levelFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setLevelFilter(tab.id)}
+                      className={`relative shrink-0 pt-2 pb-2.5 text-[13px] inline-flex items-center gap-1.5 whitespace-nowrap transition-colors after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[3px] after:rounded-t-[3px] after:bg-[#9E2A2B] after:origin-center after:transition-transform after:duration-200 ${
+                        on
+                          ? 'font-bold text-[#1C1917] dark:text-[#F5F2EB] after:scale-x-100'
+                          : 'font-semibold text-[#6E685F] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EB] after:scale-x-0'
+                      }`}
+                    >
+                      {tab.label}
+                      <span
+                        className={`text-[10px] font-bold rounded-full px-1.5 py-px ${
+                          on
+                            ? 'bg-[#F8E7E3] text-[#9E2A2B] dark:bg-red-950/40 dark:text-[#FCA5A5]'
+                            : 'bg-[#EFE9DD] text-[#6E685F] dark:bg-[#2E2924] dark:text-[#A8A29E]'
+                        }`}
                       >
-                        {/* Track Header Row */}
-                        <div className="flex items-center justify-between gap-2 px-1 py-1">
-                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                            <span
-                              className={`px-2 py-0.5 sm:px-2.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 ${grp.badgeBg}`}
-                            >
-                              {grp.level}
-                            </span>
-                            <h2 className="text-xs sm:text-sm md:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] truncate">
-                              {grp.title}
-                            </h2>
-                          </div>
-                          <span className="text-[10px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] shrink-0">
-                            {grp.rangeLabel}
-                          </span>
-                        </div>
+                        {lessonMatchCounts[tab.id]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                        {/* Lesson Cards inside Group */}
-                        <div className="space-y-2.5">
-                          {groupLessons.map((lesson) => {
+              {/* Track & quiz details (existing LessonProgressCard), one tap away */}
+              <div>
+                <button
+                  type="button"
+                  aria-expanded={isLessonProgressExpanded}
+                  onClick={() => setIsLessonProgressExpanded((prev) => !prev)}
+                  className="pill !min-h-[36px] !text-xs"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  {isLessonProgressExpanded ? 'Hide track & quiz details' : 'Track & quiz details'}
+                  {isLessonProgressExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {isLessonProgressExpanded && (
+                  <div className="mt-3 animate-fade-up">
+                    <LessonProgressCard
+                      lectures={CORE_SYLLABUS}
+                      progress={progress}
+                      recommendedLecture={recommendedLecture}
+                      activeLevelFilter={levelFilter}
+                      onSelectLevelFilter={(lvl) => setLevelFilter(lvl)}
+                      onOpenLecture={(lectureId, step = 0) => openLecture(lectureId, step)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Level groups: one .card per level with .ls-gh header + row list */}
+              {(
+                [
+                  { level: 'B1' as CEFRLevel, name: 'Foundation track', tag: 't-sage', color: '#2D6A4F' },
+                  { level: 'B2' as CEFRLevel, name: 'Workplace track', tag: 't-ochre', color: '#B07D2E' },
+                  { level: 'C1' as CEFRLevel, name: 'Advanced track', tag: 't-crim', color: '#9E2A2B' },
+                ]
+              )
+                .filter((grp) => levelFilter === 'ALL' || levelFilter === grp.level)
+                .map((grp) => {
+                  const groupLessons = CORE_SYLLABUS.filter(
+                    (l) => l.level === grp.level && lessonMatchesTopic(l, lessonTopicSearch)
+                  );
+                  if (groupLessons.length === 0) return null;
+                  const groupDone = groupLessons.filter((l) => progress.completedUnitIds.includes(l.id)).length;
+                  const groupPct = Math.round((groupDone / groupLessons.length) * 100);
+
+                  return (
+                    <section key={grp.level} className="card !p-0 overflow-hidden" aria-labelledby={`ls-g-${grp.level}`}>
+                      <div className="flex items-center gap-2 md:gap-2.5 px-3.5 md:px-5 py-3 md:py-3.5 bg-[#F6F2EA] dark:bg-[#141210] border-b border-[#EAE4D8] dark:border-[#2E2924]">
+                        <span className={`tag ${grp.tag}`}>{grp.level}</span>
+                        <h2 id={`ls-g-${grp.level}`} className="serif m-0 text-base md:text-lg whitespace-nowrap text-[#1C1917] dark:text-[#F5F2EB]">
+                          {grp.name}
+                        </h2>
+                        <span className="flex-1 flex items-center gap-2 justify-end min-w-[70px] max-w-[110px] md:max-w-[220px] ml-auto">
+                          <span className="track flex-1 !h-[5px]">
+                            <span className="fill" style={{ width: `${groupPct}%`, background: grp.color }} />
+                          </span>
+                          <span className="text-xs font-bold text-[#3D342B] dark:text-[#D6CFC4] whitespace-nowrap">
+                            {groupDone}/{groupLessons.length}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="px-3.5 md:px-5">
+                        {groupLessons.map((lesson, rowIdx) => {
                             const syllabusIdx = CORE_SYLLABUS.findIndex(
                               (item) => item.id === lesson.id
                             );
@@ -2683,27 +2669,6 @@ export default function App() {
                             const { displayTitle, displaySub, duration } =
                               getEditorialLessonPresentation(lesson);
                             const isPreviewExpanded = expandedLessonPreviewId === lesson.id;
-
-                            // Border color according to status:
-                            // - Finished: Green
-                            // - In progress: Warm Terracotta / Crimson
-                            // - Unlocked / Ready to start: Amber Gold
-                            // - Locked / Up next: Cool Slate-Stone
-                            const statusBorderClass = isCompleted
-                              ? 'border-[1.5px] border-[#2E6F4E] dark:border-emerald-500/80'
-                              : isInProgress
-                              ? 'border-[1.5px] border-[#C86D63] dark:border-[#F87171] shadow-xs'
-                              : isReadyToStart
-                              ? 'border-[1.5px] border-[#D97706] dark:border-amber-500/80 shadow-xs'
-                              : 'border-[1.5px] border-[#CBD5E1] dark:border-[#334155]';
-
-                            const numberBadgeClass = isCompleted
-                              ? 'bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300'
-                              : isInProgress
-                              ? 'bg-[#F8E7E3] dark:bg-red-950/50 text-[#9E2A2B] dark:text-red-300'
-                              : isReadyToStart
-                              ? 'bg-[#FEF3C7] dark:bg-amber-950/50 text-[#B45309] dark:text-amber-300'
-                              : 'bg-[#EDE8DC] dark:bg-[#26221E] text-[#57534E] dark:text-[#A8A29E]';
 
                             const triggerLockedMessage = (e?: React.MouseEvent) => {
                               if (e) e.stopPropagation();
@@ -2727,338 +2692,221 @@ export default function App() {
                               );
                             };
 
-                            return (
-                              <div
-                                key={lesson.id}
-                                className={`rounded-2xl bg-white dark:bg-[#141210] transition-all overflow-hidden ${statusBorderClass}`}
-                              >
-                                {/* Tap Card Row -> Opens/Closes Folded Part */}
-                                <div
-                                  onClick={() =>
-                                    setExpandedLessonPreviewId((prev) =>
-                                      prev === lesson.id ? null : lesson.id
-                                    )
+                          const state: 'done' | 'cur' | 'new' | 'lock' = isCompleted
+                            ? 'done'
+                            : isInProgress
+                            ? 'cur'
+                            : isReadyToStart
+                            ? 'new'
+                            : 'lock';
+                          const doneStepSet = new Set(progress.completedStepsByLecture?.[lesson.id] || []);
+                          const numClass = {
+                            done: 'bg-[#E3EFE8] text-[#1F5C3D] dark:bg-emerald-950/50 dark:text-emerald-300',
+                            cur: 'bg-[#9E2A2B] text-white',
+                            new: 'bg-[#EFE9DD] text-[#3D342B] dark:bg-[#2E2924] dark:text-[#D6CFC4]',
+                            lock: 'bg-[#F2EEE6] text-[#6E685F] dark:bg-[#1F1C18] dark:text-[#A8A29E]',
+                          }[state];
+                          const tagInfo = {
+                            done: ['t-sage', 'Completed'],
+                            cur: ['t-crim', 'Continue'],
+                            new: ['t-ink', 'Start'],
+                            lock: ['t-ink', 'Locked'],
+                          }[state];
+                          const sub =
+                            state === 'done'
+                              ? `Completed · ${displaySub}`
+                              : state === 'cur'
+                              ? `Step ${Math.min(5, stepsDone + 1)} of 5 · ${duration} min left`
+                              : state === 'new'
+                              ? `5 steps · ~${duration} min`
+                              : `Locked · ${displaySub}`;
+                          const ctaStep = (isInProgress ? Math.min(4, stepsDone) : 0) as ModuleStep;
+
+                          return (
+                            <div key={lesson.id} className={rowIdx > 0 ? 'border-t border-[#EFE9DD] dark:border-[#2E2924]' : ''}>
+                              <button
+                                type="button"
+                                aria-expanded={state !== 'lock' ? isPreviewExpanded : undefined}
+                                onClick={(e) => {
+                                  if (state === 'lock') {
+                                    triggerLockedMessage(e);
+                                    return;
                                   }
-                                  className="p-3 sm:p-5 flex items-start sm:items-center justify-between gap-2.5 sm:gap-4 cursor-pointer select-none"
-                                >
-                                  {/* Left: Proportional Number Box + Full Mobile-Readable Title & Subtitle */}
-                                  <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
-                                    <div
-                                      className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center font-serif text-xs sm:text-base font-semibold shrink-0 mt-0.5 sm:mt-0 ${numberBadgeClass}`}
-                                    >
-                                      {String(lesson.lectureNumber).padStart(2, '0')}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                      <h3 className="text-[0.8125rem] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
-                                        {displayTitle}
-                                      </h3>
-                                      <p className="text-[0.6875rem] sm:text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 line-clamp-1">
-                                        {displaySub}
-                                      </p>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1 md:hidden text-[0.625rem] text-[#78716C] dark:text-[#A8A29E]">
-                                        <span>
-                                          {isInProgress
-                                            ? `Step ${Math.max(1, stepsDone + 1)}/5 · ${duration}m left`
-                                            : `5 steps · ${duration} min`}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Right: Desktop Steps Info + Compact Mobile Status Action (Completed / Continue / Start / Lock Icon) */}
-                                  <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 self-center">
-                                    <span className="hidden md:inline-block text-xs text-[#78716C] dark:text-[#A8A29E] whitespace-nowrap">
-                                      {isInProgress
-                                        ? `Step ${Math.max(1, stepsDone + 1)} of 5 · ${duration} min left`
-                                        : `5 steps · ${duration} min`}
-                                    </span>
-
-                                    {isCompleted ? (
-                                      <div className="flex items-center gap-1.5 sm:gap-2">
-                                        <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#DCECE2] dark:bg-emerald-950/60 text-[#1F5C3D] dark:text-emerald-300 text-xs font-medium">
-                                          <Check className="w-3.5 h-3.5" />
-                                          <span>Completed</span>
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openLecture(lesson.id, 0);
-                                          }}
-                                          className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl border border-[#2E6F4E]/40 bg-[#DCECE2]/50 dark:bg-emerald-950/40 text-[11px] sm:text-xs font-semibold text-[#1F5C3D] dark:text-emerald-300 hover:bg-[#DCECE2] transition-colors"
-                                        >
-                                          Start
-                                        </button>
-                                      </div>
-                                    ) : isInProgress ? (
-                                      <div className="flex items-center gap-1.5 sm:gap-2">
-                                        <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-[#F0ECE1] dark:bg-[#26221E] text-[#6E685F] dark:text-[#A8A29E] text-xs font-medium">
-                                          In progress
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openLecture(
-                                              lesson.id,
-                                              Math.min(4, stepsDone) as ModuleStep
-                                            );
-                                          }}
-                                          className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl border border-[#C86D63] dark:border-[#F87171] bg-white dark:bg-[#1F1C18] text-[11px] sm:text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] hover:bg-[#FAF8F4] transition-colors"
-                                        >
-                                          Continue
-                                        </button>
-                                      </div>
-                                    ) : isReadyToStart ? (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          openLecture(lesson.id, 0);
-                                        }}
-                                        className="px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-[11px] sm:text-xs font-semibold inline-flex items-center gap-1 transition-colors shadow-xs"
-                                      >
-                                        <Play className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-current" />
-                                        <span>Start</span>
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={triggerLockedMessage}
-                                        title="Locked — finish the previous lecture first"
-                                        aria-label={`Lecture ${lesson.lectureNumber} is locked. Click for details.`}
-                                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#F2EFE9] dark:bg-[#26221E] border border-[#CBD5E1] dark:border-[#334155] text-[#64748B] dark:text-[#94A3B8] hover:text-[#9E2A2B] hover:border-[#9E2A2B]/50 flex items-center justify-center transition-colors"
-                                      >
-                                        <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                      </button>
-                                    )}
-
+                                  setExpandedLessonPreviewId((prev) => (prev === lesson.id ? null : lesson.id));
+                                }}
+                                className={`w-full flex items-center gap-3 min-h-[60px] py-2.5 text-left ${state === 'lock' ? 'opacity-60' : ''}`}
+                              >
+                                <span className={`serif shrink-0 w-[34px] h-[34px] md:w-10 md:h-10 rounded-[10px] md:rounded-xl flex items-center justify-center text-[13px] md:text-[15px] ${numClass}`}>
+                                  {String(lesson.lectureNumber).padStart(2, '0')}
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="block text-sm md:text-[15px] font-bold leading-[1.3] text-[#1C1917] dark:text-[#F5F2EB]">
+                                    {displayTitle}
+                                  </span>
+                                  <span className="muted block text-xs mt-px truncate">{sub}</span>
+                                </span>
+                                <span className="hidden md:flex gap-1" aria-hidden="true">
+                                  {[0, 1, 2, 3, 4].map((i) => (
                                     <span
-                                      aria-hidden="true"
-                                      className="p-0.5 sm:p-1 text-[#78716C] dark:text-[#A8A29E]"
-                                    >
-                                      {isPreviewExpanded ? (
-                                        <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                      ) : (
-                                        <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                      )}
+                                      key={i}
+                                      className="w-[18px] h-1.5 rounded"
+                                      style={{
+                                        background:
+                                          isCompleted || doneStepSet.has(i)
+                                            ? '#2D6A4F'
+                                            : state === 'cur' && i === stepsDone
+                                            ? '#9E2A2B'
+                                            : '#E6E0D4',
+                                      }}
+                                    />
+                                  ))}
+                                </span>
+                                <span className={`tag ${tagInfo[0]} hidden md:inline-flex`}>{tagInfo[1]}</span>
+                                {state === 'lock' ? (
+                                  <Lock className="w-[18px] h-[18px] muted shrink-0" aria-label="Locked" />
+                                ) : (
+                                  <ChevronDown
+                                    className={`w-[18px] h-[18px] muted shrink-0 transition-transform ${isPreviewExpanded ? 'rotate-180' : ''}`}
+                                  />
+                                )}
+                              </button>
+
+                              {/* .lx expanded panel */}
+                              {isPreviewExpanded && state !== 'lock' && (
+                                <div className="md:ml-[62px] flex flex-col gap-3.5 pb-5 animate-fade-up">
+                                  <p className="np muted m-0 text-sm">{lesson.nepaliTitle || lesson.subtitle}</p>
+                                  <div className="steps5 !grid-cols-2 md:!grid-cols-5 !grid-flow-row !overflow-visible">
+                                    {[
+                                      { step: 0 as ModuleStep, label: '01 · Vocabulary' },
+                                      { step: 1 as ModuleStep, label: '02 · Pronunciation' },
+                                      { step: 2 as ModuleStep, label: '03 · Spelling' },
+                                      { step: 3 as ModuleStep, label: '04 · Grammar' },
+                                      { step: 4 as ModuleStep, label: '05 · Dialogue' },
+                                    ].map((st) => {
+                                      const stDone = isCompleted || doneStepSet.has(st.step);
+                                      const stCur = state === 'cur' && st.step === stepsDone;
+                                      return (
+                                        <button
+                                          key={st.step}
+                                          type="button"
+                                          onClick={() => openLecture(lesson.id, st.step)}
+                                          className={`btn btn-sm !justify-start ${
+                                            stDone
+                                              ? 'bg-[#E3EFE8] text-[#1F5C3D] dark:bg-emerald-950/40 dark:text-emerald-300'
+                                              : stCur
+                                              ? 'bg-white text-[#9E2A2B] shadow-[inset_0_0_0_2px_#9E2A2B] dark:bg-[#1F1C18] dark:text-[#FCA5A5]'
+                                              : 'bg-white text-[#1C1917] border border-[#DFD7C8] dark:bg-[#1F1C18] dark:text-[#F5F2EB] dark:border-[#3A332D] hover:border-[#9E2A2B]'
+                                          }`}
+                                        >
+                                          {stDone && <Check className="w-3.5 h-3.5" />}
+                                          {st.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="muted text-xs font-semibold inline-flex gap-1.5 items-center">
+                                      <Type className="w-3.5 h-3.5" />
+                                      Key words
                                     </span>
+                                    {lesson.moduleA_vocabulary.slice(0, 6).map((vocab) => (
+                                      <WordPhoneticsPopover
+                                        key={vocab.id}
+                                        word={vocab.word}
+                                        ipa={vocab.ipa}
+                                        partOfSpeech={vocab.partOfSpeech}
+                                        nepaliMeaning={vocab.nepaliMeaning}
+                                        silentLettersSummary={vocab.silentLettersSummary}
+                                        englishExample={vocab.englishExample}
+                                        segments={vocab.segments}
+                                        isSaved={progress.savedWordIds.includes(vocab.id)}
+                                        preferredSpeechRate={progress.preferredSpeechRate}
+                                        onToggleSave={() => handleToggleSaveWord(vocab.id)}
+                                      >
+                                        <button type="button" className="pill !min-h-[34px]">
+                                          {vocab.word} <span className="mono muted text-[11px]">{vocab.ipa}</span>
+                                        </button>
+                                      </WordPhoneticsPopover>
+                                    ))}
+                                  </div>
+                                  <div>
+                                    <button type="button" onClick={() => openLecture(lesson.id, ctaStep)} className="btn btn-p">
+                                      <Play className="w-[15px] h-[15px] fill-current" />
+                                      {state === 'done'
+                                        ? 'Review lecture'
+                                        : state === 'cur'
+                                        ? `Continue at step ${ctaStep + 1}`
+                                        : 'Start lecture'}
+                                    </button>
                                   </div>
                                 </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })}
 
-                                {/* Folded Part: Opens on Tap with Full Info, 5 Steps, Key Vocabulary & Start/Continue CTA */}
-                                {isPreviewExpanded && (
-                                  <div className="px-4 sm:px-5 pb-4 pt-3 border-t border-[#EFEAE0] dark:border-[#2E2924] bg-[#FAF8F4]/80 dark:bg-[#1A1714] space-y-3">
-                                    {/* Full Title & Details for Mobile Clarity */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                      <div className="space-y-0.5">
-                                        <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-                                          {displayTitle}
-                                        </div>
-                                        <div className="text-xs text-[#6E685F] dark:text-[#A8A29E]">
-                                          {displaySub} · 5 steps · {duration} min
-                                        </div>
-                                      </div>
+              {/* Empty state */}
+              {lessonTopicSearch.trim() &&
+                (levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 0 && (
+                  <div className="card paper text-center flex flex-col items-center gap-2 !p-10">
+                    <span className="ico i-ink">
+                      <Search className="w-[22px] h-[22px]" />
+                    </span>
+                    <strong className="text-[#1C1917] dark:text-[#F5F2EB]">No lessons match “{lessonTopicSearch}”</strong>
+                    <span className="muted text-[13px]">Try “silent”, “modals” or create an AI lesson for it.</span>
+                    <button type="button" onClick={() => setIsAIModalOpen(true)} className="btn btn-g btn-sm mt-1">
+                      <Sparkles className="w-4 h-4" />
+                      Create AI lesson
+                    </button>
+                  </div>
+                )}
 
-                                      {isUnlocked ? (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            openLecture(
-                                              lesson.id,
-                                              isInProgress
-                                                ? (Math.min(4, stepsDone) as ModuleStep)
-                                                : 0
-                                            )
-                                          }
-                                          className="px-4 py-2 rounded-xl bg-[#9E2A2B] hover:bg-[#872223] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 self-start sm:self-auto shrink-0 transition-colors"
-                                        >
-                                          <Play className="w-3.5 h-3.5 fill-current" />
-                                          <span>
-                                            {isInProgress
-                                              ? 'Continue lecture'
-                                              : isCompleted
-                                              ? 'Start again'
-                                              : 'Start lecture'}
-                                          </span>
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={triggerLockedMessage}
-                                          className="px-3.5 py-1.5 rounded-xl bg-[#FEF3C7] dark:bg-amber-950/60 border border-[#D97706]/50 text-[#B45309] dark:text-amber-300 text-xs font-medium inline-flex items-center gap-1.5 self-start sm:self-auto shrink-0"
-                                        >
-                                          <Lock className="w-3.5 h-3.5" />
-                                          <span>
-                                            Finish Lecture{' '}
-                                            {String(prevLesson?.lectureNumber || 1).padStart(2, '0')}{' '}
-                                            first to unlock
-                                          </span>
-                                        </button>
-                                      )}
-                                    </div>
-
-                                    {/* 5 Interactive Module Steps */}
-                                    <div className="space-y-1.5">
-                                      <span className="block text-[11px] font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-                                        5 interactive steps in this lecture:
-                                      </span>
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        {[
-                                          { step: 0 as ModuleStep, label: '01 · Vocabulary' },
-                                          { step: 1 as ModuleStep, label: '02 · Silent Phonics' },
-                                          { step: 2 as ModuleStep, label: '03 · Grammar & Syntax' },
-                                          { step: 3 as ModuleStep, label: '04 · Live Dialogue' },
-                                          { step: 4 as ModuleStep, label: '05 · Mastery Quiz' },
-                                        ].map((st) => {
-                                          const stepCompleted =
-                                            isCompleted ||
-                                            (progress.completedStepsByLecture?.[lesson.id] || []).includes(
-                                              st.step
-                                            );
-                                          return (
-                                            <button
-                                              key={st.step}
-                                              type="button"
-                                              onClick={() => {
-                                                if (!isUnlocked) {
-                                                  triggerLockedMessage();
-                                                  return;
-                                                }
-                                                openLecture(lesson.id, st.step);
-                                              }}
-                                              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium inline-flex items-center gap-1 transition-colors ${
-                                                stepCompleted
-                                                  ? 'bg-[#DCECE2]/60 dark:bg-emerald-950/40 border-[#2E6F4E]/40 text-[#1F5C3D] dark:text-emerald-300'
-                                                  : 'bg-white dark:bg-[#141210] border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] text-[#1C1917] dark:text-[#F5F2EB]'
-                                              }`}
-                                            >
-                                              {stepCompleted && <Check className="w-3 h-3" />}
-                                              {!isUnlocked && <Lock className="w-2.5 h-2.5 opacity-60" />}
-                                              <span>{st.label}</span>
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-
-                                    {/* Key Words Preview with Instant Phonetics Popover */}
-                                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                      <span className="text-[#78716C] mr-1">
-                                        Key Words (tap for phonetics):
-                                      </span>
-                                      {lesson.moduleA_vocabulary.slice(0, 6).map((vocab) => (
-                                        <WordPhoneticsPopover
-                                          key={vocab.id}
-                                          word={vocab.word}
-                                          ipa={vocab.ipa}
-                                          partOfSpeech={vocab.partOfSpeech}
-                                          nepaliMeaning={vocab.nepaliMeaning}
-                                          silentLettersSummary={vocab.silentLettersSummary}
-                                          englishExample={vocab.englishExample}
-                                          segments={vocab.segments}
-                                          isSaved={progress.savedWordIds.includes(vocab.id)}
-                                          preferredSpeechRate={progress.preferredSpeechRate}
-                                          onToggleSave={() => handleToggleSaveWord(vocab.id)}
-                                        >
-                                          <button
-                                            type="button"
-                                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141210] border border-[#E6E0D4] dark:border-[#2E2924] text-xs inline-flex items-center gap-1 hover:border-[#9E2A2B]"
-                                          >
-                                            <Volume2 className="w-3 h-3 text-[#9E2A2B]" />
-                                            <span className="font-bold">{vocab.word}</span>
-                                            <span className="font-nepali text-[#1F5C3D] text-[11px]">
-                                              ({vocab.nepaliMeaning})
-                                            </span>
-                                          </button>
-                                        </WordPhoneticsPopover>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    );
-                  })}
-
-                {/* Empty search state if no lessons match */}
-                {lessonTopicSearch.trim() &&
-                  (levelFilter === 'ALL' ? lessonMatchCounts.ALL : lessonMatchCounts[levelFilter]) === 0 && (
-                    <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-6 text-center space-y-2">
-                      <p className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EB]">
-                        No lessons found for “{lessonTopicSearch}”
-                      </p>
-                      <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                        Try another topic keyword or create a custom AI lesson on this topic.
-                      </p>
-                    </div>
-                  )}
-              </div>
-
-              {/* Bottom Section: Your custom lessons (Exact match to Screenshot 2) */}
-              <section className="pt-2 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#1C1917] dark:text-[#F5F2EB]">
+              {/* Your custom lessons (.g3 of .card.hov + dashed create card) */}
+              <section className="flex flex-col gap-3" aria-labelledby="ls-custom">
+                <div className="sec">
+                  <h2 id="ls-custom" className="serif h2 text-[#1C1917] dark:text-[#F5F2EB]">
                     Your custom lessons
                   </h2>
+                  <span className="muted text-[13px]">Made with AI from your own topics</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {enrichSyllabusWithEnhancements(progress.customLectures).map((customLec) => (
+                    <button
+                      key={customLec.id}
+                      type="button"
+                      onClick={() => openLecture(customLec.id, 0)}
+                      className="card hov flex flex-col gap-2.5 text-left"
+                    >
+                      <span className="flex justify-between items-center">
+                        <span className="ico sm i-ochre">
+                          <Sparkles className="w-[18px] h-[18px]" />
+                        </span>
+                        <span className="tag t-ochre">AI · {customLec.level}</span>
+                      </span>
+                      <span className="text-[15px] font-bold text-[#1C1917] dark:text-[#F5F2EB] line-clamp-2">
+                        {customLec.title}
+                      </span>
+                      <span className="muted text-[13px] line-clamp-2">
+                        {customLec.moduleA_vocabulary?.length || 0} words · {customLec.subtitle}
+                      </span>
+                    </button>
+                  ))}
                   <button
                     type="button"
                     onClick={() => setIsAIModalOpen(true)}
-                    className="text-xs font-medium text-[#9E2A2B] dark:text-[#F87171] hover:underline"
+                    className="card hov !bg-transparent !border-2 !border-dashed !border-[#DFD7C8] dark:!border-[#3A332D] flex flex-col items-center justify-center gap-2 min-h-[140px] text-[#9E2A2B] dark:text-[#F87171] font-bold"
                   >
-                    + Make a lesson
+                    <Plus className="w-[22px] h-[22px]" />
+                    Create AI lesson
+                    <span className="muted font-medium text-xs">Any topic, your level</span>
                   </button>
                 </div>
-
-                {progress.customLectures.length === 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
-                    <div className="rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] p-5 text-sm text-[#78716C] dark:text-[#A8A29E] flex items-center">
-                      AI-created lessons appear here and are saved for offline study.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAIModalOpen(true)}
-                      className="min-h-[7rem] rounded-2xl border-2 border-dashed border-[#DFD7C8] dark:border-[#3A332D] bg-transparent flex flex-col items-center justify-center gap-1.5 text-[#9E2A2B] dark:text-[#F87171] font-bold hover:border-[#9E2A2B] hover:bg-white/60 dark:hover:bg-[#1A1714] transition-colors"
-                    >
-                      <Sparkles className="w-5 h-5" />
-                      <span>Create AI lesson</span>
-                      <span className="text-xs font-medium text-[#6E685F] dark:text-[#A8A29E]">Any topic, your level</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {enrichSyllabusWithEnhancements(progress.customLectures).map((customLec) => (
-                      <div
-                        key={customLec.id}
-                        onClick={() => openLecture(customLec.id, 0)}
-                        className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-[#1A1714] border border-[#E6E0D4] dark:border-[#2E2924] hover:border-[#9E2A2B] flex items-center justify-between gap-3 sm:gap-4 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-start sm:items-center gap-2.5 sm:gap-4 min-w-0 flex-1">
-                          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-[#F8E7E3] text-[#9E2A2B] flex items-center justify-center font-serif font-semibold text-xs sm:text-sm shrink-0">
-                            AI
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-[13px] sm:text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-snug line-clamp-2 sm:line-clamp-1">
-                              {customLec.title}
-                            </h3>
-                            <p className="text-[11px] sm:text-xs text-[#78716C] dark:text-[#A8A29E] line-clamp-1">
-                              {customLec.subtitle}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-[#9E2A2B] text-white text-[11px] sm:text-xs font-medium shrink-0"
-                        >
-                          Open
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                {progress.customLectures.length === 0 && (
+                  <p className="muted text-xs m-0">AI-created lessons appear here and are saved for offline study.</p>
                 )}
               </section>
             </div>
