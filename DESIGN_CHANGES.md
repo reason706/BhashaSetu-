@@ -306,3 +306,39 @@ The controls are unchanged (dropdowns, switches, sliders).
 | `.ls-tabs` mode tabs with icons | Pill segmented buttons | Underline tabs (Lexicon cards, Vocab table, SRS flashcards, Match game, Audio dictation, Speed quiz, Mistakes) with count badges |
 | `.dc-chip` quick filters | Solid crimson active pill | Tinted crimson active chip |
 | `.dc-list` / `.dc-w` word cards: serif 28px headword with `.sil`, mono IPA, Nepali, level + status tags, round play/save buttons, dashed `.dc-more` panel (rule tag, example with play, 0.65×, AI explain) | Tall cards with everything always visible | Artifact cards (auto-fill 300px; one bordered list on phones). Tap a word to expand. The phonetics pop-up stays on the headword. Lecture link, meaning reveal (English-only mode), mastered toggle and AI explanation are all kept. |
+
+## Session 7: Welcome / About / Pop-ups
+
+**Artifacts read:**
+- `project/About.dc.html`: lines 620–708
+- `project/Popups.dc.html`: lines 560–770 (all markup plus the script)
+- `project/Welcome.dc.html`: lines 560–693, read in pass 1
+
+| Artifact | Before | Change |
+|---|---|---|
+| Welcome flow | (built from the artifact in pass 1) | Unchanged |
+| About `.ls-head` "About guide" + tag | Title inside a white card | Artifact head |
+| About `.hero` with faded illustration, eyebrow, serif statement | Plain white intro card | `.hero` with illustration underlay (50% opacity), Nepali eyebrow, serif heading, `btn-p` Explore lectures and `btn-g` language-mode buttons (same handlers) |
+| About lecture steps: `.card` with toned `.ico` | Small bordered icon squares | `.card` with crimson / sage / ochre / ink `.ico` tiles and mono step numbers. The silent-letter rules matrix (an app feature not in the artifact) is kept and its containers moved onto `.card`. |
+| `.pp-sheet` + `.pp-grab` (bottom sheet on phones, centred 26px dialog from sm, slide-up) | Mixed cream panels | Added to the design system and used by the AI lesson, AI roleplay and daily-challenge pop-ups. Daily challenge is now a bottom sheet on phones. |
+| Level-up: dark gradient sheet, gold Continue, translucent stats and share | Cream gradient card | Dark `160deg #29231F → #45352E → #6F483B` sheet, white type, translucent stat panel, gold Continue, translucent Share. Confetti, chime and the share-bonus logic are unchanged. |
+
+**Not ported:** the artifact's "Moments & pop-ups" demo index and its
+offline-states demo sheet are design-review pages, not app screens. The app's
+existing offline handling is unchanged.
+
+---
+
+## Overall status
+
+All pages in the requested order are ported: shared design system, Home,
+Lessons, lecture player, Practice arena and tools, Progress / Achievements /
+Settings, Dictionary, Welcome / About / Pop-ups.
+
+**Checks after every page:**
+- `npm run lint` (`tsc --noEmit`) and `vite build` pass
+- Playwright screenshots at 1440×900 and 390×844
+- A script confirms no horizontal overflow on phones for Home, Lessons,
+  Dictionary, Arena, Progress and Settings
+
+**Untouched:** the sidebar and the mobile bottom bar.

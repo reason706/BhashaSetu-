@@ -492,6 +492,20 @@
     .pg-mini small { font-size: 9px; white-space: normal; line-height: 1.2; }
   }
 
+  /* ---- pop-up sheet (artifact .pp-sheet): bottom sheet on phones, centred dialog from sm ---- */
+  .pp-sheet {
+    position: relative; width: 100%; box-sizing: border-box; background: #fff; color: #1C1917;
+    border-radius: 26px 26px 0 0; padding: 12px 18px 24px; max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 30px 60px -24px rgba(28, 25, 23, .5); animation: ppUp .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .pp-grab { display: block; width: 40px; height: 5px; border-radius: 5px; background: #DFD7C8; margin: 0 auto 10px; }
+  .dark .pp-sheet { background: #1A1714; color: #F5F2EB; }
+  .dark .pp-grab { background: #3A332D; }
+  @media (min-width: 640px) {
+    .pp-sheet { border-radius: 26px; padding: 24px 26px 26px; }
+    .pp-grab { display: none; }
+  }
+
   /* ---- page-load stagger for direct children of a .main page ---- */
   .main > * { animation: fadeSlideUpPage .45s cubic-bezier(.22,1,.36,1) backwards; }
   .main > *:nth-child(2) { animation-delay: .04s; }
@@ -521,6 +535,8 @@
 @keyframes pgSpin { from { transform: rotate(-25deg); } to { transform: rotate(335deg); } }
 @keyframes pgSpin2 { from { transform: rotate(35deg); } to { transform: rotate(-325deg); } }
 @keyframes pgTw { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+
+@keyframes ppUp { from { transform: translateY(40px); opacity: 0; } }
 
 @keyframes fadeSlideUpPage {
   from { opacity: 0; transform: translateY(8px); }

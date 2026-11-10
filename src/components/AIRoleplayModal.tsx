@@ -284,7 +284,8 @@ export const AIRoleplayModal: React.FC<AIRoleplayModalProps> = ({
       onMouseDown={backdropDismiss(onClose)}
       className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center ${MODAL_BACKDROP_CLASS} p-0 sm:p-4 animate-fade-up`}
     >
-      <div className="w-full max-w-3xl bg-[#FAF8F4] dark:bg-[#181512] border border-[#E6E0D4] dark:border-[#2E2924] rounded-t-3xl sm:rounded-2xl shadow-xl flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="pp-sheet !p-0 max-w-3xl flex flex-col !max-h-[92vh] !overflow-hidden">
+        <span className="pp-grab !mt-3 !mb-1" aria-hidden="true" />
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-[#E6E0D4] dark:border-[#2E2924] flex items-center justify-between gap-4 bg-white dark:bg-[#141210]">
           <div className="flex items-center gap-3">

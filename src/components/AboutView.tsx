@@ -158,49 +158,57 @@ export const AboutView: React.FC<AboutViewProps> = ({
       : SILENT_LETTER_MATRIX.filter((item) => item.cluster === activeClusterFilter);
 
   return (
-    <div className="w-full max-w-[82rem] mx-auto px-[0.625rem] sm:px-[1rem] lg:px-[1.5rem] py-[0.875rem] sm:py-[1.25rem] pb-24 space-y-6">
-      {/* Editorial Hero Header */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 sm:p-8">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-3xl">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
-              <Compass className="w-4 h-4" />
-              <span>About BhashaSetu · Linguistic Methodology & Reference</span>
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-semibold text-[#1C1917] dark:text-[#F5F2EB] leading-tight">
-              The Spiral 4-Pillar Bridge Methodology
-            </h1>
-            <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-              Devanagari (Nepali) is phonetically transparent—every written letter is pronounced, and sentences follow a Subject–Object–Verb (SOV) order. English is etymological—preserving silent letters from Old English, Latin, Greek, and French while using Subject–Verb–Object (SVO) syntax. BhashaSetu bridges these two linguistic systems step by step.
+    <div className="main w-full max-w-[1240px] mx-auto px-4 lg:px-10 pt-4 md:pt-7 pb-28 flex flex-col gap-5 md:gap-6">
+      {/* .ls-head */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="serif m-0 text-[28px] md:text-[34px] leading-[1.1] text-[#1C1917] dark:text-[#F5F2EB]">About guide</h1>
+        <span className="tag t-ink !text-xs !px-3 !py-1.5">Offline-ready PWA</span>
+      </div>
+
+      {/* .hero with illustration underlay */}
+      <section className="hero flex flex-col gap-2.5" aria-labelledby="about-hero-title">
+        <div className="art opacity-50" aria-hidden="true">
+          <svg viewBox="0 0 320 300" width="100%" height="100%" style={{ display: 'block', overflow: 'visible' }}>
+            <circle cx="160" cy="150" r="140" fill="#D7C6AE" fillOpacity="0.55" />
+            <circle cx="160" cy="150" r="140" fill="none" stroke="#CBB89D" strokeOpacity="0.6" />
+            <g transform="translate(50 68) rotate(-6 110 82)">
+              <rect x="18" y="20" width="86" height="122" rx="6" fill="#FAF7F0" stroke="#E2DACB" strokeWidth="1.5" />
+              <rect x="112" y="20" width="86" height="122" rx="6" fill="#FAF7F0" stroke="#E2DACB" strokeWidth="1.5" />
+              <rect x="103" y="18" width="10" height="126" rx="4" fill="#9E2A2B" />
+              <text x="62" y="114" textAnchor="middle" fill="#9E2A2B" fontSize="36" fontWeight="600" fontFamily="Noto Sans Devanagari, serif">अ</text>
+              <text x="155" y="114" textAnchor="middle" fill="#2D6A4F" fontSize="38" fontWeight="600" fontFamily="Fraunces, Georgia, serif">A</text>
+            </g>
+          </svg>
+        </div>
+        <div className="body flex flex-col gap-2.5">
+          <span className="eyebrow">
+            <span className="np normal-case tracking-normal">भाषासेतु</span> · The Spiral 4-pillar bridge methodology
+          </span>
+          <h2 id="about-hero-title" className="serif m-0 text-[22px] md:text-[28px] leading-[1.2] text-[#1C1917] dark:text-[#F5F2EB]">
+            Bridging Devanagari habits and English spelling, sound and word order.
+          </h2>
+          <p className="m-0 text-[15px] leading-[1.6] text-[#57534E] dark:text-[#A8A29E]">
+            Devanagari (Nepali) is phonetically transparent—every written letter is pronounced, and sentences follow a
+            Subject–Object–Verb (SOV) order. English is etymological—preserving silent letters from Old English, Latin,
+            Greek and French while using Subject–Verb–Object (SVO) syntax. BhashaSetu bridges these two systems step by step.
+          </p>
+          {isFullNepali && (
+            <p className="np m-0 text-sm text-[#57534E] dark:text-[#A8A29E]">
+              नेपाली (देवनागरी) मा जे लेखिन्छ त्यही बोलिन्छ र क्रिया वाक्यको अन्त्यमा आउँछ। अङ्ग्रेजीमा भने ऐतिहासिक मौन अक्षरहरू (Silent Letters) र कर्ता–क्रिया–कर्म (SVO) संरचना हुन्छ। भाषासेतुले यी दुई भाषाबीच वैज्ञानिक पुल निर्माण गर्छ।
             </p>
-            {isFullNepali && (
-              <p className="font-nepali text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E]">
-                नेपाली (देवनागरी) मा जे लेखिन्छ त्यही बोलिन्छ र क्रिया वाक्यको अन्त्यमा आउँछ। अङ्ग्रेजीमा भने ऐतिहासिक मौन अक्षरहरू (Silent Letters) र कर्ता–क्रिया–कर्म (SVO) संरचना हुन्छ। भाषासेतुले यी दुई भाषाबीच वैज्ञानिक पुल निर्माण गर्छ।
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={onOpenSettings}
-              className="min-h-[44px] px-4 py-2.5 rounded-xl border border-[#E7E0D6] dark:border-[#2E2924] bg-[#FAF7F2] dark:bg-[#141210] text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EB] hover:border-[#9E2A2B] inline-flex items-center gap-2"
-            >
-              <Globe className="w-4 h-4 text-[#9E2A2B]" />
-              <span>
-                {languageMode === 'english-only'
-                  ? 'Mode: English Only'
-                  : languageMode === 'english-meanings'
-                  ? 'Mode: English + Meanings'
-                  : 'Mode: Full Nepali'}
-              </span>
-            </button>
-
-            <button
-              onClick={onStartCurriculum}
-              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#9E2A2B] text-white text-xs sm:text-sm font-semibold hover:bg-[#872223] transition-colors inline-flex items-center gap-2"
-            >
-              <span>Explore Lectures (01–12)</span>
+          )}
+          <div className="flex flex-wrap items-center gap-2.5 mt-1">
+            <button onClick={onStartCurriculum} className="btn btn-p">
+              Explore lectures (01–12)
               <ArrowRight className="w-4 h-4" />
+            </button>
+            <button onClick={onOpenSettings} className="btn btn-g !bg-white/75 dark:!bg-[#1F1C18]/80">
+              <Globe className="w-4 h-4" />
+              {languageMode === 'english-only'
+                ? 'Mode: English only'
+                : languageMode === 'english-meanings'
+                ? 'Mode: English + meanings'
+                : 'Mode: Full Nepali'}
             </button>
           </div>
         </div>
@@ -209,8 +217,8 @@ export const AboutView: React.FC<AboutViewProps> = ({
       {/* The 5 Connected Modules Inside Every Lecture */}
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
-            How Every Lecture Works (The Spiral Learning Loop)
+          <h2 className="serif h2 text-[#1C1917] dark:text-[#F5F2EB]">
+            How every lecture works
           </h2>
           <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-0.5">
             Instead of memorizing isolated word lists, you encounter the same target words across five connected modules so recognition, pronunciation, spelling, syntax, and conversation reinforce one another:
@@ -254,16 +262,14 @@ export const AboutView: React.FC<AboutViewProps> = ({
             return (
               <div
                 key={pillar.step}
-                className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-5 flex flex-col justify-between space-y-3"
+                className="card !p-[18px] flex flex-col justify-between space-y-3"
               >
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-ipa text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
-                      {pillar.step}
+                    <span className={`ico ${['i-crim', 'i-sage', 'i-ochre', 'i-ink', 'i-crim'][Number(pillar.step.slice(-1)) - 1] || 'i-crim'}`}>
+                      <Icon className="w-5 h-5" />
                     </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#FAF7F2] dark:bg-[#141210] border border-[#E7E0D6] dark:border-[#2E2924] flex items-center justify-center text-[#9E2A2B]">
-                      <Icon className="w-4 h-4" />
-                    </div>
+                    <span className="mono muted text-xs font-semibold">{pillar.step}</span>
                   </div>
                   <h3 className="text-base font-semibold text-[#1C1917] dark:text-[#F5F2EB]">
                     {pillar.title}
@@ -279,7 +285,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
       </section>
 
       {/* Sequential CEFR Curriculum Architecture (B1 -> B2 -> C1) */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-4">
+      <section className="card p-6 space-y-4">
         <div>
           <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">
             Sequential CEFR Track Architecture
@@ -344,7 +350,7 @@ export const AboutView: React.FC<AboutViewProps> = ({
       </section>
 
       {/* Interactive A-Z Silent-Letter Reference Matrix */}
-      <section className="bg-white dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl p-6 space-y-5">
+      <section className="card p-6 space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#E7E0D6] dark:border-[#2E2924] pb-4">
           <div>
             <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171]">

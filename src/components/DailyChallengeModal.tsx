@@ -344,12 +344,13 @@ export const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
   return (
     <div
       onMouseDown={backdropDismiss(onClose)}
-      className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS} flex items-center justify-center p-4 overflow-y-auto animate-fade-up`}
+      className={`fixed inset-0 z-50 ${MODAL_BACKDROP_CLASS} flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-up`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="daily-challenge-title"
     >
-      <div className="bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-2xl max-w-2xl w-full p-5 sm:p-7 shadow-2xl space-y-5 my-auto">
+      <div className="pp-sheet max-w-2xl sm:!p-7 space-y-5">
+        <span className="pp-grab" aria-hidden="true" />
         {/* Top Modal Header */}
         <div className="flex items-start justify-between gap-3 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>

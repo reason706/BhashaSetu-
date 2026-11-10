@@ -111,7 +111,8 @@ export const AILessonModal: React.FC<AILessonModalProps> = ({
       onMouseDown={backdropDismiss(requestClose)}
       className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center ${MODAL_BACKDROP_CLASS} p-0 sm:p-4 animate-fade-up`}
     >
-      <div className="w-full max-w-xl bg-[#FAF7F2] dark:bg-[#1F1C18] border border-[#E7E0D6] dark:border-[#2E2924] rounded-t-3xl sm:rounded-2xl p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="pp-sheet max-w-xl">
+        <span className="pp-grab" aria-hidden="true" />
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#E7E0D6] dark:border-[#2E2924]">
           <div>
             <div className="text-xs font-semibold text-[#9E2A2B] dark:text-[#F87171] mb-0.5">
